@@ -123,16 +123,6 @@ export default function Matches() {
       <div className="mx-auto w-full max-w-2xl px-5 pt-6">
         {!liveLoading && !liveError && myLiveMatches.length > 0 && (
           <section className="mb-9">
-            <div className="mb-4 flex items-center gap-2">
-              <span className="relative flex h-2.5 w-2.5">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
-              </span>
-              <h2 className="text-lg font-black text-[#111318]">
-                Live match data
-              </h2>
-            </div>
-
             <div className="flex flex-col gap-4">
               {myLiveMatches.map((match) => {
                 const isHomeFollowed = selectedIds.includes(match.homeClubId);
@@ -147,7 +137,7 @@ export default function Matches() {
                 return (
                   <article
                     key={match.id}
-                    className="relative overflow-hidden rounded-[26px] border border-emerald-200/70 bg-white shadow-[0_6px_24px_rgba(16,185,129,0.08)]"
+                    className="relative overflow-hidden rounded-[26px] border border-black/[0.045] bg-white shadow-[0_6px_24px_rgba(0,0,0,0.045)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_34px_rgba(0,0,0,0.08)]"
                   >
                     <div
                       className="h-1.5 w-full"
@@ -157,12 +147,7 @@ export default function Matches() {
                     />
 
                     <div className="p-5">
-                      <div className="mb-5 flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-600">
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                          Live data
-                        </div>
-
+                      <div className="mb-5 flex items-center justify-end gap-3">
                         <div className="shrink-0 rounded-full bg-[#F2F4F7] px-3 py-1.5 text-[11px] font-bold text-zinc-500">
                           {match.competition}
                         </div>
