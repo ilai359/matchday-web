@@ -6,6 +6,7 @@ import { matches } from "../../../data/matches";
 import { useClubs } from "../../../context/ClubsContext";
 import { getClub, getClubName } from "../../../lib/clubHelpers";
 import { formatFullDate, formatTime } from "../../../lib/dateHelpers";
+import { formatCompetition } from "../../../lib/competitionNames";
 import { fetchLiveMatches, LiveMatch } from "../../../lib/footballApi";
 import ClubBadge from "../../../components/ClubBadge";
 
@@ -31,7 +32,7 @@ function buildFromMock(mockMatch: (typeof matches)[number]): DisplayMatch {
   const awayClub = getClub(mockMatch.awayClubId);
   return {
     id: mockMatch.id,
-    competition: mockMatch.competition,
+    competition: formatCompetition(mockMatch.competition),
     homeName: getClubName(mockMatch.homeClubId),
     awayName: getClubName(mockMatch.awayClubId),
     homeCrest: homeClub?.crest,
@@ -52,7 +53,7 @@ function buildFromLive(liveMatch: LiveMatch): DisplayMatch {
   const awayClub = getClub(liveMatch.awayClubId);
   return {
     id: liveMatch.id,
-    competition: liveMatch.competition,
+    competition: formatCompetition(liveMatch.competition),
     homeName: homeClub?.name ?? liveMatch.homeTeamName,
     awayName: awayClub?.name ?? liveMatch.awayTeamName,
     homeCrest: homeClub?.crest ?? liveMatch.homeCrest ?? undefined,

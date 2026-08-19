@@ -6,6 +6,7 @@ import { matches } from "../../data/matches";
 import { useClubs } from "../../context/ClubsContext";
 import { getClub, getClubName } from "../../lib/clubHelpers";
 import { formatDate, formatTime } from "../../lib/dateHelpers";
+import { formatCompetition } from "../../lib/competitionNames";
 import { fetchLiveMatches, LiveMatch } from "../../lib/footballApi";
 import ClubBadge from "../../components/ClubBadge";
 export default function Matches() {
@@ -128,7 +129,7 @@ export default function Matches() {
                     <div className="p-5">
                       <div className="mb-5 flex items-center justify-end gap-3">
                         <div className="shrink-0 rounded-full bg-[#F2F4F7] px-3 py-1.5 text-[11px] font-bold text-zinc-500">
-                          {match.competition}
+                          {formatCompetition(match.competition)}
                         </div>
                       </div>
                       <div className="grid grid-cols-[1fr_72px_1fr] items-center gap-3">
@@ -328,7 +329,7 @@ export default function Matches() {
                             </div>
                           )}
                           <div className="truncate text-[10px] font-black uppercase tracking-[0.15em] text-zinc-400">
-                            {match.competition}
+                            {formatCompetition(match.competition)}
                           </div>
                         </div>
                         <div className="shrink-0 rounded-full bg-[#F2F4F7] px-3 py-1.5 text-[11px] font-bold text-zinc-500">

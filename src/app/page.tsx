@@ -6,6 +6,7 @@ import { updates } from "../data/updates";
 import { useClubs } from "../context/ClubsContext";
 import { getClub, displayName } from "../lib/clubHelpers";
 import { formatDate, formatFullDate, formatTime } from "../lib/dateHelpers";
+import { formatCompetition } from "../lib/competitionNames";
 import { categoryStyles } from "../lib/categoryStyles";
 import { fetchLiveMatches, LiveMatch } from "../lib/footballApi";
 import ClubBadge from "../components/ClubBadge";
@@ -47,6 +48,8 @@ export default function Home() {
           awayClubId: m.awayClubId,
           homeTeamName: m.homeTeamName,
           awayTeamName: m.awayTeamName,
+          homeCrest: m.homeCrest,
+          awayCrest: m.awayCrest,
           kickoff: m.kickoff,
           venue: m.venue,
         }))
@@ -57,6 +60,8 @@ export default function Home() {
           awayClubId: m.awayClubId,
           homeTeamName: getClub(m.homeClubId)?.name ?? m.homeClubId,
           awayTeamName: getClub(m.awayClubId)?.name ?? m.awayClubId,
+          homeCrest: getClub(m.homeClubId)?.crest,
+          awayCrest: getClub(m.awayClubId)?.crest,
           kickoff: m.kickoff,
           venue: m.venue,
         }));
@@ -182,18 +187,13 @@ export default function Home() {
         )}
         {nextMatch && (
           <section className="mb-9">
-            <div className="mb-3 flex items-end justify-between px-1">
-              <div>
-                <div className="text-[10px] font-black uppercase tracking-[0.22em] text-zinc-400">
-                  Next match
-                </div>
-                <h2 className="mt-1 text-xl font-black tracking-tight text-[#111318]">
-                  Coming up
-                </h2>
+            <div className="mb-3 px-1">
+              <div className="text-[10px] font-black uppercase tracking-[0.22em] text-zinc-400">
+                Next match
               </div>
-              <div className="rounded-full bg-white px-3 py-1.5 text-[11px] font-bold text-zinc-500 shadow-sm">
-                {nextMatch.competition}
-              </div>
+              <h2 className="mt-1 text-xl font-black tracking-tight text-[#111318]">
+                Coming up
+              </h2>
             </div>
             <div
               className="relative overflow-hidden rounded-[30px] text-white shadow-[0_20px_50px_-20px_rgba(0,0,0,0.45)]"
@@ -209,7 +209,7 @@ export default function Home() {
                 <div className="mb-7 flex items-center justify-between gap-3">
                   <div className="min-w-0 rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-white/80 backdrop-blur-xl">
                     <span className="block truncate">
-                      {nextMatch.competition}
+                      {formatCompetition(nextMatch.competition)}
                     </span>
                   </div>
                   <span className="shrink-0 text-xs font-semibold text-white/65">
@@ -221,7 +221,7 @@ export default function Home() {
                     <div className="mb-3">
                       <ClubBadge
                         name={nextMatch.homeTeamName}
-                        crest={homeClub?.crest}
+                        crest={homeClub?.crest ?? nextMatch.homeCrest ?? undefined}
                         color={homeColor}
                         size={56}
                       />
@@ -245,7 +245,7 @@ export default function Home() {
                     <div className="mb-3">
                       <ClubBadge
                         name={nextMatch.awayTeamName}
-                        crest={awayClub?.crest}
+                        crest={awayClub?.crest ?? nextMatch.awayCrest ?? undefined}
                         color={awayColor}
                         size={56}
                       />
@@ -313,7 +313,7 @@ export default function Home() {
                       <div className="min-w-0 flex-1">
                         <div className="mb-2 flex items-center gap-2">
                           <span className="truncate text-[10px] font-black uppercase tracking-[0.16em] text-zinc-400">
-                            {match.competition}
+                            {formatCompetition(match.competition)}
                           </span>
                         </div>
                         <div className="flex flex-wrap items-center gap-2 text-[15px] leading-snug">
