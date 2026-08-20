@@ -9,7 +9,7 @@ export default function Clubs() {
   const [query, setQuery] = useState("");
   const { selectedIds, toggleClub } = useClubs();
 
-  const clubRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const clubRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const clickedClub = useRef<{
     id: string;
@@ -76,6 +76,7 @@ export default function Clubs() {
       className="min-h-screen overflow-x-hidden bg-[#F5F6F8] pb-24"
       style={{ overflowAnchor: "none" }}
     >
+      {/* HEADER */}
       <header className="relative overflow-hidden bg-[#080B13] text-white">
         <div className="pointer-events-none absolute inset-0">
           <div className="absolute -left-24 -top-28 h-72 w-72 rounded-full bg-blue-600/25 blur-[90px]" />
@@ -118,7 +119,9 @@ export default function Clubs() {
         </div>
       </header>
 
+      {/* CONTENT */}
       <div className="mx-auto w-full max-w-2xl px-5 pt-6">
+        {/* FOLLOWING */}
         {followedClubs.length > 0 && (
           <section className="mb-9">
             <div className="mb-4 flex items-end justify-between">
@@ -172,11 +175,18 @@ export default function Clubs() {
                       </div>
 
                       <button
+                        type="button"
                         onClick={() => handleFollowingToggle(club.id)}
                         className="group shrink-0 rounded-xl bg-emerald-50 px-3 py-2 text-[11px] font-black text-emerald-700 transition-all hover:bg-red-50 hover:text-red-600 active:scale-95"
+                        aria-label={`Unfollow ${club.name}`}
                       >
-                        <span className="group-hover:hidden">✓ Following</span>
-                        <span className="hidden group-hover:inline">Unfollow</span>
+                        <span className="group-hover:hidden">
+                          ✓ Following
+                        </span>
+
+                        <span className="hidden group-hover:inline">
+                          Unfollow
+                        </span>
                       </button>
                     </div>
                   </article>
@@ -186,10 +196,13 @@ export default function Clubs() {
           </section>
         )}
 
+        {/* ADD ANOTHER CLUB */}
         <section>
           <div className="mb-4">
             <h2 className="text-[22px] font-black tracking-tight text-[#111318]">
-              {followedClubs.length > 0 ? "Add another club" : "Choose your clubs"}
+              {followedClubs.length > 0
+                ? "Add another club"
+                : "Choose your clubs"}
             </h2>
 
             <p className="mt-0.5 text-xs font-medium text-zinc-400">
@@ -197,6 +210,7 @@ export default function Clubs() {
             </p>
           </div>
 
+          {/* SEARCH */}
           <div className="relative mb-5">
             <div className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400">
               🔎
@@ -212,6 +226,7 @@ export default function Clubs() {
 
             {query.length > 0 && (
               <button
+                type="button"
                 onClick={() => setQuery("")}
                 className="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-[#F1F3F7] text-sm font-bold text-zinc-400 transition hover:bg-zinc-200"
                 aria-label="Clear search"
@@ -221,19 +236,26 @@ export default function Clubs() {
             )}
           </div>
 
+          {/* SEARCH RESULT COUNT */}
           {query.trim() && filteredClubs.length > 0 && (
             <div className="mb-3 px-1 text-[11px] font-bold text-zinc-400">
-              {filteredClubs.length} {filteredClubs.length === 1 ? "club found" : "clubs found"}
+              {filteredClubs.length}{" "}
+              {filteredClubs.length === 1
+                ? "club found"
+                : "clubs found"}
             </div>
           )}
 
+          {/* EMPTY SEARCH */}
           {filteredClubs.length === 0 && (
             <div className="rounded-[28px] border border-black/[0.04] bg-white px-6 py-10 text-center shadow-sm">
               <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#F1F3F7] text-2xl">
                 🔎
               </div>
 
-              <h3 className="mb-2 text-lg font-black text-[#111318]">No clubs found</h3>
+              <h3 className="mb-2 text-lg font-black text-[#111318]">
+                No clubs found
+              </h3>
 
               <p className="mx-auto max-w-xs text-sm leading-6 text-zinc-500">
                 We couldn&apos;t find a club matching
@@ -251,6 +273,7 @@ export default function Clubs() {
               </p>
 
               <button
+                type="button"
                 onClick={() => setQuery("")}
                 className="mt-5 rounded-xl bg-[#111318] px-5 py-2.5 text-xs font-black text-white transition active:scale-95"
               >
@@ -259,29 +282,41 @@ export default function Clubs() {
             </div>
           )}
 
+          {/* CLUB LIST */}
           <div className="flex flex-col gap-3">
             {filteredClubs.map((club) => {
               const isSelected = selectedIds.includes(club.id);
               const clubColor = club.primaryColor ?? "#111827";
 
               return (
-                <button
+                <div
                   key={club.id}
                   ref={(element) => {
                     clubRefs.current[club.id] = element;
                   }}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => handleListToggle(club.id)}
-                  className={`group relative w-full overflow-hidden rounded-[24px] border p-4 text-left shadow-[0_5px_20px_rgba(0,0,0,0.035)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_30px_rgba(0,0,0,0.07)] active:scale-[0.995] ${
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      handleListToggle(club.id);
+                    }
+                  }}
+                  className={`group relative w-full cursor-pointer overflow-hidden rounded-[24px] border p-4 text-left shadow-[0_5px_20px_rgba(0,0,0,0.035)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_30px_rgba(0,0,0,0.07)] active:scale-[0.995] ${
                     isSelected
                       ? "border-transparent text-white"
                       : "border-black/[0.045] bg-white text-[#111318]"
                   }`}
                   style={
                     isSelected
-                      ? { background: `linear-gradient(135deg, ${clubColor}, #111827 85%)` }
+                      ? {
+                          background: `linear-gradient(135deg, ${clubColor}, #111827 85%)`,
+                        }
                       : undefined
                   }
                 >
+                  {/* COLOR STRIPE */}
                   {!isSelected && (
                     <div
                       className="absolute bottom-0 left-0 top-0 w-1"
@@ -289,6 +324,7 @@ export default function Clubs() {
                     />
                   )}
 
+                  {/* SELECTED GLOWS */}
                   {isSelected && (
                     <>
                       <div className="pointer-events-none absolute -right-14 -top-16 h-40 w-40 rounded-full bg-white/15 blur-[45px]" />
@@ -297,38 +333,76 @@ export default function Clubs() {
                   )}
 
                   <div className="relative z-10 flex items-center gap-4">
-                    <ClubBadge
-                      name={club.name}
-                      crest={club.crest}
-                      color={club.primaryColor}
-                      size={48}
-                    />
+                    {/* CLUB LOGO - NOT CLICKABLE */}
+                    <div
+                      className="shrink-0 cursor-default"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                      }}
+                    >
+                      <ClubBadge
+                        name={club.name}
+                        crest={club.crest}
+                        color={club.primaryColor}
+                        size={48}
+                      />
+                    </div>
 
+                    {/* CLUB DETAILS */}
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-[15px] font-black">{club.name}</div>
+                      <div className="truncate text-[15px] font-black">
+                        {club.name}
+                      </div>
 
                       <div
                         className={`mt-1 flex min-w-0 items-center gap-1.5 text-xs ${
-                          isSelected ? "text-white/55" : "text-zinc-400"
+                          isSelected
+                            ? "text-white/55"
+                            : "text-zinc-400"
                         }`}
                       >
-                        <span className="truncate">{club.country}</span>
-                        <span className={isSelected ? "text-white/25" : "text-zinc-300"}>·</span>
-                        <span className="truncate">{club.league}</span>
+                        <span className="truncate">
+                          {club.country}
+                        </span>
+
+                        <span
+                          className={
+                            isSelected
+                              ? "text-white/25"
+                              : "text-zinc-300"
+                          }
+                        >
+                          ·
+                        </span>
+
+                        <span className="truncate">
+                          {club.league}
+                        </span>
                       </div>
                     </div>
 
-                    <div
-                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-lg font-black transition-transform group-hover:scale-105 ${
+                    {/* ADD / REMOVE BUTTON */}
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        handleListToggle(club.id);
+                      }}
+                      aria-label={
                         isSelected
-                          ? "border border-white/10 bg-white/15 text-white"
-                          : "bg-[#F1F3F7] text-zinc-600"
+                          ? `Unfollow ${club.name}`
+                          : `Follow ${club.name}`
+                      }
+                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-lg font-black transition-all hover:scale-105 active:scale-90 ${
+                        isSelected
+                          ? "border border-white/10 bg-white/15 text-white hover:bg-white/25"
+                          : "bg-[#F1F3F7] text-zinc-600 hover:bg-[#E4E7EC]"
                       }`}
                     >
                       {isSelected ? "✓" : "+"}
-                    </div>
+                    </button>
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>
