@@ -1,25 +1,28 @@
 "use client";
+
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { matches } from "../data/matches";
-import { updates } from "../data/updates";
 import { useClubs } from "../context/ClubsContext";
 import { getClub, displayName } from "../lib/clubHelpers";
-import { formatDate, formatFullDate, formatTime } from "../lib/dateHelpers";
+import { formatDate, formatTime } from "../lib/dateHelpers";
 import { formatCompetition } from "../lib/competitionNames";
-import { categoryStyles } from "../lib/categoryStyles";
 import { fetchLiveMatches, LiveMatch } from "../lib/footballApi";
 import ClubBadge from "../components/ClubBadge";
+import YourClubs from "../components/YourClubs";
+
 export default function Home() {
   const { selectedIds } = useClubs();
   const [liveMatches, setLiveMatches] = useState<LiveMatch[]>([]);
   const [liveLoading, setLiveLoading] = useState(true);
+
   useEffect(() => {
     fetchLiveMatches()
       .then(setLiveMatches)
       .catch(() => {})
       .finally(() => setLiveLoading(false));
   }, []);
+
   const myLiveMatches = liveMatches
     .filter(
       (m) => selectedIds.includes(m.homeClubId) || selectedIds.includes(m.awayClubId)
@@ -70,13 +73,7 @@ export default function Home() {
   );
   const nextMatch = futureMatches[0];
   const upcomingMatches = futureMatches.slice(1, 5);
-  const myUpdates = updates
-    .filter((update) => selectedIds.includes(update.clubId))
-    .sort(
-      (a, b) =>
-        new Date(b.publishedAt).getTime() -
-        new Date(a.publishedAt).getTime()
-    );
+
   if (selectedIds.length === 0) {
     return (
       <main className="relative min-h-screen overflow-hidden bg-[#070A12] text-white">
@@ -136,6 +133,7 @@ export default function Home() {
       </main>
     );
   }
+
   const homeClub = nextMatch ? getClub(nextMatch.homeClubId) : undefined;
   const awayClub = nextMatch ? getClub(nextMatch.awayClubId) : undefined;
   const homeColor = homeClub?.primaryColor ?? "#2563EB";
@@ -356,93 +354,7 @@ export default function Home() {
             </div>
           </section>
         )}
-        {myUpdates.length > 0 && (
-          <section>
-            <div className="mb-4 flex items-end justify-between">
-              <div>
-                <h2 className="text-[22px] font-black tracking-tight text-[#111318]">
-                  Latest
-                </h2>
-                <p className="mt-0.5 text-xs font-medium text-zinc-400">
-                  What&apos;s happening around your clubs
-                </p>
-              </div>
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-sm text-white shadow-lg shadow-orange-500/20">
-                ⚡
-              </div>
-            </div>
-            <div className="flex flex-col gap-3">
-              {myUpdates.map((update) => {
-                const club = getClub(update.clubId);
-                const category =
-                  categoryStyles[update.category] ??
-                  categoryStyles.Club;
-                const clubColor = club?.primaryColor ?? "#111827";
-                return (
-                  <article
-                    key={update.id}
-                    className="overflow-hidden rounded-[24px] border border-black/[0.045] bg-white shadow-[0_5px_20px_rgba(0,0,0,0.035)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_30px_rgba(0,0,0,0.07)]"
-                  >
-                    <div className="p-5">
-                      <div className="mb-4 flex items-start justify-between gap-3">
-                        <div className="flex min-w-0 items-center gap-3">
-                          <ClubBadge
-                            name={club?.name ?? update.clubId}
-                            crest={club?.crest}
-                            color={clubColor}
-                            size={40}
-                          />
-                          <div className="min-w-0">
-                            <div className="truncate text-sm font-black text-[#111318]">
-                              {club?.name ?? update.clubId}
-                            </div>
-                            <div className="mt-0.5 text-[10px] font-semibold text-zinc-400">
-                              {formatFullDate(update.publishedAt)}
-                            </div>
-                          </div>
-                        </div>
-                        <div
-                          className="flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1.5"
-                          style={{
-                            backgroundColor: category.background,
-                            color: category.color,
-                          }}
-                        >
-                          <span className="text-[10px] font-black">
-                            {category.icon}
-                          </span>
-                          <span className="text-[9px] font-black uppercase tracking-wider">
-                            {update.category}
-                          </span>
-                        </div>
-                      </div>
-                      <h3 className="mb-2 text-[16px] font-black leading-snug tracking-[-0.01em] text-[#111318]">
-                        {update.title}
-                      </h3>
-                      <p className="text-[13px] leading-[1.65] text-zinc-500">
-                        {update.summary}
-                      </p>
-                      <div className="mt-4 flex items-center justify-between border-t border-zinc-100 pt-4">
-                        <span className="text-[11px] font-semibold text-zinc-400">
-                          Club update
-                        </span>
-                        <button
-                          className="text-[11px] font-black transition-opacity hover:opacity-70"
-                          style={{
-                            color: category.color,
-                          }}
-                        >
-                          Read more →
-                        </button>
-                      </div>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          </section>
-        )}
-        {!nextMatch && myUpdates.length === 0 && (
+        {!nextMatch && (
           <section className="py-12">
             <div className="rounded-[28px] border border-black/[0.04] bg-white px-6 py-10 text-center shadow-sm">
               <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#F1F3F7] text-2xl">
@@ -452,11 +364,12 @@ export default function Home() {
                 You&apos;re all caught up
               </h2>
               <p className="mx-auto max-w-xs text-sm leading-6 text-zinc-500">
-                New matches and updates from your clubs will appear here.
+                New matches from your clubs will appear here.
               </p>
             </div>
           </section>
         )}
+        <YourClubs />
       </div>
     </main>
   );

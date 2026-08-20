@@ -149,7 +149,7 @@ const CLUB_ALIASES: Record<string, string[]> = {
   alverca: ["fc alverca", "alverca"],
   "estrela-amadora": ["cf estrela da amadora", "estrela da amadora", "amadora"],
 };
-function matchClubId(apiTeamName: string): string | null {
+export function matchClubId(apiTeamName: string): string | null {
   const normalized = apiTeamName.toLowerCase().trim();
   for (const club of clubs) {
     const aliases = CLUB_ALIASES[club.id] ?? [club.name.toLowerCase()];
@@ -194,4 +194,100 @@ export async function fetchLiveMatches(): Promise<LiveMatch[]> {
       };
     })
     .filter((match) => match.status === "TIMED" || match.status === "SCHEDULED");
+}
+
+// --- League table & top scorers/assists ---
+
+export const LEAGUE_TO_CODE: Record<string, string> = {
+  "Premier League": "PL",
+  "La Liga": "PD",
+  Bundesliga: "BL1",
+  "Ligue 1": "FL1",
+  "Serie A": "SA",
+  Eredivisie: "DED",
+  "Primeira Liga": "PPL",
+};
+
+export type StandingsRow = {
+  position: number;
+  teamName: string;
+  clubId: string | null;
+  playedGames: number;
+  won: number;
+  draw: number;
+  lost: number;
+  points: number;
+  goalDifference: number;
+};
+
+type RawStandingsResponse = {
+  standings?: {
+    type: string;
+    table: {
+      position: number;
+      team: { name: string };
+      playedGames: number;
+      won: number;
+      draw: number;
+      lost: number;
+      points: number;
+      goalDifference: number;
+    }[];
+  }[];
+};
+
+export async function fetchStandings(
+  competitionCode: string
+): Promise<StandingsRow[]> {
+  const response = await fetch(`/api/standings?competition=${competitionCode}`);
+  if (!response.ok) {
+    throw new Error("Failed to fetch standings");
+  }
+  const data: RawStandingsResponse = await response.json();
+  const totalTable =
+    data.standings?.find((s) => s.type === "TOTAL")?.table ?? [];
+  return totalTable.map((row) => ({
+    position: row.position,
+    teamName: row.team.name,
+    clubId: matchClubId(row.team.name),
+    playedGames: row.playedGames,
+    won: row.won,
+    draw: row.draw,
+    lost: row.lost,
+    points: row.points,
+    goalDifference: row.goalDifference,
+  }));
+}
+
+export type Scorer = {
+  playerName: string;
+  teamName: string;
+  clubId: string | null;
+  goals: number;
+  assists: number | null;
+};
+
+type RawScorersResponse = {
+  scorers?: {
+    player: { name: string };
+    team: { name: string };
+    goals: number;
+    assists: number | null;
+  }[];
+};
+
+export async function fetchScorers(competitionCode: string): Promise<Scorer[]> {
+  const response = await fetch(`/api/scorers?competition=${competitionCode}`);
+  if (!response.ok) {
+    throw new Error("Failed to fetch scorers");
+  }
+  const data: RawScorersResponse = await response.json();
+  const rawScorers = data.scorers ?? [];
+  return rawScorers.map((s) => ({
+    playerName: s.player.name,
+    teamName: s.team.name,
+    clubId: matchClubId(s.team.name),
+    goals: s.goals,
+    assists: s.assists ?? null,
+  }));
 }
