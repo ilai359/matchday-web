@@ -1,21 +1,47 @@
 "use client";
 
-import { useState } from "react";
-import { updates, UpdateCategory } from "../../data/updates";
+import { useEffect, useState } from "react";
+import { updates as mockUpdates, UpdateCategory } from "../../data/updates";
 import { useClubs } from "../../context/ClubsContext";
 import { getClub, getClubName } from "../../lib/clubHelpers";
 import { formatDate, timeAgo } from "../../lib/dateHelpers";
 import { categories, categoryStyles } from "../../lib/categoryStyles";
+import { fetchLiveUpdates, NewsUpdate } from "../../lib/newsApi";
 import ClubBadge from "../../components/ClubBadge";
+
+type DisplayUpdate = {
+  id: string;
+  clubId: string;
+  category: UpdateCategory;
+  title: string;
+  summary: string;
+  source: string;
+  publishedAt: string;
+  link?: string;
+};
 
 export default function Updates() {
   const { selectedIds } = useClubs();
+  const [liveUpdates, setLiveUpdates] = useState<NewsUpdate[]>([]);
+  const [liveLoading, setLiveLoading] = useState(true);
+
+  useEffect(() => {
+    fetchLiveUpdates()
+      .then(setLiveUpdates)
+      .catch(() => {})
+      .finally(() => setLiveLoading(false));
+  }, []);
 
   const [activeCategory, setActiveCategory] = useState(
     "All" as UpdateCategory | "All"
   );
 
-  const myUpdates = updates
+  const combinedUpdates: DisplayUpdate[] =
+    liveUpdates.length > 0
+      ? liveUpdates.map((u) => ({ ...u }))
+      : mockUpdates.map((u) => ({ ...u, link: undefined }));
+
+  const myUpdates = combinedUpdates
     .filter((update) => selectedIds.includes(update.clubId))
     .filter(
       (update) =>
@@ -95,6 +121,18 @@ export default function Updates() {
       </header>
 
       <div className="mx-auto w-full max-w-2xl px-5 pt-6">
+        {!liveLoading && liveUpdates.length > 0 && (
+          <div className="mb-3 flex items-center gap-2 px-1">
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+            </span>
+            <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600">
+              Live news
+            </span>
+          </div>
+        )}
+
         <section className="mb-7">
           <div className="mb-3 flex items-end justify-between px-1">
             <div>
@@ -292,21 +330,42 @@ export default function Updates() {
                           </div>
                         </div>
 
-                        <button
-                          className="shrink-0 rounded-xl px-3 py-2 text-[11px] font-black transition-opacity hover:opacity-70"
-                          style={{
-                            backgroundColor: category.background,
-                            color: category.color,
-                          }}
-                        >
-                          Read more →
-                        </button>
+                        {update.link ? (
+                          <a
+                            href={update.link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="shrink-0 rounded-xl px-3 py-2 text-[11px] font-black transition-opacity hover:opacity-70"
+                            style={{
+                              backgroundColor: category.background,
+                              color: category.color,
+                            }}
+                          >
+                            Read more →
+                          </a>
+                        ) : (
+                          <span
+                            className="shrink-0 rounded-xl px-3 py-2 text-[11px] font-black opacity-50"
+                            style={{
+                              backgroundColor: category.background,
+                              color: category.color,
+                            }}
+                          >
+                            Read more →
+                          </span>
+                        )}
                       </div>
                     </div>
                   </article>
                 );
               })}
             </div>
+
+            {liveUpdates.length > 0 && (
+              <p className="mt-6 text-center text-[10px] font-medium text-zinc-400">
+                News powered by NewsData.io
+              </p>
+            )}
           </section>
         )}
       </div>
