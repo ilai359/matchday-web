@@ -291,3 +291,91 @@ export async function fetchScorers(competitionCode: string): Promise<Scorer[]> {
     assists: s.assists ?? null,
   }));
 }
+
+// --- Finished matches (head-to-head history & recent form) ---
+
+export type FinishedMatch = {
+  id: string;
+  competition: string;
+  homeClubId: string | null;
+  awayClubId: string | null;
+  homeTeamName: string;
+  awayTeamName: string;
+  homeCrest: string | null;
+  awayCrest: string | null;
+  homeScore: number | null;
+  awayScore: number | null;
+  kickoff: string;
+};
+
+type RawFinishedMatch = {
+  id: number;
+  utcDate: string;
+  competition: { name: string };
+  homeTeam: { name: string; crest?: string };
+  awayTeam: { name: string; crest?: string };
+  score?: {
+    fullTime?: { home: number | null; away: number | null };
+  };
+};
+
+export async function fetchFinishedMatches(
+  competitionCode: string,
+  season?: string
+): Promise<FinishedMatch[]> {
+  const seasonParam = season ? `&season=${season}` : "";
+  const response = await fetch(
+    `/api/finished-matches?competition=${competitionCode}${seasonParam}`
+  );
+  if (!response.ok) {
+    throw new Error("Failed to fetch finished matches");
+  }
+  const data = await response.json();
+  const rawMatches: RawFinishedMatch[] = data.matches ?? [];
+  return rawMatches.map((match) => ({
+    id: String(match.id),
+    competition: match.competition.name,
+    homeClubId: matchClubId(match.homeTeam.name),
+    awayClubId: matchClubId(match.awayTeam.name),
+    homeTeamName: match.homeTeam.name,
+    awayTeamName: match.awayTeam.name,
+    homeCrest: match.homeTeam.crest ?? null,
+    awayCrest: match.awayTeam.crest ?? null,
+    homeScore: match.score?.fullTime?.home ?? null,
+    awayScore: match.score?.fullTime?.away ?? null,
+    kickoff: match.utcDate,
+  }));
+}
+
+// --- Live match polling (for the match detail page) ---
+
+export type LiveMatchStatus = {
+  status: string;
+  minute: number | null;
+  homeScore: number | null;
+  awayScore: number | null;
+};
+
+type RawSingleMatch = {
+  status: string;
+  minute?: number | null;
+  score?: {
+    fullTime?: { home: number | null; away: number | null };
+  };
+};
+
+export async function fetchLiveMatchStatus(
+  matchId: string
+): Promise<LiveMatchStatus | null> {
+  const response = await fetch(`/api/match-live?id=${matchId}`);
+  if (!response.ok) {
+    return null;
+  }
+  const data: RawSingleMatch = await response.json();
+  return {
+    status: data.status,
+    minute: data.minute ?? null,
+    homeScore: data.score?.fullTime?.home ?? null,
+    awayScore: data.score?.fullTime?.away ?? null,
+  };
+}

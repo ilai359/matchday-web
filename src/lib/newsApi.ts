@@ -23,6 +23,22 @@ type RawArticle = {
   language?: string;
 };
 
+type RelevanceResult = {
+  id: string;
+  clubs: string[];
+  summary: string;
+  isDuplicate?: boolean;
+};
+
+type Candidate = {
+  id: string;
+  title: string;
+  description: string;
+  source: string;
+  publishedAt: string;
+  link: string;
+};
+
 const CATEGORY_KEYWORDS: { category: UpdateCategory; keywords: string[] }[] = [
   {
     category: "Injury",
@@ -109,13 +125,6 @@ function guessCategory(text: string): UpdateCategory {
   return "Club";
 }
 
-function findMatchingClubIds(text: string): string[] {
-  const lower = text.toLowerCase();
-  return clubs
-    .filter((club) => lower.includes(club.name.toLowerCase()))
-    .map((club) => club.id);
-}
-
 function normalizeTitle(title: string): string {
   return title
     .toLowerCase()
@@ -154,17 +163,137 @@ function isLikelyEnglish(text: string): boolean {
   return words.some((word) => ENGLISH_MARKER_WORDS.has(word));
 }
 
-export async function fetchLiveUpdates(): Promise<NewsUpdate[]> {
-  const response = await fetch("/api/news");
+function countOccurrences(haystack: string, needle: string): number {
+  if (!needle) return 0;
+  let count = 0;
+  let index = haystack.indexOf(needle);
+  while (index !== -1) {
+    count += 1;
+    index = haystack.indexOf(needle, index + needle.length);
+  }
+  return count;
+}
+
+function findMatchingClubIdsByKeyword(
+  title: string,
+  description: string
+): string[] {
+  const titleLower = title.toLowerCase();
+  const titleMatches = clubs
+    .filter((club) => titleLower.includes(club.name.toLowerCase()))
+    .map((club) => club.id);
+
+  if (titleMatches.length > 0) {
+    return titleMatches;
+  }
+
+  const fullLower = `${title} ${description}`.toLowerCase();
+  const counts = clubs
+    .map((club) => ({
+      id: club.id,
+      count: countOccurrences(fullLower, club.name.toLowerCase()),
+    }))
+    .filter((entry) => entry.count > 0);
+
+  if (counts.length === 0) return [];
+
+  const maxCount = Math.max(...counts.map((entry) => entry.count));
+  return counts
+    .filter((entry) => entry.count === maxCount)
+    .map((entry) => entry.id);
+}
+
+function buildFromKeywordMatching(candidates: Candidate[]): NewsUpdate[] {
+  const result: NewsUpdate[] = [];
+  for (const candidate of candidates) {
+    const clubIds = findMatchingClubIdsByKeyword(
+      candidate.title,
+      candidate.description
+    );
+    if (clubIds.length === 0) continue;
+
+    const category = guessCategory(`${candidate.title} ${candidate.description}`);
+
+    for (const clubId of clubIds) {
+      result.push({
+        id: `${candidate.id}-${clubId}`,
+        clubId,
+        category,
+        title: candidate.title,
+        summary: candidate.description,
+        source: candidate.source,
+        publishedAt: candidate.publishedAt,
+        link: candidate.link,
+      });
+    }
+  }
+  return result;
+}
+
+function buildFromRelevance(
+  candidates: Candidate[],
+  relevanceResults: RelevanceResult[]
+): NewsUpdate[] {
+  const candidatesById = new Map(
+    candidates.map((candidate) => [candidate.id, candidate])
+  );
+  const result: NewsUpdate[] = [];
+
+  for (const item of relevanceResults) {
+    if (item.isDuplicate) continue;
+
+    const candidate = candidatesById.get(item.id);
+    if (!candidate) continue;
+    if (!item.clubs || item.clubs.length === 0) continue;
+
+    const summary =
+      item.summary && item.summary.trim().length > 0
+        ? item.summary
+        : candidate.description;
+    const category = guessCategory(`${candidate.title} ${summary}`);
+
+    for (const clubName of item.clubs) {
+      const club = clubs.find(
+        (c) => c.name.toLowerCase() === clubName.toLowerCase()
+      );
+      if (!club) continue;
+
+      result.push({
+        id: `${candidate.id}-${club.id}`,
+        clubId: club.id,
+        category,
+        title: candidate.title,
+        summary,
+        source: candidate.source,
+        publishedAt: candidate.publishedAt,
+        link: candidate.link,
+      });
+    }
+  }
+
+  return result;
+}
+
+export async function fetchLiveUpdates(
+  clubNames: string[]
+): Promise<NewsUpdate[]> {
+  const query =
+    clubNames.length > 0
+      ? `?clubs=${encodeURIComponent(clubNames.join(","))}`
+      : "";
+  const response = await fetch(`/api/news${query}`);
   if (!response.ok) {
     throw new Error("Failed to fetch news");
   }
   const data = await response.json();
   const rawArticles: RawArticle[] = data.articles ?? [];
 
+  const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+  const now = Date.now();
+
   const seenLinks = new Set<string>();
   const seenTitles = new Set<string>();
-  const result: NewsUpdate[] = [];
+  const candidates: Candidate[] = [];
 
   for (const article of rawArticles) {
     if (!article.title || !article.link) continue;
@@ -177,38 +306,68 @@ export async function fetchLiveUpdates(): Promise<NewsUpdate[]> {
       continue;
     }
 
-    const text = `${article.title} ${article.description ?? ""}`;
+    if (!article.pubDate) continue;
+    const publishedAt = `${article.pubDate.replace(" ", "T")}Z`;
+    const publishedTime = new Date(publishedAt).getTime();
+    if (Number.isNaN(publishedTime)) continue;
+    if (now - publishedTime > MAX_AGE_MS) continue;
+
+    const description = article.description ?? "";
+    const text = `${article.title} ${description}`;
     if (!isLikelyEnglish(text)) continue;
 
     const normalizedTitle = normalizeTitle(article.title);
     if (seenTitles.has(normalizedTitle)) continue;
 
-    const clubIds = findMatchingClubIds(text);
-    if (clubIds.length === 0) continue;
-
     seenLinks.add(article.link);
     seenTitles.add(normalizedTitle);
-    const category = guessCategory(text);
-    const publishedAt = article.pubDate
-      ? `${article.pubDate.replace(" ", "T")}Z`
-      : new Date().toISOString();
-    const source = article.source_name ?? article.source_id ?? "News";
 
-    for (const clubId of clubIds) {
-      result.push({
-        id: `${article.article_id ?? article.link}-${clubId}`,
-        clubId,
-        category,
-        title: article.title,
-        summary: article.description ?? "",
-        source,
-        publishedAt,
-        link: article.link,
-      });
-    }
+    candidates.push({
+      id: article.article_id ?? article.link,
+      title: article.title,
+      description,
+      source: article.source_name ?? article.source_id ?? "News",
+      publishedAt,
+      link: article.link,
+    });
   }
 
-  return result.sort(
+  if (candidates.length === 0 || clubNames.length === 0) {
+    return [];
+  }
+
+  try {
+    const relevanceResponse = await fetch("/api/news-relevance", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        clubNames,
+        articles: candidates.map((candidate) => ({
+          id: candidate.id,
+          title: candidate.title,
+          description: candidate.description,
+        })),
+      }),
+    });
+
+    if (relevanceResponse.ok) {
+      const relevanceData = await relevanceResponse.json();
+      const relevanceResults: RelevanceResult[] = relevanceData.results ?? [];
+      if (relevanceResults.length > 0) {
+        const built = buildFromRelevance(candidates, relevanceResults);
+        return built.sort(
+          (a, b) =>
+            new Date(b.publishedAt).getTime() -
+            new Date(a.publishedAt).getTime()
+        );
+      }
+    }
+  } catch {
+    // AI check unavailable — fall through to keyword matching below.
+  }
+
+  const fallback = buildFromKeywordMatching(candidates);
+  return fallback.sort(
     (a, b) =>
       new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
   );

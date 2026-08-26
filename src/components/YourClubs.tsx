@@ -134,6 +134,7 @@ export default function YourClubs() {
 // Returns the top N by a stat, plus this club's own best player for that
 // stat if they didn't already make the top N — so there's always
 // something of the club's to highlight, even in a thin/early-season list.
+// Ties go to the followed club's player first.
 function topWithClubGuaranteed(
   scorers: Scorer[],
   clubId: string,
@@ -144,9 +145,13 @@ function topWithClubGuaranteed(
     stat === "assists"
       ? scorers.filter((s) => s.assists !== null && s.assists > 0)
       : scorers;
-  const sorted = [...eligible].sort(
-    (a, b) => (b[stat] ?? 0) - (a[stat] ?? 0)
-  );
+  const sorted = [...eligible].sort((a, b) => {
+    const diff = (b[stat] ?? 0) - (a[stat] ?? 0);
+    if (diff !== 0) return diff;
+    if (a.clubId === clubId && b.clubId !== clubId) return -1;
+    if (b.clubId === clubId && a.clubId !== clubId) return 1;
+    return 0;
+  });
   const top = sorted.slice(0, limit);
   const alreadyIncluded = top.some((s) => s.clubId === clubId);
   if (!alreadyIncluded) {
@@ -156,6 +161,31 @@ function topWithClubGuaranteed(
     }
   }
   return top;
+}
+
+// The API groups tied teams under the same position number. Within each
+// tied group, move the followed club's row to the front, then renumber
+// everything sequentially so no two teams ever show the same position.
+function applyClubTieBreak(
+  rows: StandingsRow[],
+  clubId: string
+): StandingsRow[] {
+  const groups: StandingsRow[][] = [];
+  for (const row of rows) {
+    const lastGroup = groups[groups.length - 1];
+    if (lastGroup && lastGroup[0].position === row.position) {
+      lastGroup.push(row);
+    } else {
+      groups.push([row]);
+    }
+  }
+  const reordered = groups.flatMap((group) => {
+    if (group.length <= 1) return group;
+    const clubRow = group.find((r) => r.clubId === clubId);
+    if (!clubRow) return group;
+    return [clubRow, ...group.filter((r) => r !== clubRow)];
+  });
+  return reordered.map((row, i) => ({ ...row, position: i + 1 }));
 }
 
 function rankBadgeClass(i: number): string {
@@ -267,13 +297,14 @@ function ClubStatsCard({
   scorers: Scorer[];
   loading: boolean;
 }) {
-  const clubIndex = standings.findIndex((row) => row.clubId === club.id);
-  const clubRow = clubIndex >= 0 ? standings[clubIndex] : undefined;
+  const rankedStandings = applyClubTieBreak(standings, club.id);
+  const clubIndex = rankedStandings.findIndex((row) => row.clubId === club.id);
+  const clubRow = clubIndex >= 0 ? rankedStandings[clubIndex] : undefined;
 
   const visibleRows =
     clubIndex >= 0
-      ? standings.slice(Math.max(0, clubIndex - 2), clubIndex + 3)
-      : standings.slice(0, 5);
+      ? rankedStandings.slice(Math.max(0, clubIndex - 2), clubIndex + 3)
+      : rankedStandings.slice(0, 5);
 
   const topScorers = topWithClubGuaranteed(scorers, club.id, "goals", 5);
   const topAssists = topWithClubGuaranteed(scorers, club.id, "assists", 5);
@@ -383,15 +414,17 @@ function ClubStatsCard({
                   >
                     {row.teamName}
                   </div>
-                  <div className="flex shrink-0 items-center gap-3 text-[11px] font-bold text-zinc-400">
-                    <span>{row.playedGames}P</span>
-                    <span>
+                                   <div className="flex shrink-0 items-center gap-3 text-[11px] font-bold text-zinc-400">
+                    <span className="w-6 text-right">{row.playedGames}P</span>
+                    <span className="w-7 text-right">
                       {row.goalDifference > 0
                         ? `+${row.goalDifference}`
                         : row.goalDifference}
                     </span>
                     <span
-                      className={isClub ? "font-black" : "font-bold text-zinc-500"}
+                      className={`w-12 text-right ${
+                        isClub ? "font-black" : "font-bold text-zinc-500"
+                      }`}
                       style={isClub ? { color: club.primaryColor } : undefined}
                     >
                       {row.points} pts

@@ -5,27 +5,19 @@ export async function GET(request: Request) {
   if (!apiKey) {
     return NextResponse.json({ error: "Missing API key" }, { status: 500 });
   }
-
   const { searchParams } = new URL(request.url);
-  const competition = searchParams.get("competition");
-  if (!competition) {
-    return NextResponse.json(
-      { error: "Missing competition code" },
-      { status: 400 }
-    );
+  const id = searchParams.get("id");
+  if (!id) {
+    return NextResponse.json({ error: "Missing match id" }, { status: 400 });
   }
-
   try {
     const response = await fetch(
-      `https://api.football-data.org/v4/competitions/${competition}/scorers?limit=50`,
-      {
-        headers: { "X-Auth-Token": apiKey },
-        next: { revalidate: 3600 },
-      }
+      `https://api.football-data.org/v4/matches/${id}`,
+      { headers: { "X-Auth-Token": apiKey }, cache: "no-store" }
     );
     if (!response.ok) {
       return NextResponse.json(
-        { error: "Failed to fetch scorers" },
+        { error: "Failed to fetch live match" },
         { status: response.status }
       );
     }

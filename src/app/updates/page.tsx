@@ -21,17 +21,20 @@ type DisplayUpdate = {
 };
 
 export default function Updates() {
-  const { selectedIds } = useClubs();
+   const { selectedIds } = useClubs();
   const [liveUpdates, setLiveUpdates] = useState<NewsUpdate[]>([]);
   const [liveLoading, setLiveLoading] = useState(true);
 
+  const followedClubNames = selectedIds.map((id) => getClubName(id));
+  const clubsKey = followedClubNames.join(",");
+
   useEffect(() => {
-    fetchLiveUpdates()
+    fetchLiveUpdates(followedClubNames)
       .then(setLiveUpdates)
       .catch(() => {})
       .finally(() => setLiveLoading(false));
-  }, []);
-
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clubsKey]);
   const [activeCategory, setActiveCategory] = useState(
     "All" as UpdateCategory | "All"
   );
