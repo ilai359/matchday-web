@@ -28,7 +28,7 @@ const CLUB_ALIASES: Record<string, string[]> = {
   ajax: ["afc ajax", "ajax"],
   psv: ["psv", "psv eindhoven"],
   porto: ["fc porto", "porto"],
-  benfica: ["sl benfica", "benfica"],
+  benfica: ["sl benfica", "benfica", "sport lisboa e benfica"],
   "sporting-cp": ["sporting clube de portugal", "sporting cp"],
   "aston-villa": ["aston villa fc", "aston villa"],
   chelsea: ["chelsea fc", "chelsea"],
@@ -201,6 +201,7 @@ export async function fetchLiveMatches(): Promise<LiveMatch[]> {
 export const LEAGUE_TO_CODE: Record<string, string> = {
   "Premier League": "PL",
   "La Liga": "PD",
+  "Primera Division": "PD",
   Bundesliga: "BL1",
   "Ligue 1": "FL1",
   "Serie A": "SA",
