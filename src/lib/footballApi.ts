@@ -159,6 +159,16 @@ export function matchClubId(apiTeamName: string): string | null {
   }
   return null;
 }
+
+// Pulls the numeric football-data.org team ID out of one of our own crest
+// URLs (e.g. "https://crests.football-data.org/341.png" -> "341"). A club
+// without a crest, or with a non-numeric placeholder crest, returns null.
+export function extractTeamId(crestUrl?: string): string | null {
+  if (!crestUrl) return null;
+  const match = crestUrl.match(/\/(\d+)\.png(?:\?.*)?$/);
+  return match ? match[1] : null;
+}
+
 type RawApiMatch = {
   id: number;
   utcDate: string;
@@ -168,6 +178,25 @@ type RawApiMatch = {
   homeTeam: { name: string; crest?: string };
   awayTeam: { name: string; crest?: string };
 };
+
+function mapRawMatch(match: RawApiMatch): LiveMatch {
+  const homeClubId = matchClubId(match.homeTeam.name);
+  const awayClubId = matchClubId(match.awayTeam.name);
+  return {
+    id: String(match.id),
+    competition: match.competition.name,
+    homeClubId: homeClubId ?? match.homeTeam.name,
+    awayClubId: awayClubId ?? match.awayTeam.name,
+    homeTeamName: match.homeTeam.name,
+    awayTeamName: match.awayTeam.name,
+    homeCrest: match.homeTeam.crest ?? null,
+    awayCrest: match.awayTeam.crest ?? null,
+    kickoff: match.utcDate,
+    venue: match.venue ?? "",
+    status: match.status,
+  };
+}
+
 export async function fetchLiveMatches(): Promise<LiveMatch[]> {
   const response = await fetch("/api/matches");
   if (!response.ok) {
@@ -176,23 +205,23 @@ export async function fetchLiveMatches(): Promise<LiveMatch[]> {
   const data = await response.json();
   const rawMatches: RawApiMatch[] = data.matches ?? [];
   return rawMatches
-    .map((match) => {
-      const homeClubId = matchClubId(match.homeTeam.name);
-      const awayClubId = matchClubId(match.awayTeam.name);
-      return {
-        id: String(match.id),
-        competition: match.competition.name,
-        homeClubId: homeClubId ?? match.homeTeam.name,
-        awayClubId: awayClubId ?? match.awayTeam.name,
-        homeTeamName: match.homeTeam.name,
-        awayTeamName: match.awayTeam.name,
-        homeCrest: match.homeTeam.crest ?? null,
-        awayCrest: match.awayTeam.crest ?? null,
-        kickoff: match.utcDate,
-        venue: match.venue ?? "",
-        status: match.status,
-      };
-    })
+    .map(mapRawMatch)
+    .filter((match) => match.status === "TIMED" || match.status === "SCHEDULED");
+}
+
+// Every upcoming match for one club, across every competition our
+// football-data.org plan gives us access to (not just their main league) -
+// so cup runs and continental competitions show up too, whenever the plan
+// covers them.
+export async function fetchTeamMatches(teamId: string): Promise<LiveMatch[]> {
+  const response = await fetch(`/api/team-matches?id=${teamId}`);
+  if (!response.ok) {
+    return [];
+  }
+  const data = await response.json();
+  const rawMatches: RawApiMatch[] = data.matches ?? [];
+  return rawMatches
+    .map(mapRawMatch)
     .filter((match) => match.status === "TIMED" || match.status === "SCHEDULED");
 }
 
