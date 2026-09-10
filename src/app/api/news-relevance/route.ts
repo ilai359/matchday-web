@@ -111,12 +111,12 @@ export async function POST(request: Request) {
   }
 
   try {
-    // Cached for 30 minutes - the same window the underlying news fetch
+    // Cached for 3 hours - the same window the underlying news fetch
     // itself uses (see src/app/api/news/route.ts), so this cache and the
     // articles it's analyzing go stale together.
     const parsed = await getOrSet(
       buildCacheKey(clubNames, articles),
-      30 * 60 * 1000,
+      3 * 60 * 60 * 1000,
       () => callAnthropic(apiKey, clubNames, articles)
     );
     return NextResponse.json(parsed);

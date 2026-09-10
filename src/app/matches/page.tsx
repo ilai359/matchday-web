@@ -9,6 +9,20 @@ import { formatDate, formatTime } from "../../lib/dateHelpers";
 import { formatCompetition } from "../../lib/competitionNames";
 import { fetchLiveMatches, LiveMatch } from "../../lib/footballApi";
 import ClubBadge from "../../components/ClubBadge";
+
+const MATCHES_SCROLL_KEY = "matchday:matches-scroll";
+
+// Called right before navigating to a match's Details page, so we know
+// exactly where to put the user back when they return.
+function saveScrollPosition() {
+  try {
+    sessionStorage.setItem(MATCHES_SCROLL_KEY, String(window.scrollY));
+  } catch {
+    // sessionStorage can fail (private browsing, disabled) — worst case
+    // the user just lands at the top like before, nothing breaks.
+  }
+}
+
 export default function Matches() {
   const { selectedIds } = useClubs();
   const [activeFilter, setActiveFilter] = useState<string>("all");
@@ -21,9 +35,30 @@ export default function Matches() {
       .catch(() => setLiveError(true))
       .finally(() => setLiveLoading(false));
   }, []);
+
+  // Restore the scroll position we were at before someone clicked into a
+  // match's Details page, once this page has real content to scroll to.
+  // We save it ourselves (see saveScrollPosition below) instead of relying
+  // on the browser/Next.js to remember it, since that only works
+  // reliably for a short window after leaving the page.
+  useEffect(() => {
+    if (liveLoading) return;
+    const saved = sessionStorage.getItem(MATCHES_SCROLL_KEY);
+    if (!saved) return;
+    sessionStorage.removeItem(MATCHES_SCROLL_KEY);
+    const y = Number(saved);
+    if (Number.isNaN(y)) return;
+    requestAnimationFrame(() => window.scrollTo(0, y));
+  }, [liveLoading]);
   const myLiveMatches = liveMatches
     .filter(
       (m) => selectedIds.includes(m.homeClubId) || selectedIds.includes(m.awayClubId)
+    )
+    .filter(
+      (m) =>
+        activeFilter === "all" ||
+        m.homeClubId === activeFilter ||
+        m.awayClubId === activeFilter
     )
     .sort(
       (a, b) => new Date(a.kickoff).getTime() - new Date(b.kickoff).getTime()
@@ -105,6 +140,66 @@ export default function Matches() {
         </div>
       </header>
       <div className="mx-auto w-full max-w-2xl px-5 pt-6">
+        <section className="mb-7">
+          <div className="mb-3 flex items-end justify-between px-1">
+            <div>
+              <h2 className="text-lg font-black text-[#111318] dark:text-white">
+                Filter by club
+              </h2>
+              <p className="mt-0.5 text-xs font-medium text-zinc-400 dark:text-zinc-500">
+                Show matches from one club
+              </p>
+            </div>
+            <div className="rounded-full bg-white px-3 py-1.5 text-[11px] font-black text-zinc-500 shadow-sm dark:bg-[#14171F] dark:text-zinc-300 dark:shadow-none">
+              {myLiveMatches.length + myMatches.length} matches
+            </div>
+          </div>
+          <div className="-mx-5 overflow-x-auto px-5 pb-2">
+            <div className="flex w-max gap-2">
+              <button
+                onClick={() => setActiveFilter("all")}
+                className={`whitespace-nowrap rounded-full px-4 py-2.5 text-sm font-bold transition-all ${
+                  activeFilter === "all"
+                    ? "bg-[#111318] text-white shadow-lg shadow-black/10 dark:bg-white dark:text-[#111318] dark:shadow-none"
+                    : "border border-black/[0.05] bg-white text-zinc-600 shadow-sm dark:border-white/10 dark:bg-[#14171F] dark:text-zinc-300 dark:shadow-none"
+                }`}
+              >
+                All clubs
+              </button>
+              {myClubs.map((club) => {
+                const isActive = activeFilter === club.id;
+                return (
+                  <button
+                    key={club.id}
+                    onClick={() => setActiveFilter(club.id)}
+                    className={`flex items-center gap-2 whitespace-nowrap rounded-full px-3.5 py-2 text-sm font-bold transition-all ${
+                      isActive
+                        ? "text-white shadow-lg"
+                        : "border border-black/[0.05] bg-white text-zinc-600 shadow-sm dark:border-white/10 dark:bg-[#14171F] dark:text-zinc-300 dark:shadow-none"
+                    }`}
+                    style={
+                      isActive
+                        ? {
+                            background: `linear-gradient(135deg, ${
+                              club.primaryColor ?? "#2563EB"
+                            }, #111827)`,
+                          }
+                        : undefined
+                    }
+                  >
+                    <ClubBadge
+                      name={club.name}
+                      crest={club.crest}
+                      color={club.primaryColor}
+                      size={24}
+                    />
+                    {club.name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </section>
         {!liveLoading && !liveError && myLiveMatches.length > 0 && (
           <section className="mb-9">
             <div className="flex flex-col gap-4">
@@ -220,6 +315,7 @@ export default function Matches() {
                         </div>
                         <Link
                           href={`/match/${match.id}`}
+                          onClick={saveScrollPosition}
                           className="shrink-0 rounded-xl bg-[#F2F4F7] px-3 py-2 text-[11px] font-black text-zinc-600 transition hover:bg-[#E8EBF0] dark:bg-white/10 dark:text-zinc-300 dark:hover:bg-white/15"
                         >
                           Details →
@@ -237,66 +333,6 @@ export default function Matches() {
             Couldn&apos;t load live match data. Showing saved matches below.
           </div>
         )}
-        <section className="mb-7">
-          <div className="mb-3 flex items-end justify-between px-1">
-            <div>
-              <h2 className="text-lg font-black text-[#111318] dark:text-white">
-                Filter by club
-              </h2>
-              <p className="mt-0.5 text-xs font-medium text-zinc-400 dark:text-zinc-500">
-                Show matches from one club
-              </p>
-            </div>
-            <div className="rounded-full bg-white px-3 py-1.5 text-[11px] font-black text-zinc-500 shadow-sm dark:bg-[#14171F] dark:text-zinc-300 dark:shadow-none">
-              {myMatches.length} matches
-            </div>
-          </div>
-          <div className="-mx-5 overflow-x-auto px-5 pb-2">
-            <div className="flex w-max gap-2">
-              <button
-                onClick={() => setActiveFilter("all")}
-                className={`whitespace-nowrap rounded-full px-4 py-2.5 text-sm font-bold transition-all ${
-                  activeFilter === "all"
-                    ? "bg-[#111318] text-white shadow-lg shadow-black/10 dark:bg-white dark:text-[#111318] dark:shadow-none"
-                    : "border border-black/[0.05] bg-white text-zinc-600 shadow-sm dark:border-white/10 dark:bg-[#14171F] dark:text-zinc-300 dark:shadow-none"
-                }`}
-              >
-                All clubs
-              </button>
-              {myClubs.map((club) => {
-                const isActive = activeFilter === club.id;
-                return (
-                  <button
-                    key={club.id}
-                    onClick={() => setActiveFilter(club.id)}
-                    className={`flex items-center gap-2 whitespace-nowrap rounded-full px-3.5 py-2 text-sm font-bold transition-all ${
-                      isActive
-                        ? "text-white shadow-lg"
-                        : "border border-black/[0.05] bg-white text-zinc-600 shadow-sm dark:border-white/10 dark:bg-[#14171F] dark:text-zinc-300 dark:shadow-none"
-                    }`}
-                    style={
-                      isActive
-                        ? {
-                            background: `linear-gradient(135deg, ${
-                              club.primaryColor ?? "#2563EB"
-                            }, #111827)`,
-                          }
-                        : undefined
-                    }
-                  >
-                    <ClubBadge
-                      name={club.name}
-                      crest={club.crest}
-                      color={club.primaryColor}
-                      size={24}
-                    />
-                    {club.name}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </section>
         {myMatches.length === 0 && (
           <section className="py-10">
             <div className="rounded-[28px] border border-black/[0.04] bg-white px-6 py-10 text-center shadow-sm dark:border-white/[0.06] dark:bg-[#14171F] dark:shadow-none">
@@ -418,6 +454,7 @@ export default function Matches() {
                         </div>
                         <Link
                           href={`/match/${match.id}`}
+                          onClick={saveScrollPosition}
                           className="shrink-0 rounded-xl bg-[#F2F4F7] px-3 py-2 text-[11px] font-black text-zinc-600 transition hover:bg-[#E8EBF0] dark:bg-white/10 dark:text-zinc-300 dark:hover:bg-white/15"
                         >
                           Details →

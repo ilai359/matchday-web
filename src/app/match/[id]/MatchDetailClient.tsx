@@ -1,11 +1,11 @@
 "use client";
 
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { matches } from "../../../data/matches";
 import { useClubs } from "../../../context/ClubsContext";
 import { getClub, getClubName } from "../../../lib/clubHelpers";
-import { formatFullDate, formatTime } from "../../../lib/dateHelpers";
+import { formatFullDate, formatFullDateWithYear, formatTime } from "../../../lib/dateHelpers";
 import { formatCompetition } from "../../../lib/competitionNames";
 import {
   fetchLiveMatches,
@@ -192,7 +192,7 @@ function HeadToHeadRow({
   return (
     <div className="rounded-2xl bg-white/85 px-3 py-3 shadow-sm dark:bg-white/[0.08] dark:shadow-none">
       <div className="mb-2 text-center text-[10px] font-bold text-zinc-400 dark:text-zinc-500">
-        {formatFullDate(match.kickoff)}
+        {formatFullDateWithYear(match.kickoff)}
       </div>
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
         <div className="flex min-w-0 items-center justify-end gap-2">
@@ -242,6 +242,7 @@ function HeadToHeadRow({
 export default function MatchDetailClient({ id }: { id: string }) {
   const { selectedIds } = useClubs();
   const mockMatch = matches.find((m) => m.id === id);
+  const router = useRouter();
 
   const [liveMatch, setLiveMatch] = useState<LiveMatch | null>(null);
   const [liveLoading, setLiveLoading] = useState(!mockMatch);
@@ -265,8 +266,13 @@ export default function MatchDetailClient({ id }: { id: string }) {
 
   // Kept separate on purpose: head-to-head history looks back two seasons,
   // but "recent form" pills should only ever reflect the current season.
+  //
+  // Head-to-head looks back 3 seasons total (this one + the 2 before it) so
+  // there's enough history to actually show something for rivalries that
+  // don't meet every single year.
   const [currentSeasonMatches, setCurrentSeasonMatches] = useState<FinishedMatch[]>([]);
   const [previousSeasonMatches, setPreviousSeasonMatches] = useState<FinishedMatch[]>([]);
+  const [twoSeasonsAgoMatches, setTwoSeasonsAgoMatches] = useState<FinishedMatch[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
 
   const rawCompetition = displayMatch?.rawCompetition;
@@ -274,7 +280,12 @@ export default function MatchDetailClient({ id }: { id: string }) {
   const awayClubId = displayMatch?.awayClubId;
   const leagueCode = rawCompetition ? LEAGUE_TO_CODE[rawCompetition] : undefined;
   useEffect(() => {
-    if (!leagueCode || !homeClubId || !awayClubId) {
+    // Only leagueCode is actually required to fetch this competition's
+    // matches. We used to also require both clubs to be ones we recognize,
+    // but that meant a match against a club we don't have in our list
+    // (e.g. Fenerbahçe) silently hid the OTHER team's form too, even
+    // though we know exactly who they are and could show it fine.
+    if (!leagueCode) {
       setHistoryLoading(false);
       return;
     }
@@ -282,20 +293,24 @@ export default function MatchDetailClient({ id }: { id: string }) {
     setHistoryLoading(true);
     const currentSeasonYear = getSeasonStartYear(new Date());
     const previousSeasonYear = currentSeasonYear - 1;
+    const twoSeasonsAgoYear = currentSeasonYear - 2;
     Promise.all([
       fetchFinishedMatches(leagueCode, String(currentSeasonYear)),
       fetchFinishedMatches(leagueCode, String(previousSeasonYear)),
+      fetchFinishedMatches(leagueCode, String(twoSeasonsAgoYear)),
     ])
-      .then(([current, previous]) => {
+      .then(([current, previous, twoAgo]) => {
         if (!cancelled) {
           setCurrentSeasonMatches(current);
           setPreviousSeasonMatches(previous);
+          setTwoSeasonsAgoMatches(twoAgo);
         }
       })
       .catch(() => {
         if (!cancelled) {
           setCurrentSeasonMatches([]);
           setPreviousSeasonMatches([]);
+          setTwoSeasonsAgoMatches([]);
         }
       })
       .finally(() => {
@@ -354,6 +369,18 @@ export default function MatchDetailClient({ id }: { id: string }) {
     );
   }
 
+  // Prefer real browser back-navigation so the Matches page keeps its
+  // scroll position (Next.js restores scroll on back/forward). Only if
+  // there's no history to go back to (e.g. someone opened this match via
+  // a direct link) do we fall back to a normal push to /matches.
+  function goBackToMatches() {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back();
+    } else {
+      router.push("/matches");
+    }
+  }
+
   if (!displayMatch) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center gap-5 bg-[#F5F6F8] px-5 text-center dark:bg-[#0B0D12]">
@@ -364,12 +391,13 @@ export default function MatchDetailClient({ id }: { id: string }) {
         <p className="max-w-xs text-sm leading-6 text-zinc-500 dark:text-zinc-400">
           This match may have already been played or the link is out of date.
         </p>
-        <Link
-          href="/matches"
+        <button
+          type="button"
+          onClick={goBackToMatches}
           className="rounded-2xl bg-[#111318] px-6 py-3 text-sm font-black text-white shadow-lg transition hover:-translate-y-0.5 active:scale-[0.98] dark:bg-white dark:text-[#111318]"
         >
           Back to Matches
-        </Link>
+        </button>
       </main>
     );
   }
@@ -391,7 +419,11 @@ export default function MatchDetailClient({ id }: { id: string }) {
     ? "Full-time"
     : displayMatch.statusLabel;
 
-  const headToHeadMatches = [...currentSeasonMatches, ...previousSeasonMatches]
+  const headToHeadMatches = [
+    ...currentSeasonMatches,
+    ...previousSeasonMatches,
+    ...twoSeasonsAgoMatches,
+  ]
     .filter(
       (m) =>
         (m.homeClubId === displayMatch.homeClubId &&
@@ -402,16 +434,21 @@ export default function MatchDetailClient({ id }: { id: string }) {
     .sort(
       (a, b) => new Date(b.kickoff).getTime() - new Date(a.kickoff).getTime()
     )
-    .slice(0, 5);
+    .slice(0, 2);
 
   function recentFormFor(clubId?: string): FinishedMatch[] {
     if (!clubId) return [];
     return currentSeasonMatches
       .filter((m) => m.homeClubId === clubId || m.awayClubId === clubId)
+      // Newest first so `.slice(0, 5)` keeps the 5 most recent matches...
       .sort(
         (a, b) => new Date(b.kickoff).getTime() - new Date(a.kickoff).getTime()
       )
-      .slice(0, 5);
+      .slice(0, 5)
+      // ...then flipped back to oldest-first for display, so the pills
+      // read left-to-right in normal chronological order (most recent
+      // match on the right, matching how "form" is conventionally shown).
+      .reverse();
   }
 
   const homeForm = recentFormFor(displayMatch.homeClubId);
@@ -425,12 +462,13 @@ export default function MatchDetailClient({ id }: { id: string }) {
           <div className="absolute -right-24 -top-10 h-72 w-72 rounded-full bg-violet-600/20 blur-[90px]" />
         </div>
         <div className="relative z-10 mx-auto w-full max-w-2xl px-5 pb-8 pt-8">
-          <Link
-            href="/matches"
+          <button
+            type="button"
+            onClick={goBackToMatches}
             className="mb-6 inline-flex items-center gap-1.5 text-xs font-bold text-white/60 transition hover:text-white/90"
           >
             ← Back to Matches
-          </Link>
+          </button>
           <div className="mb-1.5 text-[10px] font-black uppercase tracking-[0.28em] text-blue-300/70">
             {displayMatch.competition}
           </div>
@@ -628,7 +666,7 @@ export default function MatchDetailClient({ id }: { id: string }) {
                   </div>
                 ) : (
                   <div className="rounded-2xl bg-white/85 py-4 text-center text-[12px] font-medium text-zinc-500 dark:bg-white/[0.08] dark:text-zinc-400">
-                    These two haven&apos;t met in the last two seasons.
+                    These two haven&apos;t met in the last three seasons.
                   </div>
                 )}
 

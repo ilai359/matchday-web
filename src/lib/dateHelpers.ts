@@ -16,6 +16,19 @@ export function formatFullDate(iso: string) {
   });
 }
 
+// Same as formatFullDate, but with the year included — used for
+// head-to-head history, which can span multiple seasons/years, so it's
+// worth being explicit about which year each past match was.
+export function formatFullDateWithYear(iso: string) {
+  const date = new Date(iso);
+  return date.toLocaleDateString(undefined, {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
 export function formatTime(iso: string) {
   const date = new Date(iso);
   return date.toLocaleTimeString(undefined, {

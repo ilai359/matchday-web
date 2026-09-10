@@ -34,7 +34,12 @@ async function fetchNewsWithRetry(
 ): Promise<{ results?: unknown[] }> {
   for (let i = 0; i < attempts; i++) {
     try {
-      const res = await fetch(url, { next: { revalidate: 1800 } });
+      // NewsData.io's free plan already delays articles by ~12 hours before
+      // they're even available, so checking more often than that buys no
+      // real freshness - it just burns through the free daily quota faster.
+      // Refreshing every 3 hours still catches newly-available articles
+      // promptly relative to that 12-hour delay, at a fraction of the cost.
+      const res = await fetch(url, { next: { revalidate: 3 * 60 * 60 } });
       if (res.ok) {
         return await res.json();
       }
