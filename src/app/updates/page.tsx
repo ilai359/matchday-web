@@ -65,14 +65,8 @@ export default function Updates() {
       ? liveUpdates.map((u) => ({ ...u }))
       : mockUpdates.map((u) => ({ ...u, link: undefined }));
 
-  const coveredClubIds = new Set(baseUpdates.map((u) => u.clubId));
-
   const spotlightUpdates: DisplayUpdate[] = clubSpotlights
-    .filter(
-      (spotlight) =>
-        selectedIds.includes(spotlight.clubId) &&
-        !coveredClubIds.has(spotlight.clubId)
-    )
+    .filter((spotlight) => selectedIds.includes(spotlight.clubId))
     .map((spotlight) => ({
       id: `spotlight-${spotlight.clubId}`,
       clubId: spotlight.clubId,
@@ -385,8 +379,7 @@ export default function Updates() {
                         </div>
 
                         {update.link ? (
-                          <a
-                            href={update.link}
+                          <a href={update.link}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="shrink-0 rounded-xl px-3 py-2 text-[11px] font-black transition-opacity hover:opacity-70"

@@ -433,14 +433,6 @@ export const clubs: Club[] = [
     crest: "https://crests.football-data.org/16.png",
   },
   {
-    id: "fc-basel",
-    name: "FC Basel",
-    shortName: "FC Basel",
-    country: "Switzerland",
-    league: "Swiss Super League",
-    primaryColor: "#EA1A2C",
-  },
-  {
     id: "fc-groningen",
     name: "FC Groningen",
     shortName: "Groningen",
@@ -493,14 +485,6 @@ export const clubs: Club[] = [
     league: "Eredivisie",
     primaryColor: "#E2001A",
     crest: "https://crests.football-data.org/676.png",
-  },
-  {
-    id: "fc-zurich",
-    name: "FC Zürich",
-    shortName: "FC Zürich",
-    country: "Switzerland",
-    league: "Swiss Super League",
-    primaryColor: "#0033A0",
   },
   {
     id: "feyenoord",
@@ -1087,15 +1071,6 @@ export const clubs: Club[] = [
     crest: "https://crests.football-data.org/719.png",
   },
   {
-    id: "telstar",
-    name: "Telstar",
-    shortName: "Telstar",
-    country: "Netherlands",
-    league: "Eredivisie",
-    primaryColor: "#000000",
-    crest: "https://crests.football-data.org/1912.png",
-  },
-  {
     id: "torino",
     name: "Torino",
     shortName: "Torino",
@@ -1211,13 +1186,5 @@ export const clubs: Club[] = [
     league: "Eredivisie",
     primaryColor: "#002F6C",
     crest: "https://crests.football-data.org/672.png",
-  },
-  {
-    id: "young-boys",
-    name: "Young Boys",
-    shortName: "YB",
-    country: "Switzerland",
-    league: "Swiss Super League",
-    primaryColor: "#FDD800",
   },
 ];

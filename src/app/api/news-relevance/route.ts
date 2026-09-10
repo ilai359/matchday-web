@@ -1,20 +1,26 @@
 import { NextResponse } from "next/server";
+import { getOrSet } from "@/lib/cache";
 
-export async function POST(request: Request) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json({ error: "Missing API key" }, { status: 500 });
-  }
+type ArticleInput = { id: string; title: string; description: string };
 
-  const body = await request.json();
-  const clubNames: string[] = body.clubNames ?? [];
-  const articles: { id: string; title: string; description: string }[] =
-    body.articles ?? [];
+// Cache key covers exactly the inputs that determine the AI's output: the
+// set of followed clubs and the set of candidate article ids. Different
+// visitors following the same (or overlapping) clubs will very often see
+// the same batch of candidate articles within any given refresh window,
+// so this lets them share one Claude call instead of each paying for
+// their own from scratch. Sorted so that club/article order in the
+// request doesn't create needless duplicate cache entries.
+function buildCacheKey(clubNames: string[], articles: ArticleInput[]): string {
+  const sortedClubs = [...clubNames].map((name) => name.toLowerCase()).sort();
+  const sortedIds = [...articles.map((a) => a.id)].sort();
+  return `news-relevance:${JSON.stringify({ clubs: sortedClubs, ids: sortedIds })}`;
+}
 
-  if (clubNames.length === 0 || articles.length === 0) {
-    return NextResponse.json({ results: [] });
-  }
-
+async function callAnthropic(
+  apiKey: string,
+  clubNames: string[],
+  articles: ArticleInput[]
+) {
   const prompt = `You are helping a football news app decide which articles genuinely belong to which clubs, and to remove duplicate coverage of the same story.
 
 Here is the list of clubs the user follows:
@@ -38,57 +44,81 @@ Respond with ONLY valid JSON, no other text, in exactly this shape:
 
 Include one entry in "results" for every article given, matched by its "id".`;
 
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model: "claude-haiku-4-5",
+      max_tokens: 8192,
+      messages: [{ role: "user", content: prompt }],
+    }),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    console.error(
+      `[news-relevance] Anthropic API returned ${response.status}:`,
+      errorBody
+    );
+    // Thrown (not returned) so getOrSet never caches a failed attempt -
+    // the next request, even moments later, gets a fresh try instead of
+    // being stuck replaying today's failure for the next 30 minutes.
+    throw new Error(`Anthropic API request failed with status ${response.status}`);
+  }
+
+  const data = await response.json();
+  const textContent = data.content?.[0]?.text ?? "";
+
   try {
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-haiku-4-5",
-        max_tokens: 8192,
-        messages: [{ role: "user", content: prompt }],
-      }),
-    });
-
-    if (!response.ok) {
-      const errorBody = await response.text();
-      console.error(
-        `[news-relevance] Anthropic API returned ${response.status}:`,
-        errorBody
-      );
-      return NextResponse.json({ error: "AI request failed" }, { status: 500 });
-    }
-
-    const data = await response.json();
-    const textContent = data.content?.[0]?.text ?? "";
-
-    let parsed;
-    try {
-      parsed = JSON.parse(textContent);
-    } catch {
-      const match = textContent.match(/\{[\s\S]*\}/);
-      if (match) {
-        try {
-          parsed = JSON.parse(match[0]);
-        } catch {
-          console.error(
-            "[news-relevance] Could not parse AI response as JSON:",
-            textContent.slice(0, 500)
-          );
-          parsed = { results: [] };
-        }
-      } else {
+    return JSON.parse(textContent);
+  } catch {
+    const match = textContent.match(/\{[\s\S]*\}/);
+    if (match) {
+      try {
+        return JSON.parse(match[0]);
+      } catch {
         console.error(
-          "[news-relevance] AI response had no JSON object at all:",
+          "[news-relevance] Could not parse AI response as JSON:",
           textContent.slice(0, 500)
         );
-        parsed = { results: [] };
+        return { results: [] };
       }
     }
+    console.error(
+      "[news-relevance] AI response had no JSON object at all:",
+      textContent.slice(0, 500)
+    );
+    return { results: [] };
+  }
+}
 
+export async function POST(request: Request) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    return NextResponse.json({ error: "Missing API key" }, { status: 500 });
+  }
+
+  const body = await request.json();
+  const clubNames: string[] = body.clubNames ?? [];
+  const articles: ArticleInput[] = body.articles ?? [];
+
+  if (clubNames.length === 0 || articles.length === 0) {
+    return NextResponse.json({ results: [] });
+  }
+
+  try {
+    // Cached for 30 minutes - the same window the underlying news fetch
+    // itself uses (see src/app/api/news/route.ts), so this cache and the
+    // articles it's analyzing go stale together.
+    const parsed = await getOrSet(
+      buildCacheKey(clubNames, articles),
+      30 * 60 * 1000,
+      () => callAnthropic(apiKey, clubNames, articles)
+    );
     return NextResponse.json(parsed);
   } catch (error) {
     console.error("[news-relevance] Unexpected error:", error);

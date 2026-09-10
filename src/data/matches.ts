@@ -31,16 +31,6 @@ export const matches: Match[] = [
     status: "scheduled",
   },
   {
-    id: "m3",
-    competition: "Swiss Super League",
-    homeClubId: "fc-zurich",
-    awayClubId: "fc-basel",
-    kickoff: "2026-08-17T16:30:00",
-    venue: "Letzigrund",
-    city: "Zürich",
-    status: "scheduled",
-  },
-  {
     id: "m4",
     competition: "La Liga",
     homeClubId: "barcelona",
@@ -98,16 +88,6 @@ export const matches: Match[] = [
     kickoff: "2026-08-22T19:00:00",
     venue: "Allianz Stadium",
     city: "Turin",
-    status: "scheduled",
-  },
-  {
-    id: "m10",
-    competition: "Swiss Super League",
-    homeClubId: "young-boys",
-    awayClubId: "fc-zurich",
-    kickoff: "2026-08-23T16:00:00",
-    venue: "Wankdorf Stadium",
-    city: "Bern",
     status: "scheduled",
   },
   {

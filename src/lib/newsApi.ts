@@ -142,17 +142,77 @@ function normalizeTitle(title: string): string {
     .trim();
 }
 
-// Catches near-duplicate titles that aren't byte-identical, most commonly
-// when one source appends its own name to the same headline (e.g. "...
-// Enzo Fernandez replacement" vs "... Enzo Fernandez replacement - Sports
-// Mole"). If one normalized title is a prefix of the other, treat them as
-// the same story.
+// Words too common to say anything about whether two headlines describe
+// the same story - stripped out before comparing titles for overlap.
+const TITLE_STOPWORDS = new Set([
+  "a",
+  "an",
+  "the",
+  "and",
+  "or",
+  "but",
+  "in",
+  "on",
+  "at",
+  "to",
+  "for",
+  "of",
+  "with",
+  "by",
+  "from",
+  "as",
+  "is",
+  "are",
+  "was",
+  "were",
+  "his",
+  "her",
+  "their",
+  "its",
+  "after",
+  "before",
+  "into",
+  "over",
+  "against",
+  "vs",
+  "new",
+]);
+
+function significantWords(normalizedTitle: string): Set<string> {
+  return new Set(
+    normalizedTitle
+      .split(" ")
+      .filter((word) => word.length > 2 && !TITLE_STOPWORDS.has(word))
+  );
+}
+
+// How much of the smaller title's meaningful words also appear in the
+// other title. Two outlets covering the same match will independently
+// reuse the same player names, club names and score - even while wording
+// the rest of the headline completely differently - so a high overlap is
+// a strong signal they're the same story.
+function titleSimilarity(a: string, b: string): number {
+  const wordsA = significantWords(a);
+  const wordsB = significantWords(b);
+  if (wordsA.size === 0 || wordsB.size === 0) return 0;
+
+  let shared = 0;
+  for (const word of wordsA) {
+    if (wordsB.has(word)) shared += 1;
+  }
+
+  const smaller = Math.min(wordsA.size, wordsB.size);
+  return shared / smaller;
+}
+
+// Catches near-duplicate titles that aren't byte-identical: a source
+// appending its own name to the same headline, and - more commonly - two
+// different outlets independently paraphrasing the same story (different
+// wording, same players/clubs/score). A high shared-word ratio between the
+// two titles is treated as the same story either way.
 function normalizedTitlesAreNearDuplicate(a: string, b: string): boolean {
   if (a === b) return true;
-  const shorter = a.length <= b.length ? a : b;
-  const longer = a.length <= b.length ? b : a;
-  if (shorter.length < 15) return false;
-  return longer.startsWith(shorter);
+  return titleSimilarity(a, b) >= 0.6;
 }
 
 // A club name can collide with unrelated things (a wrestler's stage name,
@@ -266,7 +326,11 @@ function buildFromKeywordMatching(candidates: Candidate[]): NewsUpdate[] {
     );
     if (clubIds.length === 0) continue;
 
-    const category = guessCategory(`${candidate.title} ${candidate.description}`);
+    // Categorize using the same truncated text the user will actually
+    // see, not the full raw article body - a long, unrelated tail further
+    // down in the raw description shouldn't be able to hijack the category.
+    const summary = truncateSummary(candidate.description);
+    const category = guessCategory(`${candidate.title} ${summary}`);
 
     for (const clubId of clubIds) {
       result.push({
@@ -274,7 +338,7 @@ function buildFromKeywordMatching(candidates: Candidate[]): NewsUpdate[] {
         clubId,
         category,
         title: candidate.title,
-        summary: truncateSummary(candidate.description),
+        summary,
         source: candidate.source,
         publishedAt: candidate.publishedAt,
         link: candidate.link,
@@ -304,7 +368,8 @@ function buildFromRelevance(
       item.summary && item.summary.trim().length > 0
         ? item.summary
         : candidate.description;
-    const category = guessCategory(`${candidate.title} ${rawSummary}`);
+    const summary = truncateSummary(rawSummary);
+    const category = guessCategory(`${candidate.title} ${summary}`);
 
     for (const clubName of item.clubs) {
       const club = clubs.find(
@@ -317,7 +382,7 @@ function buildFromRelevance(
         clubId: club.id,
         category,
         title: candidate.title,
-        summary: truncateSummary(rawSummary),
+        summary,
         source: candidate.source,
         publishedAt: candidate.publishedAt,
         link: candidate.link,
