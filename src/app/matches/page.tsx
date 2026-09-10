@@ -79,7 +79,7 @@ export default function Matches() {
     );
   }
   return (
-    <main className="min-h-screen overflow-x-hidden bg-[#F5F6F8] pb-24">
+    <main className="min-h-screen overflow-x-hidden bg-[#F5F6F8] pb-24 dark:bg-[#0B0D12]">
       <header className="relative overflow-hidden bg-[#080B13] text-white">
         <div className="pointer-events-none absolute inset-0">
           <div className="absolute -left-24 -top-28 h-72 w-72 rounded-full bg-blue-600/25 blur-[90px]" />
@@ -115,10 +115,11 @@ export default function Matches() {
                 const awayClub = getClub(match.awayClubId);
                 const homeColor = homeClub?.primaryColor ?? "#94A3B8";
                 const awayColor = awayClub?.primaryColor ?? "#94A3B8";
+                const isInPlay = match.status === "IN_PLAY" || match.status === "PAUSED";
                 return (
                   <article
                     key={match.id}
-                    className="relative overflow-hidden rounded-[26px] border border-black/[0.045] bg-white shadow-[0_6px_24px_rgba(0,0,0,0.045)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_34px_rgba(0,0,0,0.08)]"
+                    className="relative overflow-hidden rounded-[26px] border border-black/[0.045] bg-white shadow-[0_6px_24px_rgba(0,0,0,0.045)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_34px_rgba(0,0,0,0.08)] dark:border-white/[0.06] dark:bg-[#14171F] dark:shadow-none"
                   >
                     <div
                       className="h-1.5 w-full"
@@ -127,10 +128,16 @@ export default function Matches() {
                       }}
                     />
                     <div className="p-5">
-                      <div className="mb-5 flex items-center justify-end gap-3">
-                        <div className="shrink-0 rounded-full bg-[#F2F4F7] px-3 py-1.5 text-[11px] font-bold text-zinc-500">
+                      <div className="mb-5 flex items-center justify-start gap-2">
+                        <div className="shrink-0 rounded-full bg-[#F2F4F7] px-3 py-1.5 text-[11px] font-bold text-zinc-500 dark:bg-white/10 dark:text-zinc-300">
                           {formatCompetition(match.competition)}
                         </div>
+                        {isInPlay && (
+                          <div className="flex shrink-0 items-center gap-1.5 rounded-full bg-red-500/10 px-3 py-1.5 text-[11px] font-black uppercase tracking-wider text-red-600 dark:bg-red-500/15 dark:text-red-400">
+                            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />
+                            {match.status === "PAUSED" ? "Half-time" : "Live"}
+                          </div>
+                        )}
                       </div>
                       <div className="grid grid-cols-[1fr_72px_1fr] items-center gap-3">
                         <div className="min-w-0">
@@ -145,21 +152,38 @@ export default function Matches() {
                           <div
                             className={`break-words leading-tight ${
                               isHomeFollowed
-                                ? "text-[16px] font-black text-[#111318]"
-                                : "text-[14px] font-medium text-zinc-400"
+                                ? "text-[16px] font-black text-[#111318] dark:text-white"
+                                : "text-[14px] font-medium text-zinc-400 dark:text-zinc-500"
                             }`}
                           >
                             {homeClub?.name ?? match.homeTeamName}
                           </div>
                         </div>
                         <div className="text-center">
-                          <div className="text-[9px] font-black uppercase tracking-[0.16em] text-zinc-400">
-                            Kickoff
-                          </div>
-                          <div className="mt-1 whitespace-nowrap text-lg font-black tracking-tight text-[#111318]">
-                            {formatTime(match.kickoff)}
-                          </div>
-                          <div className="mx-auto mt-2 w-fit rounded-full bg-[#F2F4F7] px-3 py-1 text-[9px] font-black uppercase tracking-widest text-zinc-400">
+                          {isInPlay ? (
+                            <>
+                              <div className="text-[9px] font-black uppercase tracking-[0.16em] text-red-500">
+                                {match.status === "PAUSED"
+                                  ? "Half-time"
+                                  : match.minute
+                                  ? `${match.minute}'`
+                                  : "Live"}
+                              </div>
+                              <div className="mt-1 whitespace-nowrap text-lg font-black tracking-tight text-[#111318] dark:text-white">
+                                {match.homeScore ?? 0} – {match.awayScore ?? 0}
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="text-[9px] font-black uppercase tracking-[0.16em] text-zinc-400 dark:text-zinc-500">
+                                Kickoff
+                              </div>
+                              <div className="mt-1 whitespace-nowrap text-lg font-black tracking-tight text-[#111318] dark:text-white">
+                                {formatTime(match.kickoff)}
+                              </div>
+                            </>
+                          )}
+                          <div className="mx-auto mt-2 w-fit rounded-full bg-[#F2F4F7] px-3 py-1 text-[9px] font-black uppercase tracking-widest text-zinc-400 dark:bg-white/10 dark:text-zinc-400">
                             VS
                           </div>
                         </div>
@@ -175,28 +199,28 @@ export default function Matches() {
                           <div
                             className={`break-words leading-tight ${
                               isAwayFollowed
-                                ? "text-[16px] font-black text-[#111318]"
-                                : "text-[14px] font-medium text-zinc-400"
+                                ? "text-[16px] font-black text-[#111318] dark:text-white"
+                                : "text-[14px] font-medium text-zinc-400 dark:text-zinc-500"
                             }`}
                           >
                             {awayClub?.name ?? match.awayTeamName}
                           </div>
                         </div>
                       </div>
-                      <div className="mt-5 flex items-center justify-between gap-3 border-t border-zinc-100 pt-4">
+                      <div className="mt-5 flex items-center justify-between gap-3 border-t border-zinc-100 pt-4 dark:border-white/10">
                         <div className="min-w-0">
-                          <div className="text-xs font-bold text-zinc-600">
+                          <div className="text-xs font-bold text-zinc-600 dark:text-zinc-300">
                             {formatDate(match.kickoff)}
                           </div>
                           {match.venue && (
-                            <div className="mt-0.5 truncate text-[11px] text-zinc-400">
+                            <div className="mt-0.5 truncate text-[11px] text-zinc-400 dark:text-zinc-500">
                               {match.venue}
                             </div>
                           )}
                         </div>
                         <Link
                           href={`/match/${match.id}`}
-                          className="shrink-0 rounded-xl bg-[#F2F4F7] px-3 py-2 text-[11px] font-black text-zinc-600 transition hover:bg-[#E8EBF0]"
+                          className="shrink-0 rounded-xl bg-[#F2F4F7] px-3 py-2 text-[11px] font-black text-zinc-600 transition hover:bg-[#E8EBF0] dark:bg-white/10 dark:text-zinc-300 dark:hover:bg-white/15"
                         >
                           Details →
                         </Link>
@@ -209,21 +233,21 @@ export default function Matches() {
           </section>
         )}
         {liveError && (
-          <div className="mb-6 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+          <div className="mb-6 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 dark:bg-red-500/10 dark:border-red-500/30 dark:text-red-400">
             Couldn&apos;t load live match data. Showing saved matches below.
           </div>
         )}
         <section className="mb-7">
           <div className="mb-3 flex items-end justify-between px-1">
             <div>
-              <h2 className="text-lg font-black text-[#111318]">
+              <h2 className="text-lg font-black text-[#111318] dark:text-white">
                 Filter by club
               </h2>
-              <p className="mt-0.5 text-xs font-medium text-zinc-400">
+              <p className="mt-0.5 text-xs font-medium text-zinc-400 dark:text-zinc-500">
                 Show matches from one club
               </p>
             </div>
-            <div className="rounded-full bg-white px-3 py-1.5 text-[11px] font-black text-zinc-500 shadow-sm">
+            <div className="rounded-full bg-white px-3 py-1.5 text-[11px] font-black text-zinc-500 shadow-sm dark:bg-[#14171F] dark:text-zinc-300 dark:shadow-none">
               {myMatches.length} matches
             </div>
           </div>
@@ -233,8 +257,8 @@ export default function Matches() {
                 onClick={() => setActiveFilter("all")}
                 className={`whitespace-nowrap rounded-full px-4 py-2.5 text-sm font-bold transition-all ${
                   activeFilter === "all"
-                    ? "bg-[#111318] text-white shadow-lg shadow-black/10"
-                    : "border border-black/[0.05] bg-white text-zinc-600 shadow-sm"
+                    ? "bg-[#111318] text-white shadow-lg shadow-black/10 dark:bg-white dark:text-[#111318] dark:shadow-none"
+                    : "border border-black/[0.05] bg-white text-zinc-600 shadow-sm dark:border-white/10 dark:bg-[#14171F] dark:text-zinc-300 dark:shadow-none"
                 }`}
               >
                 All clubs
@@ -248,7 +272,7 @@ export default function Matches() {
                     className={`flex items-center gap-2 whitespace-nowrap rounded-full px-3.5 py-2 text-sm font-bold transition-all ${
                       isActive
                         ? "text-white shadow-lg"
-                        : "border border-black/[0.05] bg-white text-zinc-600 shadow-sm"
+                        : "border border-black/[0.05] bg-white text-zinc-600 shadow-sm dark:border-white/10 dark:bg-[#14171F] dark:text-zinc-300 dark:shadow-none"
                     }`}
                     style={
                       isActive
@@ -275,14 +299,14 @@ export default function Matches() {
         </section>
         {myMatches.length === 0 && (
           <section className="py-10">
-            <div className="rounded-[28px] border border-black/[0.04] bg-white px-6 py-10 text-center shadow-sm">
-              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#F1F3F7] text-2xl">
+            <div className="rounded-[28px] border border-black/[0.04] bg-white px-6 py-10 text-center shadow-sm dark:border-white/[0.06] dark:bg-[#14171F] dark:shadow-none">
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#F1F3F7] text-2xl dark:bg-white/10">
                 📅
               </div>
-              <h2 className="mb-2 text-lg font-black text-[#111318]">
+              <h2 className="mb-2 text-lg font-black text-[#111318] dark:text-white">
                 No upcoming matches
               </h2>
-              <p className="mx-auto max-w-xs text-sm leading-6 text-zinc-500">
+              <p className="mx-auto max-w-xs text-sm leading-6 text-zinc-500 dark:text-zinc-400">
                 There aren&apos;t any upcoming matches for this filter right now.
               </p>
             </div>
@@ -291,10 +315,10 @@ export default function Matches() {
         {myMatches.length > 0 && (
           <section>
             <div className="mb-4">
-              <h2 className="text-[22px] font-black tracking-tight text-[#111318]">
+              <h2 className="text-[22px] font-black tracking-tight text-[#111318] dark:text-white">
                 Upcoming (saved)
               </h2>
-              <p className="mt-0.5 text-xs font-medium text-zinc-400">
+              <p className="mt-0.5 text-xs font-medium text-zinc-400 dark:text-zinc-500">
                 Your next fixtures
               </p>
             </div>
@@ -308,10 +332,10 @@ export default function Matches() {
                 return (
                   <article
                     key={match.id}
-                    className={`relative overflow-hidden rounded-[26px] border bg-white shadow-[0_6px_24px_rgba(0,0,0,0.045)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_34px_rgba(0,0,0,0.08)] ${
+                    className={`relative overflow-hidden rounded-[26px] border bg-white shadow-[0_6px_24px_rgba(0,0,0,0.045)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_34px_rgba(0,0,0,0.08)] dark:bg-[#14171F] dark:shadow-none ${
                       isNextMatch
-                        ? "border-blue-200/70"
-                        : "border-black/[0.045]"
+                        ? "border-blue-200/70 dark:border-blue-500/40"
+                        : "border-black/[0.045] dark:border-white/[0.06]"
                     }`}
                   >
                     <div
@@ -324,15 +348,15 @@ export default function Matches() {
                       <div className="mb-5 flex items-center justify-between gap-3">
                         <div className="min-w-0">
                           {isNextMatch && (
-                            <div className="mb-1 text-[9px] font-black uppercase tracking-[0.2em] text-blue-500">
+                            <div className="mb-1 text-[9px] font-black uppercase tracking-[0.2em] text-blue-500 dark:text-blue-400">
                               Next match
                             </div>
                           )}
-                          <div className="truncate text-[10px] font-black uppercase tracking-[0.15em] text-zinc-400">
+                          <div className="truncate text-[10px] font-black uppercase tracking-[0.15em] text-zinc-400 dark:text-zinc-500">
                             {formatCompetition(match.competition)}
                           </div>
                         </div>
-                        <div className="shrink-0 rounded-full bg-[#F2F4F7] px-3 py-1.5 text-[11px] font-bold text-zinc-500">
+                        <div className="shrink-0 rounded-full bg-[#F2F4F7] px-3 py-1.5 text-[11px] font-bold text-zinc-500 dark:bg-white/10 dark:text-zinc-300">
                           {formatDate(match.kickoff)}
                         </div>
                       </div>
@@ -346,21 +370,21 @@ export default function Matches() {
                               size={48}
                             />
                           </div>
-                          <div className="break-words text-[15px] font-black leading-tight text-[#111318]">
+                          <div className="break-words text-[15px] font-black leading-tight text-[#111318] dark:text-white">
                             {getClubName(match.homeClubId)}
                           </div>
-                          <div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                          <div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
                             Home
                           </div>
                         </div>
                         <div className="text-center">
-                          <div className="text-[9px] font-black uppercase tracking-[0.16em] text-zinc-400">
+                          <div className="text-[9px] font-black uppercase tracking-[0.16em] text-zinc-400 dark:text-zinc-500">
                             Kickoff
                           </div>
-                          <div className="mt-1 whitespace-nowrap text-xl font-black tracking-tight text-[#111318]">
+                          <div className="mt-1 whitespace-nowrap text-xl font-black tracking-tight text-[#111318] dark:text-white">
                             {formatTime(match.kickoff)}
                           </div>
-                          <div className="mx-auto mt-2 w-fit rounded-full bg-[#F2F4F7] px-3 py-1 text-[9px] font-black uppercase tracking-widest text-zinc-400">
+                          <div className="mx-auto mt-2 w-fit rounded-full bg-[#F2F4F7] px-3 py-1 text-[9px] font-black uppercase tracking-widest text-zinc-400 dark:bg-white/10 dark:text-zinc-400">
                             VS
                           </div>
                         </div>
@@ -373,28 +397,28 @@ export default function Matches() {
                               size={48}
                             />
                           </div>
-                          <div className="break-words text-[15px] font-black leading-tight text-[#111318]">
+                          <div className="break-words text-[15px] font-black leading-tight text-[#111318] dark:text-white">
                             {getClubName(match.awayClubId)}
                           </div>
-                          <div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                          <div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
                             Away
                           </div>
                         </div>
                       </div>
-                      <div className="mt-5 flex items-center justify-between gap-3 border-t border-zinc-100 pt-4">
+                      <div className="mt-5 flex items-center justify-between gap-3 border-t border-zinc-100 pt-4 dark:border-white/10">
                         <div className="min-w-0">
-                          <div className="truncate text-xs font-bold text-zinc-600">
+                          <div className="truncate text-xs font-bold text-zinc-600 dark:text-zinc-300">
                             {match.venue}
                           </div>
                           {match.city && (
-                            <div className="mt-0.5 truncate text-[11px] text-zinc-400">
+                            <div className="mt-0.5 truncate text-[11px] text-zinc-400 dark:text-zinc-500">
                               {match.city}
                             </div>
                           )}
                         </div>
                         <Link
                           href={`/match/${match.id}`}
-                          className="shrink-0 rounded-xl bg-[#F2F4F7] px-3 py-2 text-[11px] font-black text-zinc-600 transition hover:bg-[#E8EBF0]"
+                          className="shrink-0 rounded-xl bg-[#F2F4F7] px-3 py-2 text-[11px] font-black text-zinc-600 transition hover:bg-[#E8EBF0] dark:bg-white/10 dark:text-zinc-300 dark:hover:bg-white/15"
                         >
                           Details →
                         </Link>

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { updates as mockUpdates, UpdateCategory } from "../../data/updates";
+import { clubSpotlights } from "../../data/clubSpotlights";
 import { useClubs } from "../../context/ClubsContext";
 import { getClub, getClubName } from "../../lib/clubHelpers";
 import { formatDate, timeAgo } from "../../lib/dateHelpers";
@@ -18,7 +19,17 @@ type DisplayUpdate = {
   source: string;
   publishedAt: string;
   link?: string;
+  isAiSummary?: boolean;
 };
+
+const CARD_PREVIEW_LENGTH = 160;
+
+function getPreview(text: string, limit: number): string {
+  if (text.length <= limit) return text;
+  const trimmed = text.slice(0, limit);
+  const lastSpace = trimmed.lastIndexOf(" ");
+  return `${trimmed.slice(0, lastSpace > 0 ? lastSpace : limit)}…`;
+}
 
 export default function Updates() {
    const { selectedIds } = useClubs();
@@ -38,11 +49,43 @@ export default function Updates() {
   const [activeCategory, setActiveCategory] = useState(
     "All" as UpdateCategory | "All"
   );
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
-  const combinedUpdates: DisplayUpdate[] =
+  const toggleExpanded = (id: string) => {
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const baseUpdates: DisplayUpdate[] =
     liveUpdates.length > 0
       ? liveUpdates.map((u) => ({ ...u }))
       : mockUpdates.map((u) => ({ ...u, link: undefined }));
+
+  const coveredClubIds = new Set(baseUpdates.map((u) => u.clubId));
+
+  const spotlightUpdates: DisplayUpdate[] = clubSpotlights
+    .filter(
+      (spotlight) =>
+        selectedIds.includes(spotlight.clubId) &&
+        !coveredClubIds.has(spotlight.clubId)
+    )
+    .map((spotlight) => ({
+      id: `spotlight-${spotlight.clubId}`,
+      clubId: spotlight.clubId,
+      category: "Club" as UpdateCategory,
+      title: spotlight.title,
+      summary: spotlight.summary,
+      source: `AI Summary · written ${formatDate(spotlight.writtenAt)}`,
+      publishedAt: spotlight.writtenAt,
+      link: undefined,
+      isAiSummary: true,
+    }));
+
+  const combinedUpdates: DisplayUpdate[] = [...baseUpdates, ...spotlightUpdates];
 
   const myUpdates = combinedUpdates
     .filter((update) => selectedIds.includes(update.clubId))
@@ -92,7 +135,7 @@ export default function Updates() {
   }
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-[#F5F6F8] pb-24">
+    <main className="min-h-screen overflow-x-hidden bg-[#F5F6F8] pb-24 dark:bg-[#0B0D12]">
       <header className="relative overflow-hidden bg-[#080B13] text-white">
         <div className="pointer-events-none absolute inset-0">
           <div className="absolute -left-24 -top-28 h-72 w-72 rounded-full bg-blue-600/25 blur-[90px]" />
@@ -139,16 +182,16 @@ export default function Updates() {
         <section className="mb-7">
           <div className="mb-3 flex items-end justify-between px-1">
             <div>
-              <h2 className="text-lg font-black text-[#111318]">
+              <h2 className="text-lg font-black text-[#111318] dark:text-white">
                 Filter updates
               </h2>
 
-              <p className="mt-0.5 text-xs font-medium text-zinc-400">
+              <p className="mt-0.5 text-xs font-medium text-zinc-400 dark:text-zinc-500">
                 Choose what you want to see
               </p>
             </div>
 
-            <div className="rounded-full bg-white px-3 py-1.5 text-[11px] font-black text-zinc-500 shadow-sm">
+            <div className="rounded-full bg-white px-3 py-1.5 text-[11px] font-black text-zinc-500 shadow-sm dark:bg-[#14171F] dark:text-zinc-300 dark:shadow-none">
               {myUpdates.length} updates
             </div>
           </div>
@@ -168,7 +211,7 @@ export default function Updates() {
                     className={`flex items-center gap-2 whitespace-nowrap rounded-full px-4 py-2.5 text-sm font-bold transition-all ${
                       isActive
                         ? "text-white shadow-lg"
-                        : "border border-black/[0.05] bg-white text-zinc-600 shadow-sm"
+                        : "border border-black/[0.05] bg-white text-zinc-600 shadow-sm dark:border-white/10 dark:bg-[#14171F] dark:text-zinc-300 dark:shadow-none"
                     }`}
                     style={
                       isActive
@@ -209,16 +252,16 @@ export default function Updates() {
 
         {myUpdates.length === 0 && (
           <section className="py-10">
-            <div className="rounded-[28px] border border-black/[0.04] bg-white px-6 py-10 text-center shadow-sm">
-              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#F1F3F7] text-2xl">
+            <div className="rounded-[28px] border border-black/[0.04] bg-white px-6 py-10 text-center shadow-sm dark:border-white/[0.06] dark:bg-[#14171F] dark:shadow-none">
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#F1F3F7] text-2xl dark:bg-white/10">
                 🔎
               </div>
 
-              <h2 className="mb-2 text-lg font-black text-[#111318]">
+              <h2 className="mb-2 text-lg font-black text-[#111318] dark:text-white">
                 Nothing here yet
               </h2>
 
-              <p className="mx-auto max-w-xs text-sm leading-6 text-zinc-500">
+              <p className="mx-auto max-w-xs text-sm leading-6 text-zinc-500 dark:text-zinc-400">
                 There aren&apos;t any {activeCategory.toLowerCase()} updates
                 from your clubs right now.
               </p>
@@ -226,7 +269,7 @@ export default function Updates() {
               {activeCategory !== "All" && (
                 <button
                   onClick={() => setActiveCategory("All")}
-                  className="mt-5 rounded-xl bg-[#111318] px-5 py-2.5 text-xs font-black text-white"
+                  className="mt-5 rounded-xl bg-[#111318] px-5 py-2.5 text-xs font-black text-white dark:bg-white dark:text-[#111318]"
                 >
                   Show all updates
                 </button>
@@ -238,11 +281,11 @@ export default function Updates() {
         {myUpdates.length > 0 && (
           <section>
             <div className="mb-4">
-              <h2 className="text-[22px] font-black tracking-tight text-[#111318]">
+              <h2 className="text-[22px] font-black tracking-tight text-[#111318] dark:text-white">
                 Latest
               </h2>
 
-              <p className="mt-0.5 text-xs font-medium text-zinc-400">
+              <p className="mt-0.5 text-xs font-medium text-zinc-400 dark:text-zinc-500">
                 Newest updates first
               </p>
             </div>
@@ -256,13 +299,21 @@ export default function Updates() {
 
                 const isNewest = index === 0;
 
+                const isExpandable =
+                  !update.link && update.summary.length > CARD_PREVIEW_LENGTH;
+                const isExpanded = expandedIds.has(update.id);
+                const displayText =
+                  isExpandable && !isExpanded
+                    ? getPreview(update.summary, CARD_PREVIEW_LENGTH)
+                    : update.summary;
+
                 return (
                   <article
                     key={update.id}
-                    className={`relative overflow-hidden rounded-[26px] border bg-white shadow-[0_6px_24px_rgba(0,0,0,0.045)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_34px_rgba(0,0,0,0.08)] ${
+                    className={`relative overflow-hidden rounded-[26px] border bg-white shadow-[0_6px_24px_rgba(0,0,0,0.045)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_34px_rgba(0,0,0,0.08)] dark:bg-[#14171F] dark:shadow-none ${
                       isNewest
-                        ? "border-blue-200/60"
-                        : "border-black/[0.045]"
+                        ? "border-blue-200/60 dark:border-blue-500/40"
+                        : "border-black/[0.045] dark:border-white/[0.06]"
                     }`}
                   >
                     <div
@@ -282,16 +333,16 @@ export default function Updates() {
 
                           <div className="min-w-0">
                             {isNewest && (
-                              <div className="mb-0.5 text-[9px] font-black uppercase tracking-[0.18em] text-blue-500">
+                              <div className="mb-0.5 text-[9px] font-black uppercase tracking-[0.18em] text-blue-500 dark:text-blue-400">
                                 Latest update
                               </div>
                             )}
 
-                            <div className="truncate text-sm font-black text-[#111318]">
+                            <div className="truncate text-sm font-black text-[#111318] dark:text-white">
                               {getClubName(update.clubId)}
                             </div>
 
-                            <div className="mt-0.5 flex items-center gap-1.5 text-[10px] font-medium text-zinc-400">
+                            <div className="mt-0.5 flex items-center gap-1.5 text-[10px] font-medium text-zinc-400 dark:text-zinc-500">
                               <span>{formatDate(update.publishedAt)}</span>
                               <span>·</span>
                               <span>{timeAgo(update.publishedAt)}</span>
@@ -314,21 +365,21 @@ export default function Updates() {
                         </div>
                       </div>
 
-                      <h3 className="mb-2 text-[17px] font-black leading-snug tracking-[-0.015em] text-[#111318]">
+                      <h3 className="mb-2 text-[17px] font-black leading-snug tracking-[-0.015em] text-[#111318] dark:text-white">
                         {update.title}
                       </h3>
 
-                      <p className="text-[13px] leading-[1.7] text-zinc-500">
-                        {update.summary}
+                      <p className="text-[13px] leading-[1.7] text-zinc-500 dark:text-zinc-400">
+                        {displayText}
                       </p>
 
-                      <div className="mt-5 flex items-center justify-between gap-3 border-t border-zinc-100 pt-4">
+                      <div className="mt-5 flex items-center justify-between gap-3 border-t border-zinc-100 pt-4 dark:border-white/10">
                         <div className="min-w-0">
-                          <div className="text-[9px] font-black uppercase tracking-[0.14em] text-zinc-300">
+                          <div className="text-[9px] font-black uppercase tracking-[0.14em] text-zinc-300 dark:text-zinc-600">
                             Source
                           </div>
 
-                          <div className="mt-0.5 truncate text-[11px] font-semibold text-zinc-500">
+                          <div className="mt-0.5 truncate text-[11px] font-semibold text-zinc-500 dark:text-zinc-400">
                             {update.source}
                           </div>
                         </div>
@@ -346,6 +397,17 @@ export default function Updates() {
                           >
                             Read more →
                           </a>
+                        ) : isExpandable ? (
+                          <button
+                            onClick={() => toggleExpanded(update.id)}
+                            className="shrink-0 rounded-xl px-3 py-2 text-[11px] font-black transition-opacity hover:opacity-70"
+                            style={{
+                              backgroundColor: category.background,
+                              color: category.color,
+                            }}
+                          >
+                            {isExpanded ? "Show less ↑" : "Read more →"}
+                          </button>
                         ) : (
                           <span
                             className="shrink-0 rounded-xl px-3 py-2 text-[11px] font-black opacity-50"
@@ -365,7 +427,7 @@ export default function Updates() {
             </div>
 
             {liveUpdates.length > 0 && (
-              <p className="mt-6 text-center text-[10px] font-medium text-zinc-400">
+              <p className="mt-6 text-center text-[10px] font-medium text-zinc-400 dark:text-zinc-500">
                 News powered by NewsData.io
               </p>
             )}

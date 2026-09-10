@@ -47,7 +47,7 @@ export default function Navigation() {
       </Link>
 
       <nav
-        className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-zinc-200 flex justify-around py-3"
+        className="fixed bottom-0 left-0 right-0 z-40 flex justify-around border-t border-zinc-200 bg-white py-3 dark:border-white/10 dark:bg-[#0B0D12]"
         style={{
           transform: "translateZ(0)",
           WebkitTransform: "translateZ(0)",
@@ -63,7 +63,9 @@ export default function Navigation() {
               key={tab.href}
               href={tab.href}
               className={`text-sm font-medium ${
-                isActive ? "text-black" : "text-[#6B6B6B]"
+                isActive
+                  ? "text-black dark:text-white"
+                  : "text-[#6B6B6B] dark:text-zinc-500"
               }`}
             >
               {tab.label}

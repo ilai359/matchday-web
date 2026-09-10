@@ -78,10 +78,10 @@ export default function YourClubs() {
     <section className="mb-10">
       <div className="mb-4 flex items-end justify-between">
         <div>
-          <h2 className="text-[22px] font-black tracking-tight text-[#111318]">
+          <h2 className="text-[22px] font-black tracking-tight text-[#111318] dark:text-white">
             Your Clubs
           </h2>
-          <p className="mt-0.5 text-xs font-medium text-zinc-400">
+          <p className="mt-0.5 text-xs font-medium text-zinc-400 dark:text-zinc-500">
             League tables and top performers
           </p>
         </div>
@@ -96,7 +96,7 @@ export default function YourClubs() {
             return (
               <div
                 key={club.id}
-                className="flex items-center gap-3 rounded-[24px] border border-dashed border-zinc-200 bg-white p-4"
+                className="flex items-center gap-3 rounded-[24px] border border-dashed border-zinc-200 bg-white p-4 dark:border-white/10 dark:bg-[#14171F]"
               >
                 <ClubBadge
                   name={club.name}
@@ -105,10 +105,10 @@ export default function YourClubs() {
                   size={44}
                 />
                 <div className="min-w-0">
-                  <div className="truncate text-sm font-black text-[#111318]">
+                  <div className="truncate text-sm font-black text-[#111318] dark:text-white">
                     {club.name}
                   </div>
-                  <div className="mt-0.5 text-[11px] font-medium text-zinc-400">
+                  <div className="mt-0.5 text-[11px] font-medium text-zinc-400 dark:text-zinc-500">
                     Stats for {club.league} aren&apos;t available yet
                   </div>
                 </div>
@@ -197,7 +197,7 @@ function rankBadgeClass(i: number): string {
     return `${base} text-white bg-gradient-to-br from-zinc-300 to-zinc-500 shadow-sm shadow-zinc-400/30`;
   if (i === 2)
     return `${base} text-white bg-gradient-to-br from-orange-400 to-orange-700 shadow-sm shadow-orange-500/30`;
-  return `${base} text-zinc-400 bg-zinc-100`;
+  return `${base} text-zinc-400 bg-zinc-100 dark:bg-white/10 dark:text-zinc-400`;
 }
 
 function StatPill({
@@ -243,7 +243,7 @@ function StatList({
     <div>
       <div className="mb-2.5 flex items-center gap-1.5">
         <span className="text-sm">{icon}</span>
-        <span className="text-[10px] font-black uppercase tracking-[0.16em] text-zinc-400">
+        <span className="text-[10px] font-black uppercase tracking-[0.16em] text-zinc-400 dark:text-zinc-500">
           {title}
         </span>
       </div>
@@ -257,12 +257,14 @@ function StatList({
               <div className="min-w-0 flex-1">
                 <div
                   className={`truncate text-[12px] leading-tight ${
-                    isClub ? "font-black text-[#111318]" : "font-semibold text-zinc-500"
+                    isClub
+                      ? "font-black text-[#111318] dark:text-white"
+                      : "font-semibold text-zinc-500 dark:text-zinc-400"
                   }`}
                 >
                   {item.playerName}
                 </div>
-                <div className="mt-1 h-1 w-full rounded-full bg-zinc-100">
+                <div className="mt-1 h-1 w-full rounded-full bg-zinc-100 dark:bg-white/10">
                   <div
                     className="h-1 rounded-full transition-all"
                     style={{
@@ -273,7 +275,9 @@ function StatList({
                 </div>
               </div>
               <div
-                className={`shrink-0 text-xs font-black ${isClub ? "" : "text-zinc-400"}`}
+                className={`shrink-0 text-xs font-black ${
+                  isClub ? "" : "text-zinc-400 dark:text-zinc-500"
+                }`}
                 style={isClub ? { color: club.primaryColor } : undefined}
               >
                 {value}
@@ -314,7 +318,7 @@ function ClubStatsCard({
     (visibleRows.length > 0 || topScorers.length > 0 || topAssists.length > 0);
 
   return (
-    <div className="overflow-hidden rounded-[28px] bg-white shadow-[0_10px_30px_rgba(0,0,0,0.06)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_45px_rgba(0,0,0,0.1)]">
+    <div className="overflow-hidden rounded-[28px] bg-white shadow-[0_10px_30px_rgba(0,0,0,0.06)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_45px_rgba(0,0,0,0.1)] dark:bg-[#14171F] dark:shadow-none">
       <div
         className="relative overflow-hidden p-5 text-white"
         style={{
@@ -364,13 +368,13 @@ function ClubStatsCard({
       </div>
 
       {loading && (
-        <div className="p-6 text-center text-xs font-medium text-zinc-400">
+        <div className="p-6 text-center text-xs font-medium text-zinc-400 dark:text-zinc-500">
           Loading league info…
         </div>
       )}
 
       {!loading && !hasStats && (
-        <div className="p-6 text-center text-xs font-medium text-zinc-400">
+        <div className="p-6 text-center text-xs font-medium text-zinc-400 dark:text-zinc-500">
           No league info available right now.
         </div>
       )}
@@ -379,7 +383,7 @@ function ClubStatsCard({
         <div className="p-4 pt-5">
           <div className="mb-2.5 flex items-center gap-1.5">
             <span className="text-sm">📊</span>
-            <span className="text-[10px] font-black uppercase tracking-[0.16em] text-zinc-400">
+            <span className="text-[10px] font-black uppercase tracking-[0.16em] text-zinc-400 dark:text-zinc-500">
               League table
             </span>
           </div>
@@ -409,12 +413,14 @@ function ClubStatsCard({
                   </div>
                   <div
                     className={`min-w-0 flex-1 truncate text-[13px] ${
-                      isClub ? "font-black text-[#111318]" : "font-semibold text-zinc-600"
+                      isClub
+                        ? "font-black text-[#111318] dark:text-white"
+                        : "font-semibold text-zinc-600 dark:text-zinc-300"
                     }`}
                   >
                     {row.teamName}
                   </div>
-                                   <div className="flex shrink-0 items-center gap-3 text-[11px] font-bold text-zinc-400">
+                                   <div className="flex shrink-0 items-center gap-3 text-[11px] font-bold text-zinc-400 dark:text-zinc-500">
                     <span className="w-6 text-right">{row.playedGames}P</span>
                     <span className="w-7 text-right">
                       {row.goalDifference > 0
@@ -423,7 +429,9 @@ function ClubStatsCard({
                     </span>
                     <span
                       className={`w-12 text-right ${
-                        isClub ? "font-black" : "font-bold text-zinc-500"
+                        isClub
+                          ? "font-black"
+                          : "font-bold text-zinc-500 dark:text-zinc-400"
                       }`}
                       style={isClub ? { color: club.primaryColor } : undefined}
                     >

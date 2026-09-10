@@ -11,6 +11,9 @@ export type LiveMatch = {
   kickoff: string;
   venue: string;
   status: string;
+  homeScore: number | null;
+  awayScore: number | null;
+  minute: number | null;
 };
 const CLUB_ALIASES: Record<string, string[]> = {
   arsenal: ["arsenal fc", "arsenal"],
@@ -173,10 +176,14 @@ type RawApiMatch = {
   id: number;
   utcDate: string;
   status: string;
+  minute?: number | null;
   venue?: string;
   competition: { name: string };
   homeTeam: { name: string; crest?: string };
   awayTeam: { name: string; crest?: string };
+  score?: {
+    fullTime?: { home: number | null; away: number | null };
+  };
 };
 
 function mapRawMatch(match: RawApiMatch): LiveMatch {
@@ -194,8 +201,44 @@ function mapRawMatch(match: RawApiMatch): LiveMatch {
     kickoff: match.utcDate,
     venue: match.venue ?? "",
     status: match.status,
+    homeScore: match.score?.fullTime?.home ?? null,
+    awayScore: match.score?.fullTime?.away ?? null,
+    minute: match.minute ?? null,
   };
 }
+
+// Fetches JSON from one of our own API routes, retrying a couple of times
+// on failure (a transient network blip, or an occasional rate-limit from
+// football-data.org) before giving up - so a single hiccup doesn't leave
+// the page silently stuck on empty data until someone manually refreshes.
+async function fetchJsonWithRetry(
+  url: string,
+  attempts = 3,
+  delayMs = 700
+): Promise<any> {
+  let lastError: unknown;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const response = await fetch(url);
+      if (response.ok) {
+        return await response.json();
+      }
+      lastError = new Error(`Request to ${url} failed with status ${response.status}`);
+    } catch (error) {
+      lastError = error;
+    }
+    if (i < attempts - 1) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+  throw lastError;
+}
+
+// Matches worth showing on the Matches page: not yet started (TIMED /
+// SCHEDULED), or currently being played (IN_PLAY / PAUSED at half-time).
+// Finished matches are deliberately left out here - this list is about
+// what's coming up or happening right now, not match history.
+const VISIBLE_STATUSES = new Set(["TIMED", "SCHEDULED", "IN_PLAY", "PAUSED"]);
 
 export async function fetchLiveMatches(): Promise<LiveMatch[]> {
   const response = await fetch("/api/matches");
@@ -206,13 +249,13 @@ export async function fetchLiveMatches(): Promise<LiveMatch[]> {
   const rawMatches: RawApiMatch[] = data.matches ?? [];
   return rawMatches
     .map(mapRawMatch)
-    .filter((match) => match.status === "TIMED" || match.status === "SCHEDULED");
+    .filter((match) => VISIBLE_STATUSES.has(match.status));
 }
 
-// Every upcoming match for one club, across every competition our
-// football-data.org plan gives us access to (not just their main league) -
-// so cup runs and continental competitions show up too, whenever the plan
-// covers them.
+// Every upcoming or in-progress match for one club, across every
+// competition our football-data.org plan gives us access to (not just
+// their main league) - so cup runs and continental competitions show up
+// too, whenever the plan covers them.
 export async function fetchTeamMatches(teamId: string): Promise<LiveMatch[]> {
   const response = await fetch(`/api/team-matches?id=${teamId}`);
   if (!response.ok) {
@@ -222,7 +265,7 @@ export async function fetchTeamMatches(teamId: string): Promise<LiveMatch[]> {
   const rawMatches: RawApiMatch[] = data.matches ?? [];
   return rawMatches
     .map(mapRawMatch)
-    .filter((match) => match.status === "TIMED" || match.status === "SCHEDULED");
+    .filter((match) => VISIBLE_STATUSES.has(match.status));
 }
 
 // --- League table & top scorers/assists ---
@@ -236,6 +279,7 @@ export const LEAGUE_TO_CODE: Record<string, string> = {
   "Serie A": "SA",
   Eredivisie: "DED",
   "Primeira Liga": "PPL",
+  "UEFA Champions League": "CL",
 };
 
 export type StandingsRow = {
@@ -354,13 +398,9 @@ export async function fetchFinishedMatches(
   season?: string
 ): Promise<FinishedMatch[]> {
   const seasonParam = season ? `&season=${season}` : "";
-  const response = await fetch(
+  const data = await fetchJsonWithRetry(
     `/api/finished-matches?competition=${competitionCode}${seasonParam}`
   );
-  if (!response.ok) {
-    throw new Error("Failed to fetch finished matches");
-  }
-  const data = await response.json();
   const rawMatches: RawFinishedMatch[] = data.matches ?? [];
   return rawMatches.map((match) => ({
     id: String(match.id),

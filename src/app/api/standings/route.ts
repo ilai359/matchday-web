@@ -20,7 +20,7 @@ export async function GET(request: Request) {
       `https://api.football-data.org/v4/competitions/${competition}/standings`,
       {
         headers: { "X-Auth-Token": apiKey },
-        next: { revalidate: 3600 },
+        next: { revalidate: 300 },
       }
     );
     if (!response.ok) {

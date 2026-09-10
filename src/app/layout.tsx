@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ClubsProvider } from "../context/ClubsContext";
+import { ThemeProvider } from "../context/ThemeContext";
 import Navigation from "../components/Navigation";
 
 const geistSans = Geist({
@@ -24,12 +25,29 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col">
-        <ClubsProvider>
-          <div className="flex-1 pb-20 bg-[#F5F6F8]">{children}</div>
-          <Navigation />
-        </ClubsProvider>
+      <body className="min-h-full flex flex-col" suppressHydrationWarning>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              try {
+                var theme = localStorage.getItem("matchday-theme");
+                if (theme === "dark") {
+                  document.documentElement.classList.add("dark");
+                }
+              } catch (e) {}
+            `,
+          }}
+        />
+        <ThemeProvider>
+          <ClubsProvider>
+            <div className="flex-1 pb-20 bg-[#F5F6F8] dark:bg-[#0B0D12]">
+              {children}
+            </div>
+            <Navigation />
+          </ClubsProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

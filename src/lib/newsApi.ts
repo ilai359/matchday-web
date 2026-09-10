@@ -83,19 +83,6 @@ const CATEGORY_KEYWORDS: { category: UpdateCategory; keywords: string[] }[] = [
     ],
   },
   {
-    category: "Fixture",
-    keywords: [
-      "kick-off",
-      "kickoff",
-      "postponed",
-      "rescheduled",
-      "fixture",
-      "schedule",
-      "confirmed for",
-      "date confirmed",
-    ],
-  },
-  {
     category: "Match",
     keywords: [
       "beat",
@@ -111,6 +98,14 @@ const CATEGORY_KEYWORDS: { category: UpdateCategory; keywords: string[] }[] = [
       "win over",
       "wins",
       "loses to",
+      "kick-off",
+      "kickoff",
+      "postponed",
+      "rescheduled",
+      "fixture",
+      "schedule",
+      "confirmed for",
+      "date confirmed",
     ],
   },
 ];
@@ -125,11 +120,70 @@ function guessCategory(text: string): UpdateCategory {
   return "Club";
 }
 
+// NewsData.io's "description" field isn't reliably short - some sources
+// send back the full article body in it. Cap what we display so a card
+// never balloons into a wall of text, cutting at the nearest word boundary
+// rather than mid-word.
+const MAX_SUMMARY_LENGTH = 260;
+
+function truncateSummary(text: string): string {
+  const trimmed = text.trim();
+  if (trimmed.length <= MAX_SUMMARY_LENGTH) return trimmed;
+  const cut = trimmed.slice(0, MAX_SUMMARY_LENGTH);
+  const lastSpace = cut.lastIndexOf(" ");
+  const safeCut = lastSpace > 40 ? cut.slice(0, lastSpace) : cut;
+  return `${safeCut}…`;
+}
+
 function normalizeTitle(title: string): string {
   return title
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
+}
+
+// Catches near-duplicate titles that aren't byte-identical, most commonly
+// when one source appends its own name to the same headline (e.g. "...
+// Enzo Fernandez replacement" vs "... Enzo Fernandez replacement - Sports
+// Mole"). If one normalized title is a prefix of the other, treat them as
+// the same story.
+function normalizedTitlesAreNearDuplicate(a: string, b: string): boolean {
+  if (a === b) return true;
+  const shorter = a.length <= b.length ? a : b;
+  const longer = a.length <= b.length ? b : a;
+  if (shorter.length < 15) return false;
+  return longer.startsWith(shorter);
+}
+
+// A club name can collide with unrelated things (a wrestler's stage name,
+// a place, a common first name). If the article clearly belongs to some
+// other sport entirely, discard it outright - regardless of whether the
+// AI relevance check is available that day.
+const NON_FOOTBALL_MARKERS = [
+  "wwe",
+  "wrestl",
+  "aew",
+  " nxt",
+  "ufc",
+  " mma ",
+  "boxing",
+  "cricket",
+  "rugby",
+  "formula 1",
+  " f1 ",
+  " nba ",
+  " nfl ",
+  " nhl ",
+  " mlb ",
+  "tennis",
+  "golf tour",
+  "basketball",
+  "baseball",
+];
+
+function looksLikeNonFootballContent(text: string): boolean {
+  const lower = ` ${text.toLowerCase()} `;
+  return NON_FOOTBALL_MARKERS.some((marker) => lower.includes(marker));
 }
 
 const ENGLISH_MARKER_WORDS = new Set([
@@ -220,7 +274,7 @@ function buildFromKeywordMatching(candidates: Candidate[]): NewsUpdate[] {
         clubId,
         category,
         title: candidate.title,
-        summary: candidate.description,
+        summary: truncateSummary(candidate.description),
         source: candidate.source,
         publishedAt: candidate.publishedAt,
         link: candidate.link,
@@ -246,11 +300,11 @@ function buildFromRelevance(
     if (!candidate) continue;
     if (!item.clubs || item.clubs.length === 0) continue;
 
-    const summary =
+    const rawSummary =
       item.summary && item.summary.trim().length > 0
         ? item.summary
         : candidate.description;
-    const category = guessCategory(`${candidate.title} ${summary}`);
+    const category = guessCategory(`${candidate.title} ${rawSummary}`);
 
     for (const clubName of item.clubs) {
       const club = clubs.find(
@@ -263,7 +317,7 @@ function buildFromRelevance(
         clubId: club.id,
         category,
         title: candidate.title,
-        summary,
+        summary: truncateSummary(rawSummary),
         source: candidate.source,
         publishedAt: candidate.publishedAt,
         link: candidate.link,
@@ -292,7 +346,7 @@ export async function fetchLiveUpdates(
   const now = Date.now();
 
   const seenLinks = new Set<string>();
-  const seenTitles = new Set<string>();
+  const seenNormalizedTitles: string[] = [];
   const candidates: Candidate[] = [];
 
   for (const article of rawArticles) {
@@ -315,12 +369,16 @@ export async function fetchLiveUpdates(
     const description = article.description ?? "";
     const text = `${article.title} ${description}`;
     if (!isLikelyEnglish(text)) continue;
+    if (looksLikeNonFootballContent(text)) continue;
 
     const normalizedTitle = normalizeTitle(article.title);
-    if (seenTitles.has(normalizedTitle)) continue;
+    const isDuplicateTitle = seenNormalizedTitles.some((seen) =>
+      normalizedTitlesAreNearDuplicate(seen, normalizedTitle)
+    );
+    if (isDuplicateTitle) continue;
 
     seenLinks.add(article.link);
-    seenTitles.add(normalizedTitle);
+    seenNormalizedTitles.push(normalizedTitle);
 
     candidates.push({
       id: article.article_id ?? article.link,

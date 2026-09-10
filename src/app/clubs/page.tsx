@@ -73,7 +73,7 @@ export default function Clubs() {
 
   return (
     <main
-      className="min-h-screen overflow-x-hidden bg-[#F5F6F8] pb-24"
+      className="min-h-screen overflow-x-hidden bg-[#F5F6F8] pb-24 dark:bg-[#0B0D12]"
       style={{ overflowAnchor: "none" }}
     >
       {/* HEADER */}
@@ -126,11 +126,11 @@ export default function Clubs() {
           <section className="mb-9">
             <div className="mb-4 flex items-end justify-between">
               <div>
-                <h2 className="text-[22px] font-black tracking-tight text-[#111318]">
+                <h2 className="text-[22px] font-black tracking-tight text-[#111318] dark:text-white">
                   Following
                 </h2>
 
-                <p className="mt-0.5 text-xs font-medium text-zinc-400">
+                <p className="mt-0.5 text-xs font-medium text-zinc-400 dark:text-zinc-500">
                   Clubs in your Matchday feed
                 </p>
               </div>
@@ -147,7 +147,7 @@ export default function Clubs() {
                 return (
                   <article
                     key={club.id}
-                    className="relative overflow-hidden rounded-[24px] border border-black/[0.045] bg-white shadow-[0_5px_20px_rgba(0,0,0,0.035)]"
+                    className="relative overflow-hidden rounded-[24px] border border-black/[0.045] bg-white shadow-[0_5px_20px_rgba(0,0,0,0.035)] dark:border-white/[0.06] dark:bg-[#14171F] dark:shadow-none"
                   >
                     <div
                       className="absolute bottom-0 left-0 top-0 w-1"
@@ -163,13 +163,13 @@ export default function Clubs() {
                       />
 
                       <div className="min-w-0 flex-1">
-                        <div className="truncate text-[15px] font-black text-[#111318]">
+                        <div className="truncate text-[15px] font-black text-[#111318] dark:text-white">
                           {club.name}
                         </div>
 
-                        <div className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-zinc-400">
+                        <div className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-zinc-400 dark:text-zinc-500">
                           <span className="truncate">{club.country}</span>
-                          <span className="shrink-0 text-zinc-300">·</span>
+                          <span className="shrink-0 text-zinc-300 dark:text-zinc-600">·</span>
                           <span className="truncate">{club.league}</span>
                         </div>
                       </div>
@@ -177,7 +177,7 @@ export default function Clubs() {
                       <button
                         type="button"
                         onClick={() => handleFollowingToggle(club.id)}
-                        className="group shrink-0 rounded-xl bg-emerald-50 px-3 py-2 text-[11px] font-black text-emerald-700 transition-all hover:bg-red-50 hover:text-red-600 active:scale-95"
+                        className="group shrink-0 rounded-xl bg-emerald-50 px-3 py-2 text-[11px] font-black text-emerald-700 transition-all hover:bg-red-50 hover:text-red-600 active:scale-95 dark:bg-emerald-500/10 dark:text-emerald-400 dark:hover:bg-red-500/10 dark:hover:text-red-400"
                         aria-label={`Unfollow ${club.name}`}
                       >
                         <span className="group-hover:hidden">
@@ -199,20 +199,20 @@ export default function Clubs() {
         {/* ADD ANOTHER CLUB */}
         <section>
           <div className="mb-4">
-            <h2 className="text-[22px] font-black tracking-tight text-[#111318]">
+            <h2 className="text-[22px] font-black tracking-tight text-[#111318] dark:text-white">
               {followedClubs.length > 0
                 ? "Add another club"
                 : "Choose your clubs"}
             </h2>
 
-            <p className="mt-0.5 text-xs font-medium text-zinc-400">
+            <p className="mt-0.5 text-xs font-medium text-zinc-400 dark:text-zinc-500">
               Search by club, league or country
             </p>
           </div>
 
           {/* SEARCH */}
           <div className="relative mb-5">
-            <div className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400">
+            <div className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-zinc-400 dark:text-zinc-500">
               🔎
             </div>
 
@@ -221,14 +221,14 @@ export default function Clubs() {
               placeholder="Search clubs..."
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              className="w-full rounded-2xl border border-black/[0.05] bg-white py-4 pl-11 pr-11 text-sm font-semibold text-[#111318] shadow-sm outline-none transition-all placeholder:font-medium placeholder:text-zinc-300 focus:border-blue-300 focus:ring-4 focus:ring-blue-100"
+              className="w-full rounded-2xl border border-black/[0.05] bg-white py-4 pl-11 pr-11 text-sm font-semibold text-[#111318] shadow-sm outline-none transition-all placeholder:font-medium placeholder:text-zinc-300 focus:border-blue-300 focus:ring-4 focus:ring-blue-100 dark:border-white/10 dark:bg-[#14171F] dark:text-white dark:shadow-none dark:placeholder:text-zinc-600 dark:focus:border-blue-500/40 dark:focus:ring-blue-500/10"
             />
 
             {query.length > 0 && (
               <button
                 type="button"
                 onClick={() => setQuery("")}
-                className="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-[#F1F3F7] text-sm font-bold text-zinc-400 transition hover:bg-zinc-200"
+                className="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-[#F1F3F7] text-sm font-bold text-zinc-400 transition hover:bg-zinc-200 dark:bg-white/10 dark:text-zinc-400 dark:hover:bg-white/20"
                 aria-label="Clear search"
               >
                 ×
@@ -238,7 +238,7 @@ export default function Clubs() {
 
           {/* SEARCH RESULT COUNT */}
           {query.trim() && filteredClubs.length > 0 && (
-            <div className="mb-3 px-1 text-[11px] font-bold text-zinc-400">
+            <div className="mb-3 px-1 text-[11px] font-bold text-zinc-400 dark:text-zinc-500">
               {filteredClubs.length}{" "}
               {filteredClubs.length === 1
                 ? "club found"
@@ -248,21 +248,21 @@ export default function Clubs() {
 
           {/* EMPTY SEARCH */}
           {filteredClubs.length === 0 && (
-            <div className="rounded-[28px] border border-black/[0.04] bg-white px-6 py-10 text-center shadow-sm">
-              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#F1F3F7] text-2xl">
+            <div className="rounded-[28px] border border-black/[0.04] bg-white px-6 py-10 text-center shadow-sm dark:border-white/[0.06] dark:bg-[#14171F] dark:shadow-none">
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#F1F3F7] text-2xl dark:bg-white/10">
                 🔎
               </div>
 
-              <h3 className="mb-2 text-lg font-black text-[#111318]">
+              <h3 className="mb-2 text-lg font-black text-[#111318] dark:text-white">
                 No clubs found
               </h3>
 
-              <p className="mx-auto max-w-xs text-sm leading-6 text-zinc-500">
+              <p className="mx-auto max-w-xs text-sm leading-6 text-zinc-500 dark:text-zinc-400">
                 We couldn&apos;t find a club matching
                 {query.trim() ? (
                   <>
                     {" "}
-                    <span className="font-bold text-zinc-700">
+                    <span className="font-bold text-zinc-700 dark:text-zinc-200">
                       &quot;{query}&quot;
                     </span>
                   </>
@@ -275,7 +275,7 @@ export default function Clubs() {
               <button
                 type="button"
                 onClick={() => setQuery("")}
-                className="mt-5 rounded-xl bg-[#111318] px-5 py-2.5 text-xs font-black text-white transition active:scale-95"
+                className="mt-5 rounded-xl bg-[#111318] px-5 py-2.5 text-xs font-black text-white transition active:scale-95 dark:bg-white dark:text-[#111318]"
               >
                 Clear search
               </button>
@@ -303,10 +303,10 @@ export default function Clubs() {
                       handleListToggle(club.id);
                     }
                   }}
-                  className={`group relative w-full cursor-pointer overflow-hidden rounded-[24px] border p-4 text-left shadow-[0_5px_20px_rgba(0,0,0,0.035)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_30px_rgba(0,0,0,0.07)] active:scale-[0.995] ${
+                  className={`group relative w-full cursor-pointer overflow-hidden rounded-[24px] border p-4 text-left shadow-[0_5px_20px_rgba(0,0,0,0.035)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_30px_rgba(0,0,0,0.07)] active:scale-[0.995] dark:hover:shadow-none ${
                     isSelected
                       ? "border-transparent text-white"
-                      : "border-black/[0.045] bg-white text-[#111318]"
+                      : "border-black/[0.045] bg-white text-[#111318] dark:border-white/[0.06] dark:bg-[#14171F] dark:text-white"
                   }`}
                   style={
                     isSelected
@@ -358,7 +358,7 @@ export default function Clubs() {
                         className={`mt-1 flex min-w-0 items-center gap-1.5 text-xs ${
                           isSelected
                             ? "text-white/55"
-                            : "text-zinc-400"
+                            : "text-zinc-400 dark:text-zinc-500"
                         }`}
                       >
                         <span className="truncate">
@@ -369,7 +369,7 @@ export default function Clubs() {
                           className={
                             isSelected
                               ? "text-white/25"
-                              : "text-zinc-300"
+                              : "text-zinc-300 dark:text-zinc-600"
                           }
                         >
                           ·
@@ -396,7 +396,7 @@ export default function Clubs() {
                       className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-lg font-black transition-all hover:scale-105 active:scale-90 ${
                         isSelected
                           ? "border border-white/10 bg-white/15 text-white hover:bg-white/25"
-                          : "bg-[#F1F3F7] text-zinc-600 hover:bg-[#E4E7EC]"
+                          : "bg-[#F1F3F7] text-zinc-600 hover:bg-[#E4E7EC] dark:bg-white/10 dark:text-zinc-300 dark:hover:bg-white/20"
                       }`}
                     >
                       {isSelected ? "✓" : "+"}

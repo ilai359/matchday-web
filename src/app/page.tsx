@@ -139,7 +139,7 @@ export default function Home() {
   const homeColor = homeClub?.primaryColor ?? "#2563EB";
   const awayColor = awayClub?.primaryColor ?? "#7C3AED";
   return (
-    <main className="min-h-screen overflow-x-hidden bg-[#F5F6F8] pb-24">
+    <main className="min-h-screen overflow-x-hidden bg-[#F5F6F8] pb-24 dark:bg-[#0B0D12]">
       <header className="relative overflow-hidden bg-[#080B13] text-white">
         <div className="pointer-events-none absolute inset-0">
           <div className="absolute -left-24 -top-28 h-72 w-72 rounded-full bg-blue-600/25 blur-[90px]" />
@@ -186,10 +186,10 @@ export default function Home() {
         {nextMatch && (
           <section className="mb-9">
             <div className="mb-3 px-1">
-              <div className="text-[10px] font-black uppercase tracking-[0.22em] text-zinc-400">
+              <div className="text-[10px] font-black uppercase tracking-[0.22em] text-zinc-400 dark:text-zinc-500">
                 Next match
               </div>
-              <h2 className="mt-1 text-xl font-black tracking-tight text-[#111318]">
+              <h2 className="mt-1 text-xl font-black tracking-tight text-[#111318] dark:text-white">
                 Coming up
               </h2>
             </div>
@@ -278,14 +278,14 @@ export default function Home() {
           <section className="mb-10">
             <div className="mb-4 flex items-end justify-between">
               <div>
-                <h2 className="text-[22px] font-black tracking-tight text-[#111318]">
+                <h2 className="text-[22px] font-black tracking-tight text-[#111318] dark:text-white">
                   Up next
                 </h2>
-                <p className="mt-0.5 text-xs font-medium text-zinc-400">
+                <p className="mt-0.5 text-xs font-medium text-zinc-400 dark:text-zinc-500">
                   Your upcoming fixtures
                 </p>
               </div>
-              <span className="rounded-full bg-[#E9ECF2] px-3 py-1.5 text-[11px] font-black text-zinc-500">
+              <span className="rounded-full bg-[#E9ECF2] px-3 py-1.5 text-[11px] font-black text-zinc-500 dark:bg-white/10 dark:text-zinc-300">
                 {upcomingMatches.length}
               </span>
             </div>
@@ -298,7 +298,7 @@ export default function Home() {
                   <Link
                     key={match.id}
                     href={`/match/${match.id}`}
-                    className="relative block overflow-hidden rounded-[22px] border border-black/[0.045] bg-white p-4 shadow-[0_5px_20px_rgba(0,0,0,0.035)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_30px_rgba(0,0,0,0.07)]"
+                    className="relative block overflow-hidden rounded-[22px] border border-black/[0.045] bg-white p-4 shadow-[0_5px_20px_rgba(0,0,0,0.035)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_30px_rgba(0,0,0,0.07)] dark:border-white/[0.06] dark:bg-[#14171F] dark:shadow-none"
                   >
                     <div
                       className="absolute bottom-0 left-0 top-0 w-1"
@@ -310,7 +310,7 @@ export default function Home() {
                     <div className="flex items-center gap-4 pl-1">
                       <div className="min-w-0 flex-1">
                         <div className="mb-2 flex items-center gap-2">
-                          <span className="truncate text-[10px] font-black uppercase tracking-[0.16em] text-zinc-400">
+                          <span className="truncate text-[10px] font-black uppercase tracking-[0.16em] text-zinc-400 dark:text-zinc-500">
                             {formatCompetition(match.competition)}
                           </span>
                         </div>
@@ -318,32 +318,32 @@ export default function Home() {
                           <span
                             className={
                               isHomeFollowed
-                                ? "font-black text-[#111318]"
-                                : "rounded-md bg-zinc-100 px-2 py-0.5 font-semibold text-zinc-500"
+                                ? "font-black text-[#111318] dark:text-white"
+                                : "rounded-md bg-zinc-100 px-2 py-0.5 font-semibold text-zinc-500 dark:bg-white/10 dark:text-zinc-400"
                             }
                           >
                             {displayName(match.homeTeamName, match.homeClubId)}
                           </span>
-                          <span className="font-bold text-zinc-300">
+                          <span className="font-bold text-zinc-300 dark:text-zinc-600">
                             vs
                           </span>
                           <span
                             className={
                               isAwayFollowed
-                                ? "font-black text-[#111318]"
-                                : "rounded-md bg-zinc-100 px-2 py-0.5 font-semibold text-zinc-500"
+                                ? "font-black text-[#111318] dark:text-white"
+                                : "rounded-md bg-zinc-100 px-2 py-0.5 font-semibold text-zinc-500 dark:bg-white/10 dark:text-zinc-400"
                             }
                           >
                             {displayName(match.awayTeamName, match.awayClubId)}
                           </span>
                         </div>
-                        <div className="mt-2 truncate text-xs font-medium text-zinc-400">
+                        <div className="mt-2 truncate text-xs font-medium text-zinc-400 dark:text-zinc-500">
                           {formatDate(match.kickoff)}
                           {match.venue ? ` · ${match.venue}` : ""}
                         </div>
                       </div>
-                      <div className="shrink-0 rounded-2xl bg-[#F3F5F8] px-3 py-2.5 text-center">
-                        <div className="whitespace-nowrap text-sm font-black text-[#111318]">
+                      <div className="shrink-0 rounded-2xl bg-[#F3F5F8] px-3 py-2.5 text-center dark:bg-white/10">
+                        <div className="whitespace-nowrap text-sm font-black text-[#111318] dark:text-white">
                           {formatTime(match.kickoff)}
                         </div>
                       </div>
@@ -356,14 +356,14 @@ export default function Home() {
         )}
         {!nextMatch && (
           <section className="py-12">
-            <div className="rounded-[28px] border border-black/[0.04] bg-white px-6 py-10 text-center shadow-sm">
-              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#F1F3F7] text-2xl">
+            <div className="rounded-[28px] border border-black/[0.04] bg-white px-6 py-10 text-center shadow-sm dark:border-white/[0.06] dark:bg-[#14171F] dark:shadow-none">
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#F1F3F7] text-2xl dark:bg-white/10">
                 ⚽
               </div>
-              <h2 className="mb-2 text-lg font-black text-[#111318]">
+              <h2 className="mb-2 text-lg font-black text-[#111318] dark:text-white">
                 You&apos;re all caught up
               </h2>
-              <p className="mx-auto max-w-xs text-sm leading-6 text-zinc-500">
+              <p className="mx-auto max-w-xs text-sm leading-6 text-zinc-500 dark:text-zinc-400">
                 New matches from your clubs will appear here.
               </p>
             </div>
