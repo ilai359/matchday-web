@@ -39,8 +39,10 @@ Articles that do not share their story with any other article in the list are no
 
 Step 3 - Summary: For the representative of each story (and for any non-duplicate article), rewrite the title and description into one clean, natural paragraph, using ONLY facts present in the original text(s). Do not add any information, statistics, quotes, or details that are not in the original text.
 
+Step 4 - Category: For the representative of each story (and for any non-duplicate article), pick exactly ONE category that best describes it, from this fixed list only: "Injury" (injuries, fitness updates, medical news), "Transfer" (transfer rumours, signings, loan moves, contract news), "Press" (press conferences, interviews, quotes from a manager or player), "Match" (match previews, results, reports, fixture/schedule news), "Club" (anything else club-related that doesn't fit the categories above). Use exactly one of these five words, spelled and capitalized exactly as shown.
+
 Respond with ONLY valid JSON, no other text, in exactly this shape:
-{"results":[{"id":"<article id>","clubs":["<exact club name from the list above>"],"summary":"<rewritten paragraph>","isDuplicate":true|false}]}
+{"results":[{"id":"<article id>","clubs":["<exact club name from the list above>"],"summary":"<rewritten paragraph>","category":"Injury|Transfer|Press|Match|Club","isDuplicate":true|false}]}
 
 Include one entry in "results" for every article given, matched by its "id".`;
 

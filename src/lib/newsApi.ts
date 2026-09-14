@@ -28,6 +28,7 @@ type RelevanceResult = {
   clubs: string[];
   summary: string;
   isDuplicate?: boolean;
+  category?: string;
 };
 
 type Candidate = {
@@ -110,14 +111,39 @@ const CATEGORY_KEYWORDS: { category: UpdateCategory; keywords: string[] }[] = [
   },
 ];
 
+// A plain substring check ("lower.includes(keyword)") matches inside other
+// words too - e.g. the injury keyword "knock" was matching "knocked back an
+// offer" in a transfer story, tagging it as an injury. Matching on whole
+// words only (via \b word boundaries) avoids that class of false positive.
+function escapeForRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function containsWholeWordOrPhrase(text: string, keyword: string): boolean {
+  const pattern = new RegExp(`\\b${escapeForRegExp(keyword)}\\b`);
+  return pattern.test(text);
+}
+
 function guessCategory(text: string): UpdateCategory {
   const lower = text.toLowerCase();
   for (const { category, keywords } of CATEGORY_KEYWORDS) {
-    if (keywords.some((keyword) => lower.includes(keyword))) {
+    if (keywords.some((keyword) => containsWholeWordOrPhrase(lower, keyword))) {
       return category;
     }
   }
   return "Club";
+}
+
+const VALID_CATEGORIES = new Set<UpdateCategory>([
+  "Club",
+  "Injury",
+  "Transfer",
+  "Press",
+  "Match",
+]);
+
+function isValidCategory(value: unknown): value is UpdateCategory {
+  return typeof value === "string" && VALID_CATEGORIES.has(value as UpdateCategory);
 }
 
 // NewsData.io's "description" field isn't reliably short - some sources
@@ -246,6 +272,22 @@ function looksLikeNonFootballContent(text: string): boolean {
   return NON_FOOTBALL_MARKERS.some((marker) => lower.includes(marker));
 }
 
+// Some sources republish old syndicated stories under a fresh current
+// pubDate, which defeats the age filter below since it trusts that field.
+// "Shotoe Nigeria" was confirmed doing this (articles about January 2025
+// fixtures showing up labelled as today's news), so it's excluded outright
+// rather than trusted to report its own dates honestly.
+const BLOCKED_SOURCES = new Set<string>(["shotoenigeria"]);
+
+function normalizeSourceKey(text: string): string {
+  return text.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function isBlockedSource(article: RawArticle): boolean {
+  const key = normalizeSourceKey(article.source_name ?? article.source_id ?? "");
+  return key.length > 0 && BLOCKED_SOURCES.has(key);
+}
+
 const ENGLISH_MARKER_WORDS = new Set([
   "the",
   "and",
@@ -369,7 +411,13 @@ function buildFromRelevance(
         ? item.summary
         : candidate.description;
     const summary = truncateSummary(rawSummary);
-    const category = guessCategory(`${candidate.title} ${summary}`);
+    // The AI already reads the full article to check relevance, so it can
+    // hand back the category in the same response at no extra cost. Only
+    // fall back to keyword-guessing if it didn't (older cached result, or
+    // it returned something we don't recognize).
+    const category = isValidCategory(item.category)
+      ? item.category
+      : guessCategory(`${candidate.title} ${summary}`);
 
     for (const clubName of item.clubs) {
       const club = clubs.find(
@@ -417,6 +465,7 @@ export async function fetchLiveUpdates(
   for (const article of rawArticles) {
     if (!article.title || !article.link) continue;
     if (seenLinks.has(article.link)) continue;
+    if (isBlockedSource(article)) continue;
 
     if (
       article.language &&
