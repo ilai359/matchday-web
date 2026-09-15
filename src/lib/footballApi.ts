@@ -280,6 +280,12 @@ export const LEAGUE_TO_CODE: Record<string, string> = {
   Eredivisie: "DED",
   "Primeira Liga": "PPL",
   "UEFA Champions League": "CL",
+  // "EL"/"ECL" aren't real football-data.org codes - football-data.org
+  // doesn't offer either competition at all. They're our own labels,
+  // recognized by /api/finished-matches to route to a separate data
+  // source (API-Football) just for these two.
+  "UEFA Europa League": "EL",
+  "UEFA Europa Conference League": "ECL",
 };
 
 export type StandingsRow = {

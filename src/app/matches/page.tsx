@@ -36,6 +36,18 @@ export default function Matches() {
       .finally(() => setLiveLoading(false));
   }, []);
 
+  // The current time, used only to notice when a match's kickoff has
+  // already passed even though our cached data still calls it
+  // "scheduled" (some competitions are only checked every several
+  // hours). Read via an effect, not directly during render - components
+  // have to be pure, and the actual clock is not. Refreshed once a
+  // minute so the label updates without needing a page reload.
+  const [clockNow, setClockNow] = useState<number | null>(() => Date.now());
+  useEffect(() => {
+    const interval = setInterval(() => setClockNow(Date.now()), 60_000);
+    return () => clearInterval(interval);
+  }, []);
+
   // Restore the scroll position we were at before someone clicked into a
   // match's Details page, once this page has real content to scroll to.
   // We save it ourselves (see saveScrollPosition below) instead of relying
@@ -211,6 +223,17 @@ export default function Matches() {
                 const homeColor = homeClub?.primaryColor ?? "#94A3B8";
                 const awayColor = awayClub?.primaryColor ?? "#94A3B8";
                 const isInPlay = match.status === "IN_PLAY" || match.status === "PAUSED";
+                // Our match list isn't checked every minute (some
+                // competitions only every several hours), so a match can
+                // sit labeled "Kickoff [time]" even after that time has
+                // actually come and gone, wrongly implying it hasn't
+                // started yet. Once the clock has passed kickoff, say so
+                // honestly rather than pretending it's still upcoming -
+                // we just don't yet know the live score.
+                const hasKickedOffByClock =
+                  !isInPlay &&
+                  clockNow !== null &&
+                  new Date(match.kickoff).getTime() <= clockNow;
                 return (
                   <article
                     key={match.id}
@@ -271,11 +294,16 @@ export default function Matches() {
                           ) : (
                             <>
                               <div className="text-[9px] font-black uppercase tracking-[0.16em] text-zinc-400 dark:text-zinc-500">
-                                Kickoff
+                                {hasKickedOffByClock ? "Kicked off" : "Kickoff"}
                               </div>
                               <div className="mt-1 whitespace-nowrap text-lg font-black tracking-tight text-[#111318] dark:text-white">
                                 {formatTime(match.kickoff)}
                               </div>
+                              {hasKickedOffByClock && (
+                                <div className="mt-1 text-[9px] font-bold text-zinc-400 dark:text-zinc-500">
+                                  Score not yet available
+                                </div>
+                              )}
                             </>
                           )}
                           <div className="mx-auto mt-2 w-fit rounded-full bg-[#F2F4F7] px-3 py-1 text-[9px] font-black uppercase tracking-widest text-zinc-400 dark:bg-white/10 dark:text-zinc-400">

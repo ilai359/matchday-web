@@ -288,6 +288,35 @@ function isBlockedSource(article: RawArticle): boolean {
   return key.length > 0 && BLOCKED_SOURCES.has(key);
 }
 
+// Belt-and-braces on top of the blocked-source list above: some articles
+// spell out an actual date inside the title/description itself (e.g. "Catch
+// Everton - Aston Villa live on 15/01/2025"), and that date can be old even
+// when the article's own pubDate metadata claims it's from today. Rather
+// than only trust one known offending source, scan the text for an
+// explicit day/month/year date and discard the article if that date is
+// clearly in the past - this also protects against any other source doing
+// the same thing later.
+const EXPLICIT_DATE_PATTERN = /\b(\d{1,2})[/\-.](\d{1,2})[/\-.](20\d{2})\b/g;
+
+function containsStaleExplicitDate(
+  text: string,
+  maxAgeMs: number,
+  now: number
+): boolean {
+  EXPLICIT_DATE_PATTERN.lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = EXPLICIT_DATE_PATTERN.exec(text)) !== null) {
+    const day = Number(match[1]);
+    const month = Number(match[2]);
+    const year = Number(match[3]);
+    if (day < 1 || day > 31 || month < 1 || month > 12) continue;
+    const parsed = Date.UTC(year, month - 1, day);
+    if (Number.isNaN(parsed)) continue;
+    if (now - parsed > maxAgeMs) return true;
+  }
+  return false;
+}
+
 const ENGLISH_MARKER_WORDS = new Set([
   "the",
   "and",
@@ -484,6 +513,7 @@ export async function fetchLiveUpdates(
     const text = `${article.title} ${description}`;
     if (!isLikelyEnglish(text)) continue;
     if (looksLikeNonFootballContent(text)) continue;
+    if (containsStaleExplicitDate(text, MAX_AGE_MS, now)) continue;
 
     const normalizedTitle = normalizeTitle(article.title);
     const isDuplicateTitle = seenNormalizedTitles.some((seen) =>
