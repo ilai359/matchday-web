@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useClubs } from "../context/ClubsContext";
 import { getClub } from "../lib/clubHelpers";
 import {
@@ -38,10 +39,13 @@ export default function YourClubs() {
 
   useEffect(() => {
     if (supportedLeagues.length === 0) {
-      setLoading(false);
       return;
     }
     let cancelled = false;
+    // Standard "start loading, then resolve" data-fetching pattern - see
+    // the identical, more detailed note on this same pattern in
+    // ClubDetailClient.tsx.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     Promise.all(
       supportedLeagues.map(async (league) => {
@@ -73,6 +77,13 @@ export default function YourClubs() {
   if (followedClubs.length === 0) {
     return null;
   }
+
+  // When no followed club has a supported league, the effect above never
+  // runs (nothing to fetch) - loading would otherwise stay stuck at its
+  // initial `true` forever. Folding that condition in here instead of
+  // having the effect set state for it avoids an extra render for no
+  // benefit.
+  const isLoading = loading && supportedLeagues.length > 0;
 
   return (
     <section className="mb-10">
@@ -122,7 +133,7 @@ export default function YourClubs() {
               club={club}
               standings={data?.standings ?? []}
               scorers={data?.scorers ?? []}
-              loading={loading && !data}
+              loading={isLoading && !data}
             />
           );
         })}
@@ -319,8 +330,9 @@ function ClubStatsCard({
 
   return (
     <div className="overflow-hidden rounded-[28px] bg-white shadow-[0_10px_30px_rgba(0,0,0,0.06)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_45px_rgba(0,0,0,0.1)] dark:bg-[#14171F] dark:shadow-none">
-      <div
-        className="relative overflow-hidden p-5 text-white"
+      <Link
+        href={`/clubs/${club.id}`}
+        className="relative block overflow-hidden p-5 text-white transition hover:brightness-[1.08] active:brightness-95"
         style={{
           background: `linear-gradient(135deg, ${club.primaryColor} 0%, #0B0F1A 130%)`,
         }}
@@ -365,7 +377,10 @@ function ClubStatsCard({
             <StatPill label="Pts" value={clubRow.points} highlight />
           </div>
         )}
-      </div>
+        <div className="relative z-10 mt-3 flex items-center justify-center gap-1 text-[10px] font-bold text-white/50">
+          View club →
+        </div>
+      </Link>
 
       {loading && (
         <div className="p-6 text-center text-xs font-medium text-zinc-400 dark:text-zinc-500">
@@ -380,20 +395,20 @@ function ClubStatsCard({
       )}
 
       {!loading && visibleRows.length > 0 && (
-        <div className="p-4 pt-5">
-          <div className="mb-2.5 flex items-center gap-1.5">
+        <div className="p-4 pt-4">
+          <div className="mb-1.5 flex items-center gap-1.5">
             <span className="text-sm">📊</span>
             <span className="text-[10px] font-black uppercase tracking-[0.16em] text-zinc-400 dark:text-zinc-500">
               League table
             </span>
           </div>
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-0.5">
             {visibleRows.map((row) => {
               const isClub = row.clubId === club.id;
               return (
                 <div
                   key={row.teamName}
-                  className="flex items-center gap-3 rounded-2xl px-2.5 py-2"
+                  className="flex items-center gap-2 rounded-xl px-2 py-1.5"
                   style={
                     isClub
                       ? {
@@ -404,7 +419,7 @@ function ClubStatsCard({
                   }
                 >
                   <div
-                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-black text-white"
+                    className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-black text-white"
                     style={{
                       backgroundColor: isClub ? club.primaryColor : "#D4D4D8",
                     }}
@@ -412,7 +427,7 @@ function ClubStatsCard({
                     {row.position}
                   </div>
                   <div
-                    className={`min-w-0 flex-1 truncate text-[13px] ${
+                    className={`min-w-0 flex-1 truncate text-[12px] ${
                       isClub
                         ? "font-black text-[#111318] dark:text-white"
                         : "font-semibold text-zinc-600 dark:text-zinc-300"
@@ -420,15 +435,15 @@ function ClubStatsCard({
                   >
                     {row.teamName}
                   </div>
-                                   <div className="flex shrink-0 items-center gap-3 text-[11px] font-bold text-zinc-400 dark:text-zinc-500">
-                    <span className="w-6 text-right">{row.playedGames}P</span>
-                    <span className="w-7 text-right">
+                  <div className="flex shrink-0 items-center gap-2 text-[10px] font-bold text-zinc-400 dark:text-zinc-500">
+                    <span className="w-5 text-right">{row.playedGames}P</span>
+                    <span className="w-6 text-right">
                       {row.goalDifference > 0
                         ? `+${row.goalDifference}`
                         : row.goalDifference}
                     </span>
                     <span
-                      className={`w-12 text-right ${
+                      className={`w-10 text-right ${
                         isClub
                           ? "font-black"
                           : "font-bold text-zinc-500 dark:text-zinc-400"

@@ -272,6 +272,30 @@ function looksLikeNonFootballContent(text: string): boolean {
   return NON_FOOTBALL_MARKERS.some((marker) => lower.includes(marker));
 }
 
+// This app only tracks men's clubs/competitions (see clubs.ts) - a women's
+// football story about "Chelsea" or "Man Utd" still matches those same club
+// names, so it slips past every other filter and shows up mislabelled as
+// regular club news. Checked as whole words/phrases (not plain substrings)
+// so it doesn't misfire on unrelated text that merely contains "women" as
+// part of a longer word.
+const WOMENS_FOOTBALL_MARKERS = [
+  "women",
+  "womens",
+  "ladies",
+  "wsl",
+  "nwsl",
+  "uwcl",
+  "wfc",
+  "w-league",
+];
+
+function looksLikeWomensFootballContent(text: string): boolean {
+  const lower = text.toLowerCase();
+  return WOMENS_FOOTBALL_MARKERS.some((marker) =>
+    containsWholeWordOrPhrase(lower, marker)
+  );
+}
+
 // Some sources republish old syndicated stories under a fresh current
 // pubDate, which defeats the age filter below since it trusts that field.
 // "Shotoe Nigeria" was confirmed doing this (articles about January 2025
@@ -388,6 +412,22 @@ function findMatchingClubIdsByKeyword(
     .map((entry) => entry.id);
 }
 
+// Belt-and-braces final check right before anything reaches the screen: no
+// matter which path built the list (AI relevance or the keyword fallback),
+// make sure no two cards ever share the same id. This is what actually
+// stops a duplicate from reaching the page even if some future change
+// reintroduces one of these sources upstream.
+function dedupeById(items: NewsUpdate[]): NewsUpdate[] {
+  const seen = new Set<string>();
+  const result: NewsUpdate[] = [];
+  for (const item of items) {
+    if (seen.has(item.id)) continue;
+    seen.add(item.id);
+    result.push(item);
+  }
+  return result;
+}
+
 function buildFromKeywordMatching(candidates: Candidate[]): NewsUpdate[] {
   const result: NewsUpdate[] = [];
   for (const candidate of candidates) {
@@ -427,6 +467,14 @@ function buildFromRelevance(
     candidates.map((candidate) => [candidate.id, candidate])
   );
   const result: NewsUpdate[] = [];
+  // The AI is asked for exactly one result entry per article id, but it's
+  // not perfectly reliable about that - it can occasionally repeat the same
+  // id twice in its response. Without this guard, a repeated id would get
+  // processed twice and the same story would show up as two identical
+  // cards. Track which article ids (and which club within an article, in
+  // case the AI also repeats a club name in one article's "clubs" list)
+  // have already been turned into a card, and skip anything seen again.
+  const seenResultIds = new Set<string>();
 
   for (const item of relevanceResults) {
     if (item.isDuplicate) continue;
@@ -454,8 +502,12 @@ function buildFromRelevance(
       );
       if (!club) continue;
 
+      const id = `${candidate.id}-${club.id}`;
+      if (seenResultIds.has(id)) continue;
+      seenResultIds.add(id);
+
       result.push({
-        id: `${candidate.id}-${club.id}`,
+        id,
         clubId: club.id,
         category,
         title: candidate.title,
@@ -513,6 +565,7 @@ export async function fetchLiveUpdates(
     const text = `${article.title} ${description}`;
     if (!isLikelyEnglish(text)) continue;
     if (looksLikeNonFootballContent(text)) continue;
+    if (looksLikeWomensFootballContent(text)) continue;
     if (containsStaleExplicitDate(text, MAX_AGE_MS, now)) continue;
 
     const normalizedTitle = normalizeTitle(article.title);
@@ -556,7 +609,7 @@ export async function fetchLiveUpdates(
       const relevanceData = await relevanceResponse.json();
       const relevanceResults: RelevanceResult[] = relevanceData.results ?? [];
       if (relevanceResults.length > 0) {
-        const built = buildFromRelevance(candidates, relevanceResults);
+        const built = dedupeById(buildFromRelevance(candidates, relevanceResults));
         return built.sort(
           (a, b) =>
             new Date(b.publishedAt).getTime() -
@@ -568,7 +621,7 @@ export async function fetchLiveUpdates(
     // AI check unavailable — fall through to keyword matching below.
   }
 
-  const fallback = buildFromKeywordMatching(candidates);
+  const fallback = dedupeById(buildFromKeywordMatching(candidates));
   return fallback.sort(
     (a, b) =>
       new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()

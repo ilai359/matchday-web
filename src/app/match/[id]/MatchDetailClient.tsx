@@ -11,6 +11,8 @@ import {
   fetchLiveMatches,
   fetchFinishedMatches,
   fetchLiveMatchStatus,
+  fetchTeamInfo,
+  extractTeamId,
   LiveMatch,
   FinishedMatch,
   LiveMatchStatus,
@@ -71,11 +73,21 @@ function buildFromLive(liveMatch: LiveMatch): DisplayMatch {
     awayCrest: awayClub?.crest ?? liveMatch.awayCrest ?? undefined,
     homeColor: homeClub?.primaryColor ?? "#2563EB",
     awayColor: awayClub?.primaryColor ?? "#7C3AED",
-    homeClubId: homeClub?.id,
-    awayClubId: awayClub?.id,
+    // liveMatch.homeClubId/awayClubId are already either a real tracked
+    // clubId, or (for a club we don't track) that team's own name used as
+    // a stand-in ID - see mapRawMatch in footballApi.ts. `homeClub?.id`
+    // was silently throwing that stand-in ID away for untracked clubs
+    // (getClub() has nothing to find, so it returned undefined), which is
+    // exactly why "recent form" and head-to-head always came up empty for
+    // an opponent we don't track: there was no ID left for either of those
+    // to match past matches against. Falling back to liveMatch's own
+    // value keeps it for that case, while changing nothing for tracked
+    // clubs (homeClub.id is already the same value there).
+    homeClubId: homeClub?.id ?? liveMatch.homeClubId,
+    awayClubId: awayClub?.id ?? liveMatch.awayClubId,
     kickoff: liveMatch.kickoff,
     venue: liveMatch.venue,
-    city: undefined,
+    city: liveMatch.city || undefined,
     statusLabel: liveMatch.status === "TIMED" ? "Scheduled" : liveMatch.status,
   };
 }
@@ -264,6 +276,30 @@ export default function MatchDetailClient({ id }: { id: string }) {
     ? buildFromLive(liveMatch)
     : null;
 
+  // Last-resort venue lookup for an opponent outside our own 132-club list
+  // (e.g. a Champions League team we don't otherwise track), only used
+  // when nothing else already gave us a venue: not this match's own data,
+  // and not our hand-checked stadiums.ts (which only covers clubs we
+  // track). A match is always played at the home side's ground, so it's
+  // always the home team's info we need, never the away team's. City is
+  // deliberately not attempted here - see fetchTeamInfo's comment.
+  const [fallbackVenue, setFallbackVenue] = useState<string | undefined>(undefined);
+  const needsFallbackVenue = Boolean(displayMatch && !displayMatch.venue);
+  const homeCrestForLookup = needsFallbackVenue ? displayMatch?.homeCrest : undefined;
+
+  useEffect(() => {
+    if (!homeCrestForLookup) return;
+    const teamId = extractTeamId(homeCrestForLookup);
+    if (!teamId) return;
+    let cancelled = false;
+    fetchTeamInfo(teamId).then((info) => {
+      if (!cancelled && info?.venue) setFallbackVenue(info.venue);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [homeCrestForLookup]);
+
   // Kept separate on purpose: head-to-head history looks back two seasons,
   // but "recent form" pills should only ever reflect the current season.
   //
@@ -286,10 +322,17 @@ export default function MatchDetailClient({ id }: { id: string }) {
     // (e.g. Fenerbahçe) silently hid the OTHER team's form too, even
     // though we know exactly who they are and could show it fine.
     if (!leagueCode) {
-      setHistoryLoading(false);
       return;
     }
     let cancelled = false;
+    // This is the standard "start loading, then resolve" data-fetching
+    // pattern: mark loading true right as the fetch kicks off, then false
+    // in .finally() below once it settles. The linter would rather this
+    // state change happen outside the effect entirely, but there's no
+    // meaningful downside to the extra render here, and restructuring this
+    // well-understood, safe pattern just to satisfy it would only make the
+    // code harder to follow.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setHistoryLoading(true);
     const currentSeasonYear = getSeasonStartYear(new Date());
     const previousSeasonYear = currentSeasonYear - 1;
@@ -333,19 +376,23 @@ export default function MatchDetailClient({ id }: { id: string }) {
     const kickoffTime = new Date(kickoffForPolling).getTime();
     if (Number.isNaN(kickoffTime)) return;
 
+    // Date.now() here is intentional and safe: this whole block only runs
+    // inside this effect (never during render), which is exactly where
+    // reading the real current time belongs - it decides whether it's
+    // worth polling at all, it doesn't affect what gets rendered directly.
+    // eslint-disable-next-line react-hooks/purity
     const minutesSinceKickoff = (Date.now() - kickoffTime) / 60000;
     const withinLiveWindow = minutesSinceKickoff >= -15 && minutesSinceKickoff <= 180;
     if (!withinLiveWindow) return;
 
     let cancelled = false;
-    let intervalId: ReturnType<typeof setInterval> | undefined;
 
     function poll() {
       fetchLiveMatchStatus(id)
         .then((result) => {
           if (cancelled || !result) return;
           setLiveStatus(result);
-          if (result.status === "FINISHED" && intervalId) {
+          if (result.status === "FINISHED") {
             clearInterval(intervalId);
           }
         })
@@ -353,11 +400,11 @@ export default function MatchDetailClient({ id }: { id: string }) {
     }
 
     poll();
-    intervalId = setInterval(poll, 45000);
+    const intervalId = setInterval(poll, 45000);
 
     return () => {
       cancelled = true;
-      if (intervalId) clearInterval(intervalId);
+      clearInterval(intervalId);
     };
   }, [id, kickoffForPolling]);
 
@@ -453,6 +500,15 @@ export default function MatchDetailClient({ id }: { id: string }) {
 
   const homeForm = recentFormFor(displayMatch.homeClubId);
   const awayForm = recentFormFor(displayMatch.awayClubId);
+
+  // When there's no leagueCode, the history effect above never runs at all
+  // (nothing to fetch), so `historyLoading` would otherwise be stuck at its
+  // initial `true` forever. Rather than have the effect reach in and flip
+  // that state itself (which just adds an extra render for no benefit),
+  // it's simpler and just as correct to fold that condition in here.
+  const isHistoryLoading = historyLoading && Boolean(leagueCode);
+
+  const effectiveVenue = displayMatch.venue || fallbackVenue;
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#F5F6F8] pb-24 dark:bg-[#0B0D12]">
@@ -607,11 +663,11 @@ export default function MatchDetailClient({ id }: { id: string }) {
                     {displayMatch.competition}
                   </span>
                 </div>
-                {displayMatch.venue && (
+                {effectiveVenue && (
                   <div className="flex items-center justify-between rounded-2xl bg-[#F8F9FB] px-4 py-3 dark:bg-white/[0.04]">
                     <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400">Venue</span>
                     <span className="text-sm font-black text-[#111318] dark:text-white">
-                      {displayMatch.venue}
+                      {effectiveVenue}
                     </span>
                   </div>
                 )}
@@ -649,7 +705,7 @@ export default function MatchDetailClient({ id }: { id: string }) {
                     style={{ backgroundColor: displayMatch.awayColor }}
                   />
                 </div>
-                {historyLoading ? (
+                {isHistoryLoading ? (
                   <div className="rounded-2xl bg-white/85 py-4 text-center text-xs font-bold text-zinc-400 dark:bg-white/[0.08] dark:text-zinc-300">
                     Loading history…
                   </div>

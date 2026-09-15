@@ -7,7 +7,12 @@ import { useClubs } from "../context/ClubsContext";
 import { getClub, displayName } from "../lib/clubHelpers";
 import { formatDate, formatTime } from "../lib/dateHelpers";
 import { formatCompetition } from "../lib/competitionNames";
-import { fetchLiveMatches, LiveMatch } from "../lib/footballApi";
+import {
+  fetchLiveMatches,
+  fetchVenueFallbacks,
+  extractTeamId,
+  LiveMatch,
+} from "../lib/footballApi";
 import ClubBadge from "../components/ClubBadge";
 import YourClubs from "../components/YourClubs";
 
@@ -30,6 +35,34 @@ export default function Home() {
     .sort(
       (a, b) => new Date(a.kickoff).getTime() - new Date(b.kickoff).getTime()
     );
+
+  // Last-resort venue lookup for whichever of the matches above are
+  // against a club outside our own 132-club list (e.g. a Champions League
+  // opponent), so those don't just show no venue at all. See
+  // fetchVenueFallbacks for why this only ever fetches each club once and
+  // only for matches that don't already have a venue from somewhere else.
+  const [venueFallback, setVenueFallback] = useState<Record<string, string>>({});
+  useEffect(() => {
+    const needLookup = liveMatches.filter(
+      (m) =>
+        !m.venue &&
+        (selectedIds.includes(m.homeClubId) || selectedIds.includes(m.awayClubId))
+    );
+    if (needLookup.length === 0) return;
+    let cancelled = false;
+    fetchVenueFallbacks(needLookup).then((result) => {
+      if (!cancelled) setVenueFallback((prev) => ({ ...prev, ...result }));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [liveMatches, selectedIds]);
+
+  function venueFor(match: { venue?: string; homeCrest?: string | null }): string | undefined {
+    if (match.venue) return match.venue;
+    const teamId = extractTeamId(match.homeCrest ?? undefined);
+    return teamId ? venueFallback[teamId] : undefined;
+  }
   const myMockMatches = matches
     .filter(
       (match) =>
@@ -260,7 +293,7 @@ export default function Home() {
                   <div className="min-w-0 text-xs font-medium text-white/60">
                     <span className="mr-1.5">⌖</span>
                     <span className="break-words">
-                      {nextMatch.venue}
+                      {venueFor(nextMatch)}
                     </span>
                   </div>
                   <Link
@@ -339,7 +372,7 @@ export default function Home() {
                         </div>
                         <div className="mt-2 truncate text-xs font-medium text-zinc-400 dark:text-zinc-500">
                           {formatDate(match.kickoff)}
-                          {match.venue ? ` · ${match.venue}` : ""}
+                          {venueFor(match) ? ` · ${venueFor(match)}` : ""}
                         </div>
                       </div>
                       <div className="shrink-0 rounded-2xl bg-[#F3F5F8] px-3 py-2.5 text-center dark:bg-white/10">

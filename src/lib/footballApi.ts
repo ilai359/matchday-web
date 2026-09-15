@@ -1,4 +1,5 @@
 import { clubs } from "../data/clubs";
+import { STADIUMS } from "../data/stadiums";
 export type LiveMatch = {
   id: string;
   competition: string;
@@ -10,6 +11,7 @@ export type LiveMatch = {
   awayCrest: string | null;
   kickoff: string;
   venue: string;
+  city: string;
   status: string;
   homeScore: number | null;
   awayScore: number | null;
@@ -172,6 +174,59 @@ export function extractTeamId(crestUrl?: string): string | null {
   return match ? match[1] : null;
 }
 
+export type TeamInfo = { venue?: string };
+
+// Only meant as a last-resort lookup for a club outside our own 132-club
+// list (e.g. an opponent in a European competition), when neither this
+// match's own data nor our hand-checked stadiums.ts had a venue for them.
+// Deliberately venue-only, no city: football-data.org doesn't give us a
+// clean city field for a club we don't otherwise track, only a free-text
+// address, and guessing turned out unreliable enough that showing nothing
+// is better than risking a wrong one. Returns null on any failure -
+// callers should just fall back to showing nothing, the same as before
+// this existed.
+export async function fetchTeamInfo(teamId: string): Promise<TeamInfo | null> {
+  try {
+    const response = await fetch(`/api/team-info?id=${teamId}`);
+    if (!response.ok) return null;
+    const data = await response.json();
+    return { venue: data.venue ?? undefined };
+  } catch {
+    return null;
+  }
+}
+
+// Same last-resort venue lookup as fetchTeamInfo, but for a whole list of
+// matches at once (the home page and Matches page show several matches,
+// not just one) - only ever looks up a club once even if it appears as
+// the home side in several of the given matches, and skips any match that
+// already has a venue from somewhere else. Returns a map from that club's
+// football-data.org team ID (see extractTeamId) to their real stadium
+// name, so a caller can look up `venueFallback[extractTeamId(match.homeCrest)]`
+// for whichever matches came back without one.
+export async function fetchVenueFallbacks(
+  matchesNeedingLookup: { homeCrest?: string | null; venue?: string }[]
+): Promise<Record<string, string>> {
+  const teamIds = new Set<string>();
+  for (const m of matchesNeedingLookup) {
+    if (m.venue) continue;
+    const teamId = extractTeamId(m.homeCrest ?? undefined);
+    if (teamId) teamIds.add(teamId);
+  }
+  if (teamIds.size === 0) return {};
+  const entries = await Promise.all(
+    Array.from(teamIds).map(async (teamId) => {
+      const info = await fetchTeamInfo(teamId);
+      return [teamId, info?.venue] as const;
+    })
+  );
+  const result: Record<string, string> = {};
+  for (const [teamId, venue] of entries) {
+    if (venue) result[teamId] = venue;
+  }
+  return result;
+}
+
 type RawApiMatch = {
   id: number;
   utcDate: string;
@@ -189,6 +244,16 @@ type RawApiMatch = {
 function mapRawMatch(match: RawApiMatch): LiveMatch {
   const homeClubId = matchClubId(match.homeTeam.name);
   const awayClubId = matchClubId(match.awayTeam.name);
+  // football-data.org (our main provider) frequently leaves "venue" blank
+  // for matches that haven't kicked off yet, especially further out from
+  // kickoff. Rather than show nothing, fall back to the home club's own
+  // real stadium - a match is always played at the home team's ground, so
+  // this is never a guess, just a more reliable source for the same fact.
+  const homeStadium = homeClubId ? STADIUMS[homeClubId] : undefined;
+  const venue =
+    match.venue && match.venue.trim().length > 0
+      ? match.venue
+      : homeStadium?.name ?? "";
   return {
     id: String(match.id),
     competition: match.competition.name,
@@ -199,7 +264,8 @@ function mapRawMatch(match: RawApiMatch): LiveMatch {
     homeCrest: match.homeTeam.crest ?? null,
     awayCrest: match.awayTeam.crest ?? null,
     kickoff: match.utcDate,
-    venue: match.venue ?? "",
+    venue,
+    city: homeStadium?.city ?? "",
     status: match.status,
     homeScore: match.score?.fullTime?.home ?? null,
     awayScore: match.score?.fullTime?.away ?? null,
@@ -211,17 +277,17 @@ function mapRawMatch(match: RawApiMatch): LiveMatch {
 // on failure (a transient network blip, or an occasional rate-limit from
 // football-data.org) before giving up - so a single hiccup doesn't leave
 // the page silently stuck on empty data until someone manually refreshes.
-async function fetchJsonWithRetry(
+async function fetchJsonWithRetry<T = unknown>(
   url: string,
   attempts = 3,
   delayMs = 700
-): Promise<any> {
+): Promise<T> {
   let lastError: unknown;
   for (let i = 0; i < attempts; i++) {
     try {
       const response = await fetch(url);
       if (response.ok) {
-        return await response.json();
+        return (await response.json()) as T;
       }
       lastError = new Error(`Request to ${url} failed with status ${response.status}`);
     } catch (error) {
@@ -404,15 +470,21 @@ export async function fetchFinishedMatches(
   season?: string
 ): Promise<FinishedMatch[]> {
   const seasonParam = season ? `&season=${season}` : "";
-  const data = await fetchJsonWithRetry(
+  const data = await fetchJsonWithRetry<{ matches?: RawFinishedMatch[] }>(
     `/api/finished-matches?competition=${competitionCode}${seasonParam}`
   );
   const rawMatches: RawFinishedMatch[] = data.matches ?? [];
   return rawMatches.map((match) => ({
     id: String(match.id),
     competition: match.competition.name,
-    homeClubId: matchClubId(match.homeTeam.name),
-    awayClubId: matchClubId(match.awayTeam.name),
+    // Same fallback as mapRawMatch above: if this team isn't one of our
+    // 132 tracked clubs, use their name itself as a stand-in ID rather than
+    // null. Without this, a tracked club's own "recent form" pills would
+    // wrongly come up empty for every match they played against a club we
+    // don't track (e.g. a Champions League game vs. Galatasaray), because
+    // this list of past matches couldn't be matched back to the club at all.
+    homeClubId: matchClubId(match.homeTeam.name) ?? match.homeTeam.name,
+    awayClubId: matchClubId(match.awayTeam.name) ?? match.awayTeam.name,
     homeTeamName: match.homeTeam.name,
     awayTeamName: match.awayTeam.name,
     homeCrest: match.homeTeam.crest ?? null,

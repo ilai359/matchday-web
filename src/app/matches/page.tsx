@@ -7,10 +7,29 @@ import { useClubs } from "../../context/ClubsContext";
 import { getClub, getClubName } from "../../lib/clubHelpers";
 import { formatDate, formatTime } from "../../lib/dateHelpers";
 import { formatCompetition } from "../../lib/competitionNames";
-import { fetchLiveMatches, LiveMatch } from "../../lib/footballApi";
+import {
+  fetchLiveMatches,
+  fetchVenueFallbacks,
+  extractTeamId,
+  LiveMatch,
+} from "../../lib/footballApi";
 import ClubBadge from "../../components/ClubBadge";
 
 const MATCHES_SCROLL_KEY = "matchday:matches-scroll";
+const MATCHES_FILTER_KEY = "matchday:matches-filter";
+
+// Reads whichever club filter tab was last selected, so navigating into a
+// match's Details page and back doesn't silently reset the filter to "All
+// clubs" - it's read once, in useState's lazy-initializer form (runs a
+// single time, not on every render), the same pattern already used below
+// for the initial clock reading.
+function readSavedFilter(): string {
+  try {
+    return sessionStorage.getItem(MATCHES_FILTER_KEY) ?? "all";
+  } catch {
+    return "all";
+  }
+}
 
 // Called right before navigating to a match's Details page, so we know
 // exactly where to put the user back when they return.
@@ -25,7 +44,18 @@ function saveScrollPosition() {
 
 export default function Matches() {
   const { selectedIds } = useClubs();
-  const [activeFilter, setActiveFilter] = useState<string>("all");
+  const [activeFilter, setActiveFilter] = useState<string>(readSavedFilter);
+  // Keep the saved filter in sync with whatever's currently selected, so
+  // it's there to restore next time this page is remounted (e.g. after
+  // clicking into a match and pressing back).
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(MATCHES_FILTER_KEY, activeFilter);
+    } catch {
+      // sessionStorage can fail (private browsing, disabled) - worst case
+      // the filter just doesn't persist, nothing else breaks.
+    }
+  }, [activeFilter]);
   const [liveMatches, setLiveMatches] = useState<LiveMatch[]>([]);
   const [liveLoading, setLiveLoading] = useState(true);
   const [liveError, setLiveError] = useState(false);
@@ -35,6 +65,35 @@ export default function Matches() {
       .catch(() => setLiveError(true))
       .finally(() => setLiveLoading(false));
   }, []);
+
+  // Last-resort venue lookup for whichever of your followed clubs' matches
+  // are against a club outside our own 132-club list (e.g. a Champions
+  // League opponent), so those don't just show no venue at all. Looked up
+  // for every followed match regardless of the currently selected filter
+  // tab, so switching tabs doesn't trigger a re-fetch. See
+  // fetchVenueFallbacks for why this only ever fetches each club once.
+  const [venueFallback, setVenueFallback] = useState<Record<string, string>>({});
+  useEffect(() => {
+    const needLookup = liveMatches.filter(
+      (m) =>
+        !m.venue &&
+        (selectedIds.includes(m.homeClubId) || selectedIds.includes(m.awayClubId))
+    );
+    if (needLookup.length === 0) return;
+    let cancelled = false;
+    fetchVenueFallbacks(needLookup).then((result) => {
+      if (!cancelled) setVenueFallback((prev) => ({ ...prev, ...result }));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [liveMatches, selectedIds]);
+
+  function venueFor(match: { venue?: string; homeCrest?: string | null }): string | undefined {
+    if (match.venue) return match.venue;
+    const teamId = extractTeamId(match.homeCrest ?? undefined);
+    return teamId ? venueFallback[teamId] : undefined;
+  }
 
   // The current time, used only to notice when a match's kickoff has
   // already passed even though our cached data still calls it
@@ -220,6 +279,7 @@ export default function Matches() {
                 const isAwayFollowed = selectedIds.includes(match.awayClubId);
                 const homeClub = getClub(match.homeClubId);
                 const awayClub = getClub(match.awayClubId);
+                const venue = venueFor(match);
                 const homeColor = homeClub?.primaryColor ?? "#94A3B8";
                 const awayColor = awayClub?.primaryColor ?? "#94A3B8";
                 const isInPlay = match.status === "IN_PLAY" || match.status === "PAUSED";
@@ -335,9 +395,9 @@ export default function Matches() {
                           <div className="text-xs font-bold text-zinc-600 dark:text-zinc-300">
                             {formatDate(match.kickoff)}
                           </div>
-                          {match.venue && (
+                          {venue && (
                             <div className="mt-0.5 truncate text-[11px] text-zinc-400 dark:text-zinc-500">
-                              {match.venue}
+                              {venue}
                             </div>
                           )}
                         </div>
