@@ -221,7 +221,12 @@ export default function Clubs() {
               placeholder="Search clubs..."
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              className="w-full rounded-2xl border border-black/[0.05] bg-white py-4 pl-11 pr-11 text-sm font-semibold text-[#111318] shadow-sm outline-none transition-all placeholder:font-medium placeholder:text-zinc-300 focus:border-blue-300 focus:ring-4 focus:ring-blue-100 dark:border-white/10 dark:bg-[#14171F] dark:text-white dark:shadow-none dark:placeholder:text-zinc-600 dark:focus:border-blue-500/40 dark:focus:ring-blue-500/10"
+              // text-base (16px) below the sm breakpoint, text-sm (14px) at
+              // sm and up - iOS Safari auto-zooms the whole page on focus
+              // for any input under 16px, which is exactly what was
+              // happening on phone. Sizing it up only below sm keeps the
+              // desktop look identical.
+              className="w-full rounded-2xl border border-black/[0.05] bg-white py-4 pl-11 pr-11 text-base font-semibold text-[#111318] shadow-sm outline-none transition-all placeholder:font-medium placeholder:text-zinc-300 focus:border-blue-300 focus:ring-4 focus:ring-blue-100 dark:border-white/10 dark:bg-[#14171F] dark:text-white dark:shadow-none dark:placeholder:text-zinc-600 dark:focus:border-blue-500/40 dark:focus:ring-blue-500/10 sm:text-sm"
             />
 
             {query.length > 0 && (
