@@ -1,86 +1,151 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { clubs } from "../../data/clubs";
-import { useClubs } from "../../context/ClubsContext";
-import ClubBadge from "../../components/ClubBadge";
 
-export default function Onboarding() {
-  const [query, setQuery] = useState("");
-  const { selectedIds, toggleClub } = useClubs();
+// First screen a brand-new visitor sees (also reachable any time at
+// /onboarding). Previously this page WAS a full club-picker list, built
+// separately from - and looking nothing like - the real "My Clubs" page at
+// /clubs, which already does this job well (search, follow/unfollow, a
+// "Following" section). Rather than keep two different club-picking UIs in
+// sync, this is a short welcome screen with one button that sends people
+// straight to that real page.
+//
+// The scattered crest chips are purely decorative - well-known clubs to
+// hint at the range of teams Matchday covers. Three tiers, each only
+// placed where there's genuinely room beside the centered column without
+// crowding it:
+// - CORNER_CRESTS: small, always visible - safe even on a narrow phone.
+// - EDGE_CRESTS: a bit bigger, sit in the clear bands above/below the
+//   centered text (sm breakpoint and up).
+// - MID_CRESTS: the biggest, level with the centered text but far enough
+//   to the sides that they only fit once the screen is properly wide
+//   (lg breakpoint and up) - this is what fills in the empty space on a
+//   desktop-width window.
+const CORNER_CRESTS = [
+  { id: "arsenal", crest: "https://crests.football-data.org/57.png", position: "left-4 top-16" },
+  { id: "real-madrid", crest: "https://crests.football-data.org/86.png", position: "right-4 top-16" },
+  { id: "manchester-city", crest: "https://crests.football-data.org/65.png", position: "left-4 bottom-28" },
+  { id: "paris-saint-germain", crest: "https://crests.football-data.org/524.png", position: "right-4 bottom-28" },
+];
+
+const EDGE_CRESTS = [
+  { id: "barcelona", crest: "https://crests.football-data.org/81.png", position: "left-[8%] top-[14%]" },
+  { id: "liverpool", crest: "https://crests.football-data.org/64.png", position: "right-[8%] top-[14%]" },
+  { id: "bayern-munich", crest: "https://crests.football-data.org/5.png", position: "left-[10%] top-[86%]" },
+  { id: "juventus", crest: "https://crests.football-data.org/109.png", position: "right-[10%] top-[86%]" },
+];
+
+const MID_CRESTS = [
+  { id: "manchester-united", crest: "https://crests.football-data.org/66.png", position: "left-[4%] top-[30%]" },
+  { id: "chelsea", crest: "https://crests.football-data.org/61.png", position: "right-[4%] top-[30%]" },
+  { id: "borussia-dortmund", crest: "https://crests.football-data.org/4.png", position: "left-[5%] top-[50%]" },
+  { id: "atletico-madrid", crest: "https://crests.football-data.org/78.png", position: "right-[5%] top-[50%]" },
+  { id: "napoli", crest: "https://crests.football-data.org/113.png", position: "left-[4%] top-[70%]" },
+  { id: "porto", crest: "https://crests.football-data.org/503.png", position: "right-[4%] top-[70%]" },
+];
+
+// A closer-in ring, between MID_CRESTS and the centered text. Only safe
+// once the window is properly wide (xl breakpoint) - any narrower and
+// this ring would start overlapping the text column.
+const INNER_CRESTS = [
+  { id: "ac-milan", crest: "https://crests.football-data.org/98.png", position: "left-[18%] top-[22%]" },
+  { id: "inter-milan", crest: "https://crests.football-data.org/108.png", position: "right-[18%] top-[22%]" },
+  { id: "ajax", crest: "https://crests.football-data.org/678.png", position: "left-[20%] top-[58%]" },
+  { id: "tottenham", crest: "https://crests.football-data.org/73.png", position: "right-[20%] top-[58%]" },
+];
+
+function CrestChip({
+  crest,
+  size,
+}: {
+  crest: string;
+  size: number;
+}) {
+  return (
+    <div
+      className="flex items-center justify-center rounded-2xl border border-white/10 bg-white/[0.08] backdrop-blur-xl"
+      style={{ width: size, height: size }}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element -- decorative background art, not worth next/image's overhead here */}
+      <img
+        src={crest}
+        alt=""
+        aria-hidden="true"
+        style={{ width: size * 0.56, height: size * 0.56 }}
+        className="object-contain opacity-70"
+      />
+    </div>
+  );
+}
+
+export default function OnboardingWelcome() {
   const router = useRouter();
 
-  const filteredClubs = clubs.filter((club) =>
-    club.name.toLowerCase().includes(query.toLowerCase())
-  );
-
   return (
-    <div className="min-h-screen bg-[#F7F7F5] px-6 py-10">
-      <h1 className="text-2xl font-bold text-[#111111] mb-1">
-        Choose your clubs
-      </h1>
-      <p className="text-[#6B6B6B] mb-6">
-        Follow the teams you care about.
-      </p>
-
-      <input
-        type="text"
-        placeholder="Search clubs..."
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        className="w-full rounded-full bg-white border border-zinc-200 px-4 py-3 mb-6 text-[#111111] outline-none"
-      />
-
-      <div className="flex flex-col gap-3">
-        {filteredClubs.map((club) => {
-          const isSelected = selectedIds.includes(club.id);
-          return (
-            <button
-              key={club.id}
-              onClick={() => toggleClub(club.id)}
-              className={`flex items-center gap-4 rounded-2xl px-4 py-4 text-left transition-colors ${
-                isSelected
-                  ? "bg-black text-white"
-                  : "bg-white text-[#111111] border border-zinc-200"
-              }`}
-            >
-              <ClubBadge
-                name={club.name}
-                crest={club.crest}
-                color={club.primaryColor}
-                size={44}
-              />
-
-              <div className="flex-1">
-                <div className="font-semibold">{club.name}</div>
-                <div
-                  className={`text-sm ${
-                    isSelected ? "text-zinc-300" : "text-[#6B6B6B]"
-                  }`}
-                >
-                  {club.country} · {club.league}
-                </div>
-              </div>
-              <span className="text-xl">{isSelected ? "✓" : "+"}</span>
-            </button>
-          );
-        })}
+    <main className="relative z-0 min-h-screen overflow-hidden text-white">
+      {/* BACKGROUND - fixed so it always fills the whole screen, ignoring
+          the extra bottom spacing the layout reserves for the nav bar */}
+      <div className="fixed inset-0 -z-10 bg-[#080B13]">
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute -left-24 -top-28 h-72 w-72 rounded-full bg-blue-600/25 blur-[90px]" />
+          <div className="absolute -right-24 -top-10 h-72 w-72 rounded-full bg-violet-600/20 blur-[90px]" />
+          <div className="absolute bottom-[-120px] left-1/2 h-64 w-64 -translate-x-1/2 rounded-full bg-emerald-500/10 blur-[90px]" />
+        </div>
       </div>
 
-      {selectedIds.length > 0 && (
-        <div className="mt-8 flex items-center justify-between">
-          <span className="text-[#111111] font-medium">
-            {selectedIds.length} club{selectedIds.length > 1 ? "s" : ""} selected
-          </span>
-          <button
-            onClick={() => router.push("/")}
-            className="rounded-full bg-black text-white px-6 py-3 font-medium"
-          >
-            Continue
-          </button>
+      {/* DECORATIVE CRESTS */}
+      {CORNER_CRESTS.map((club) => (
+        <div key={club.id} className={`absolute z-0 ${club.position}`}>
+          <CrestChip crest={club.crest} size={52} />
         </div>
-      )}
-    </div>
+      ))}
+      {EDGE_CRESTS.map((club) => (
+        <div key={club.id} className={`absolute z-0 hidden sm:block ${club.position}`}>
+          <CrestChip crest={club.crest} size={72} />
+        </div>
+      ))}
+      {MID_CRESTS.map((club) => (
+        <div key={club.id} className={`absolute z-0 hidden lg:block ${club.position}`}>
+          <CrestChip crest={club.crest} size={88} />
+        </div>
+      ))}
+      {INNER_CRESTS.map((club) => (
+        <div key={club.id} className={`absolute z-0 hidden xl:block ${club.position}`}>
+          <CrestChip crest={club.crest} size={64} />
+        </div>
+      ))}
+
+      {/* CONTENT */}
+      <div className="relative z-10 flex min-h-screen flex-col items-center justify-center px-6 text-center">
+        <div
+          className="mb-6 flex h-24 w-24 items-center justify-center rounded-[26px] shadow-[0_16px_40px_rgba(0,0,0,0.35)]"
+          style={{
+            background: "linear-gradient(135deg, #4F46E5 0%, #0B0F1A 130%)",
+          }}
+        >
+          <span className="text-[44px] font-black leading-none">M</span>
+        </div>
+
+        <h1 className="text-[32px] font-black leading-none tracking-[-0.03em]">
+          Matchday
+        </h1>
+        <p className="mt-2 text-sm font-semibold text-white/45">
+          Never miss what matters.
+        </p>
+
+        <p className="mt-6 max-w-xs text-[13px] leading-relaxed text-white/45">
+          Follow your clubs to get their fixtures, results, and news, all in
+          one place.
+        </p>
+
+        <button
+          type="button"
+          onClick={() => router.push("/clubs")}
+          className="mt-8 rounded-2xl bg-white px-8 py-3.5 text-sm font-black text-[#111318] shadow-lg transition hover:-translate-y-0.5 active:scale-[0.98]"
+        >
+          Choose your clubs →
+        </button>
+      </div>
+    </main>
   );
 }

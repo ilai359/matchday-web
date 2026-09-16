@@ -262,6 +262,71 @@ next to them (plain text right next to a bold name made them blend
 together). Now shown as a small colored chip - blue for "H", orange for
 "A" - so home vs away is readable at a glance, not just from the letter.
 
+## First-open ("onboarding") screen redesigned
+
+**Status: done, 2026-09-16.** Ilai found the very first screen a new
+visitor sees (`/onboarding`) plain and unstyled - a leftover from early
+development that showed the full club list with no branding, in a
+different visual style from the rest of the app.
+
+Turned out the app already has a genuinely good "pick your clubs" page:
+`/clubs` ("My Clubs", also reachable any time from the bottom tab bar) -
+search, follow/unfollow, a "Following" section for clubs you already
+follow. Rather than fix up the old onboarding list into a second version
+of the same thing, replaced it with a short welcome screen (Matchday
+name/tagline, one sentence on what the app does, one button) whose
+button sends people straight to that real `/clubs` page. Less to
+maintain, and whoever opens the app first is now dropped somewhere on
+brand rather than a bare list.
+
+**Follow-up, same day:** Ilai's screenshot showed a light-gray strip at
+the very bottom of the screen, breaking the dark design - a real bug,
+not a style nitpick. Every page reserves a bit of space at the bottom so
+the fixed nav bar never covers content, and every other page's own
+background happens to match that reserved strip's color so it's
+invisible - this new page uses its own different dark color, so the
+mismatch showed through. Fixed by having the background fill the whole
+screen regardless of that reserved space, the same trick used for any
+full-bleed background.
+
+Also added Ilai's request for club logos: eight real, recognizable
+clubs' crests (Arsenal, Real Madrid, Barcelona, Liverpool, Man City,
+PSG, Bayern Munich, Juventus) sit faded in the background as ambient
+decoration - a small one in each corner that's safe on any phone width,
+plus four more along the sides that only appear once the screen is wide
+enough not to crowd the middle.
+
+**Second follow-up, same day: the previous fix broke the page entirely
+(a real regression, not a nitpick).** The dark background disappeared
+completely - the whole screen showed the page's normal light-gray
+background instead, making the white text on it nearly invisible.
+Cause: the trick used to make the background ignore the reserved nav
+space (an "always fill the whole screen" positioning technique) needs
+the screen's main container to form its own self-contained layer -
+without that one extra setting, the background ended up being drawn
+behind the ENTIRE page instead of just behind this one screen's own
+content. One-line fix. Re-verified clean, no new lint/type errors.
+
+**Third follow-up, same day:** once it was rendering correctly, Ilai
+felt it looked a bit sparse on a wide desktop window - fair, since the
+first version only had 8 crests total and left big empty gaps top,
+middle and bottom. Reworked into three tiers instead of two: the same
+small always-visible corner set; a slightly bigger set in the safe
+bands above/below the text (unchanged breakpoint); and a new, bigger
+set (Man United, Chelsea, Dortmund, Atlético Madrid, Napoli, Porto)
+that only shows up on a properly wide screen (roughly tablet-landscape
+or a desktop window), since that's the only place there's enough room
+beside the centered text without crowding it. 14 real clubs total on a
+wide screen, still just 4 on a phone.
+
+**Fourth follow-up, same day:** Ilai noticed all the crests sat in two
+"walls" far left and far right, leaving a big empty gap either side of
+the text in the middle. Added a fourth, innermost ring (AC Milan, Inter
+Milan, Ajax, Tottenham) that sits closer in, between that empty gap and
+the text - it only appears on a VERY wide window (bigger than the
+existing rings need), since that's the point where there's actually
+room for something that close to the text without touching it.
+
 ## Technical snag: stale `.git/index.lock` file on this machine
 
 Not a code bug - a quirk of how this session's remote-device tools mount
