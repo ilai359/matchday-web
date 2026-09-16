@@ -6,8 +6,10 @@ import { useClubs } from "../../context/ClubsContext";
 import { clubs } from "../../data/clubs";
 import ClubBadge from "../../components/ClubBadge";
 
-const TOTAL_LEAGUES = new Set(clubs.map((club) => club.league)).size;
-const TOTAL_COUNTRIES = new Set(clubs.map((club) => club.country)).size;
+const FEEDBACK_EMAIL = "kugelmann.ilai@gmail.com";
+const FEEDBACK_HREF = `mailto:${FEEDBACK_EMAIL}?subject=${encodeURIComponent(
+  "Clubside feedback"
+)}`;
 
 export default function Settings() {
   const { theme, setTheme } = useTheme();
@@ -203,34 +205,29 @@ export default function Settings() {
 
         <section className="mb-6">
           <h2 className="mb-3 px-1 text-xs font-black uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
-            Coverage
+            Support
           </h2>
 
-          <div className="grid grid-cols-3 gap-3">
-            <div className="rounded-[22px] border border-black/[0.045] bg-white px-3 py-4 text-center shadow-[0_6px_24px_rgba(0,0,0,0.045)] dark:border-white/[0.06] dark:bg-[#14171F] dark:shadow-none">
-              <div className="text-2xl font-black text-[#111318] dark:text-white">
-                {clubs.length}
+          <div className="overflow-hidden rounded-[26px] border border-black/[0.045] bg-white shadow-[0_6px_24px_rgba(0,0,0,0.045)] dark:border-white/[0.06] dark:bg-[#14171F] dark:shadow-none">
+            <a
+              href={FEEDBACK_HREF}
+              className="flex w-full items-center justify-between px-5 py-4 text-left"
+            >
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#F2F4F7] text-lg dark:bg-white/[0.06]">
+                  💬
+                </div>
+                <div>
+                  <div className="text-sm font-black text-[#111318] dark:text-white">
+                    Send feedback
+                  </div>
+                  <div className="text-[11px] font-medium text-zinc-400 dark:text-zinc-500">
+                    Spot a bug or want a club added? Let me know
+                  </div>
+                </div>
               </div>
-              <div className="mt-1 text-[10px] font-bold uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
-                Clubs
-              </div>
-            </div>
-            <div className="rounded-[22px] border border-black/[0.045] bg-white px-3 py-4 text-center shadow-[0_6px_24px_rgba(0,0,0,0.045)] dark:border-white/[0.06] dark:bg-[#14171F] dark:shadow-none">
-              <div className="text-2xl font-black text-[#111318] dark:text-white">
-                {TOTAL_LEAGUES}
-              </div>
-              <div className="mt-1 text-[10px] font-bold uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
-                Leagues
-              </div>
-            </div>
-            <div className="rounded-[22px] border border-black/[0.045] bg-white px-3 py-4 text-center shadow-[0_6px_24px_rgba(0,0,0,0.045)] dark:border-white/[0.06] dark:bg-[#14171F] dark:shadow-none">
-              <div className="text-2xl font-black text-[#111318] dark:text-white">
-                {TOTAL_COUNTRIES}
-              </div>
-              <div className="mt-1 text-[10px] font-bold uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
-                Countries
-              </div>
-            </div>
+              <div className="text-zinc-300 dark:text-zinc-600">→</div>
+            </a>
           </div>
         </section>
 
@@ -246,15 +243,6 @@ export default function Settings() {
               </span>
               <span className="text-sm font-black text-[#111318] dark:text-white">
                 v1.0
-              </span>
-            </div>
-
-            <div className="flex items-center justify-between border-t border-zinc-100 px-5 py-4 dark:border-white/[0.06]">
-              <span className="text-sm font-bold text-zinc-500 dark:text-zinc-400">
-                Data source
-              </span>
-              <span className="text-sm font-black text-[#111318] dark:text-white">
-                football-data.org
               </span>
             </div>
           </div>
