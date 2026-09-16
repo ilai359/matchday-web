@@ -21,7 +21,7 @@ export default function Settings() {
             Settings
           </h1>
           <p className="mt-3 max-w-xs text-sm leading-5 text-white/45">
-            Manage how Matchday looks and works.
+            Manage how Clubside looks and works.
           </p>
         </div>
       </header>
@@ -97,7 +97,7 @@ export default function Settings() {
           <div className="overflow-hidden rounded-[26px] border border-black/[0.045] bg-white shadow-[0_6px_24px_rgba(0,0,0,0.045)] dark:border-white/[0.06] dark:bg-[#14171F] dark:shadow-none">
             <div className="flex items-center justify-between px-5 py-4">
               <span className="text-sm font-bold text-zinc-500 dark:text-zinc-400">
-                Matchday
+                Clubside
               </span>
               <span className="text-sm font-black text-[#111318] dark:text-white">
                 v1.0

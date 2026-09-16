@@ -185,8 +185,8 @@ export default function Home() {
                 Your football
               </div>
               <h1 className="text-[38px] font-black leading-none tracking-[-0.055em]">
-                Match
-                <span className="text-blue-400">day</span>
+                Club
+                <span className="text-blue-400">side</span>
               </h1>
               <p className="mt-3 max-w-xs text-sm leading-5 text-white/45">
                 Everything important from the clubs you follow.

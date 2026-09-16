@@ -96,7 +96,7 @@ export default function Clubs() {
               </h1>
 
               <p className="mt-3 max-w-xs text-sm leading-5 text-white/45">
-                Choose the clubs you want Matchday to follow.
+                Choose the clubs you want Clubside to follow.
               </p>
             </div>
 
@@ -131,7 +131,7 @@ export default function Clubs() {
                 </h2>
 
                 <p className="mt-0.5 text-xs font-medium text-zinc-400 dark:text-zinc-500">
-                  Clubs in your Matchday feed
+                  Clubs in your Clubside feed
                 </p>
               </div>
 

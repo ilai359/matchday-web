@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Matchday",
+  title: "Clubside",
   description: "Never miss what matters.",
 };
 
