@@ -10,100 +10,44 @@ import { useRouter } from "next/navigation";
 // sync, this is a short welcome screen with one button that sends people
 // straight to that real page.
 //
-// The scattered crest chips are purely decorative - well-known clubs to
-// hint at the range of teams Clubside covers. Spread across the FULL
-// page (top edge, bottom edge, both side rails, plus a close-in ring),
-// not just two side columns - each tier only appears once there's
-// genuinely room for it without crowding the centered column:
-// - CORNER_CRESTS: small, always visible - safe even on a narrow phone.
-// - OUTER_BAND_CRESTS: a bit bigger, hug the very top/bottom edges at
-//   the sides (sm breakpoint and up).
-// - SPREAD_LG_CRESTS: the biggest - two more along the top edge, two
-//   along the bottom edge (both nearer the horizontal center than the
-//   outer band), plus a side-rail pair level with the centered text
-//   (lg breakpoint and up) - this is what used to be two empty side
-//   walls with dead space top/center/bottom; now the top and bottom
-//   edges carry crests across their full width too.
-// - SPREAD_XL_CRESTS: an extra side-rail pair plus a closer-in ring
-//   that sits right beside the text - shown at the same lg breakpoint
-//   as SPREAD_LG_CRESTS, so the two appear together (this used to be
-//   gated to xl, one breakpoint later, which left a real gap: wide
-//   enough for SPREAD_LG_CRESTS but not yet this ring, so the space
-//   right beside the text stayed empty).
-const CORNER_CRESTS = [
-  { id: "arsenal", crest: "https://crests.football-data.org/57.png", position: "left-4 top-16" },
-  { id: "real-madrid", crest: "https://crests.football-data.org/86.png", position: "right-4 top-16" },
-  { id: "manchester-city", crest: "https://crests.football-data.org/65.png", position: "left-4 bottom-28" },
-  { id: "paris-saint-germain", crest: "https://crests.football-data.org/524.png", position: "right-4 bottom-28" },
+// Real, recognizable clubs, tiled as a full-page background pattern - a
+// faint "ghost" texture behind everything, including straight through
+// the middle where the text sits on top of it. Not meant to be read
+// individually, just texture, so the exact 18 clubs don't matter much
+// beyond giving it variety. This replaced an earlier version that hand-
+// placed a couple dozen crests at fixed spots for different screen
+// widths - it kept needing another round of fixes every time the window
+// was a size that fell between two of those fixed breakpoints. A CSS
+// grid tiles automatically at ANY size, phone or desktop, with no
+// breakpoints to get wrong.
+const CREST_URLS = [
+  "https://crests.football-data.org/57.png", // Arsenal
+  "https://crests.football-data.org/86.png", // Real Madrid
+  "https://crests.football-data.org/81.png", // Barcelona
+  "https://crests.football-data.org/64.png", // Liverpool
+  "https://crests.football-data.org/66.png", // Manchester United
+  "https://crests.football-data.org/61.png", // Chelsea
+  "https://crests.football-data.org/5.png", // Bayern Munich
+  "https://crests.football-data.org/109.png", // Juventus
+  "https://crests.football-data.org/4.png", // Borussia Dortmund
+  "https://crests.football-data.org/503.png", // Porto
+  "https://crests.football-data.org/65.png", // Manchester City
+  "https://crests.football-data.org/524.png", // Paris Saint-Germain
+  "https://crests.football-data.org/98.png", // AC Milan
+  "https://crests.football-data.org/108.png", // Inter Milan
+  "https://crests.football-data.org/678.png", // Ajax
+  "https://crests.football-data.org/73.png", // Tottenham
+  "https://crests.football-data.org/113.png", // Napoli
+  "https://crests.football-data.org/78.png", // Atletico Madrid
 ];
 
-// Phone-only: fills the top and bottom margins with a proper spread
-// (not just the 4 corners) on screens too narrow for OUTER_BAND_CRESTS
-// and up. Hidden again from sm upward, where those wider tiers take
-// over with a bigger, fuller layout.
-const MOBILE_SPREAD_CRESTS = [
-  { id: "barcelona-m", crest: "https://crests.football-data.org/81.png", position: "left-[24%] top-[3%]" },
-  { id: "bayern-munich-m", crest: "https://crests.football-data.org/5.png", position: "left-1/2 top-[6%] -translate-x-1/2" },
-  { id: "liverpool-m", crest: "https://crests.football-data.org/64.png", position: "right-[24%] top-[3%]" },
-  { id: "manchester-united-m", crest: "https://crests.football-data.org/66.png", position: "left-[24%] top-[97%] -translate-y-full" },
-  { id: "juventus-m", crest: "https://crests.football-data.org/109.png", position: "left-1/2 top-[94%] -translate-x-1/2 -translate-y-full" },
-  { id: "chelsea-m", crest: "https://crests.football-data.org/61.png", position: "right-[24%] top-[97%] -translate-y-full" },
-];
-
-const OUTER_BAND_CRESTS = [
-  { id: "barcelona", crest: "https://crests.football-data.org/81.png", position: "left-[9%] top-[6%]" },
-  { id: "liverpool", crest: "https://crests.football-data.org/64.png", position: "right-[9%] top-[6%]" },
-  { id: "bayern-munich", crest: "https://crests.football-data.org/5.png", position: "left-[9%] top-[93%]" },
-  { id: "juventus", crest: "https://crests.football-data.org/109.png", position: "right-[9%] top-[93%]" },
-];
-
-// Top edge, bottom edge, and a mid-height side-rail pair - the tier that
-// turns the old "two side walls" look into crests running along the
-// full top and bottom of the page.
-const SPREAD_LG_CRESTS = [
-  { id: "manchester-united", crest: "https://crests.football-data.org/66.png", position: "left-[36%] top-[5%]" },
-  { id: "chelsea", crest: "https://crests.football-data.org/61.png", position: "right-[36%] top-[5%]" },
-  { id: "borussia-dortmund", crest: "https://crests.football-data.org/4.png", position: "left-[36%] top-[93%]" },
-  { id: "atletico-madrid", crest: "https://crests.football-data.org/78.png", position: "right-[36%] top-[93%]" },
-  { id: "napoli", crest: "https://crests.football-data.org/113.png", position: "left-[4%] top-[50%]" },
-  { id: "porto", crest: "https://crests.football-data.org/503.png", position: "right-[4%] top-[50%]" },
-];
-
-// A second side-rail level plus a closer-in ring level with the text -
-// the tier that actually closes the horizontal gap next to the
-// centered column. Same lg breakpoint as SPREAD_LG_CRESTS (not xl -
-// that left a window where the wider tier showed but this one didn't,
-// leaving the middle looking empty).
-const SPREAD_XL_CRESTS = [
-  { id: "ac-milan", crest: "https://crests.football-data.org/98.png", position: "left-[6%] top-[26%]" },
-  { id: "inter-milan", crest: "https://crests.football-data.org/108.png", position: "right-[6%] top-[26%]" },
-  { id: "ajax", crest: "https://crests.football-data.org/678.png", position: "left-[18%] top-[50%]" },
-  { id: "tottenham", crest: "https://crests.football-data.org/73.png", position: "right-[18%] top-[50%]" },
-];
-
-function CrestChip({
-  crest,
-  size,
-}: {
-  crest: string;
-  size: number;
-}) {
-  return (
-    <div
-      className="flex items-center justify-center rounded-2xl border border-white/10 bg-white/[0.08] backdrop-blur-xl"
-      style={{ width: size, height: size }}
-    >
-      {/* eslint-disable-next-line @next/next/no-img-element -- decorative background art, not worth next/image's overhead here */}
-      <img
-        src={crest}
-        alt=""
-        aria-hidden="true"
-        style={{ width: size * 0.56, height: size * 0.56 }}
-        className="object-contain opacity-70"
-      />
-    </div>
-  );
-}
+// Repeated enough times to fully tile a large desktop window - CSS grid
+// plus overflow-hidden just clips whatever doesn't fit on a smaller
+// screen, so the same list works at any size.
+const CREST_TILE = Array.from({ length: 420 }, (_, i) => ({
+  key: i,
+  crest: CREST_URLS[i % CREST_URLS.length],
+}));
 
 export default function OnboardingWelcome() {
   const router = useRouter();
@@ -118,34 +62,23 @@ export default function OnboardingWelcome() {
           <div className="absolute -right-24 -top-10 h-72 w-72 rounded-full bg-violet-600/20 blur-[90px]" />
           <div className="absolute bottom-[-120px] left-1/2 h-64 w-64 -translate-x-1/2 rounded-full bg-emerald-500/10 blur-[90px]" />
         </div>
-      </div>
 
-      {/* DECORATIVE CRESTS */}
-      {CORNER_CRESTS.map((club) => (
-        <div key={club.id} className={`absolute z-0 ${club.position}`}>
-          <CrestChip crest={club.crest} size={52} />
+        {/* CREST PATTERN - tiled across the entire screen as a faint
+            "ghost" texture. It runs straight through the middle, behind
+            the text below (that's deliberate) - grayscale plus very low
+            opacity is what keeps the text readable on top of it. */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 grid grayscale opacity-[0.09] grid-cols-[repeat(auto-fill,minmax(84px,1fr))] auto-rows-[84px]"
+        >
+          {CREST_TILE.map(({ key, crest }) => (
+            <div key={key} className="flex items-center justify-center">
+              {/* eslint-disable-next-line @next/next/no-img-element -- decorative background texture, not worth next/image's overhead here */}
+              <img src={crest} alt="" className="h-10 w-10 object-contain" />
+            </div>
+          ))}
         </div>
-      ))}
-      {MOBILE_SPREAD_CRESTS.map((club) => (
-        <div key={club.id} className={`absolute z-0 sm:hidden ${club.position}`}>
-          <CrestChip crest={club.crest} size={44} />
-        </div>
-      ))}
-      {OUTER_BAND_CRESTS.map((club) => (
-        <div key={club.id} className={`absolute z-0 hidden sm:block ${club.position}`}>
-          <CrestChip crest={club.crest} size={72} />
-        </div>
-      ))}
-      {SPREAD_LG_CRESTS.map((club) => (
-        <div key={club.id} className={`absolute z-0 hidden lg:block ${club.position}`}>
-          <CrestChip crest={club.crest} size={88} />
-        </div>
-      ))}
-      {SPREAD_XL_CRESTS.map((club) => (
-        <div key={club.id} className={`absolute z-0 hidden lg:block ${club.position}`}>
-          <CrestChip crest={club.crest} size={64} />
-        </div>
-      ))}
+      </div>
 
       {/* CONTENT */}
       <div className="relative z-10 flex min-h-screen flex-col items-center justify-center px-6 text-center">
