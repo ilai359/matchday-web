@@ -340,3 +340,59 @@ else first (renaming works even though deleting doesn't), then the Git
 command works normally. Worth knowing about in case the eventual
 end-of-day push hits this - it looks scarier than it is and takes one
 extra step to clear.
+
+## App renamed Matchday -> Clubside, real logo/icon added, onboarding crests spread across full page
+
+**Status: done, 2026-09-16 (committed locally as a7d68e5, not yet pushed - see the
+push note right below this).**
+
+Looked into the name "Matchday" for App Store discoverability - it's heavily
+used already (official England Football app with 2,100+ ratings, plus several
+other "Matchday..." apps, including one that does almost the same thing as
+this app). Renamed every user-facing spot to **Clubside** (browser tab title,
+onboarding welcome screen, Settings, My Clubs page). Left everything internal
+untouched, per Ilai's call: repo name/folder (`matchday-web`), localStorage
+keys, code comments - only what a user actually sees changed.
+
+Ilai designed the real logo/icon himself (a shield/crest with a crowd + pitch
+scene, green). That's now wired in for real: `src/app/favicon.ico`,
+`icon.png`, and `apple-icon.png` (cleaned up from his source export - trimmed
+a stray border, made the corners transparent for the web versions, and made
+a flat full-bleed version with no baked-in rounding for Apple's icon). A
+1024x1024 master flat version is saved at
+`public/brand/clubside-icon-master-1024.png`, ready for whenever the real
+native App Store icon is needed - not wired into the web app itself.
+
+**Left open, Ilai's call:** the onboarding screen's big gradient "C" badge is
+still blue (from an earlier Claude-drawn placeholder), not the real green
+icon - swapping it means either mixing green into an otherwise all-blue app
+theme, or shifting the app's whole accent color toward green. Flagged, not
+done.
+
+Also redesigned the onboarding screen's decorative background crests (the
+faded club badges) to spread across the *whole* page - top edge, bottom
+edge, both side rails, and a close-in ring - instead of two side columns
+with a lot of dead space top/center/bottom. Reused the same 18 real club
+crests already in the file (didn't add unverified new football-data.org
+crest IDs, to avoid any risk of a broken-image icon). Same responsive
+behaviour as before - phones still only get the 4 safe corner crests.
+
+Domain: looked into buying one (e.g. clubside.com via Cloudflare Registrar
+or Porkbun, ~$10-11/year) but confirmed Apple does NOT require a custom
+domain for App Store submission - a support URL and privacy policy URL on
+the existing free Vercel address work fine. So no domain bought yet;
+revisit only if/when it actually matters for marketing.
+
+## Technical snag: `git push` doesn't work from this environment's remote shell
+
+New wrinkle on top of the existing `.git/index.lock` quirk noted above:
+attempting `git push origin main` from this session's remote-device shell
+fails outright with `403 from proxy` trying to reach github.com - that
+shell's internet access is restricted and can't reach GitHub at all, not a
+one-off glitch. Committing locally works fine (after clearing any stale
+lock file, same as before); the actual `git push` step needs to be run by
+Ilai himself, from his own Terminal/VS Code on his Mac (which has normal
+internet access) - same as he mentioned already doing previously. So the
+end-of-day flow is: Claude stages + commits everything locally, then Ilai
+runs the actual `git push` (or clicks "Sync/Push" in VS Code's Source
+Control panel) to actually make it go live on GitHub/Vercel.
