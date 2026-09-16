@@ -1,9 +1,22 @@
 "use client";
 
+import Link from "next/link";
 import { useTheme } from "../../context/ThemeContext";
+import { useClubs } from "../../context/ClubsContext";
+import { clubs } from "../../data/clubs";
 
 export default function Settings() {
   const { theme, setTheme } = useTheme();
+  const { selectedIds, resetClubs } = useClubs();
+
+  function handleReset() {
+    const confirmed = window.confirm(
+      "Unfollow all your clubs? You can always follow them again from My Clubs."
+    );
+    if (confirmed) {
+      resetClubs();
+    }
+  }
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-[#F5F6F8] pb-24 dark:bg-[#0B0D12]">
@@ -27,6 +40,33 @@ export default function Settings() {
       </header>
 
       <div className="mx-auto w-full max-w-2xl px-5 pt-6">
+        <section className="mb-6">
+          <h2 className="mb-3 px-1 text-xs font-black uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
+            Your Clubs
+          </h2>
+
+          <Link
+            href="/clubs"
+            className="flex w-full items-center justify-between rounded-[26px] border border-black/[0.045] bg-white px-5 py-4 shadow-[0_6px_24px_rgba(0,0,0,0.045)] transition hover:-translate-y-0.5 dark:border-white/[0.06] dark:bg-[#14171F] dark:shadow-none"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#F2F4F7] text-lg dark:bg-white/[0.06]">
+                🏟️
+              </div>
+              <div>
+                <div className="text-sm font-black text-[#111318] dark:text-white">
+                  {selectedIds.length}{" "}
+                  {selectedIds.length === 1 ? "club" : "clubs"} followed
+                </div>
+                <div className="text-[11px] font-medium text-zinc-400 dark:text-zinc-500">
+                  Manage which clubs you follow
+                </div>
+              </div>
+            </div>
+            <div className="text-zinc-300 dark:text-zinc-600">→</div>
+          </Link>
+        </section>
+
         <section className="mb-6">
           <h2 className="mb-3 px-1 text-xs font-black uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
             Appearance
@@ -89,6 +129,35 @@ export default function Settings() {
           </div>
         </section>
 
+        <section className="mb-6">
+          <h2 className="mb-3 px-1 text-xs font-black uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
+            Data
+          </h2>
+
+          <div className="overflow-hidden rounded-[26px] border border-black/[0.045] bg-white shadow-[0_6px_24px_rgba(0,0,0,0.045)] dark:border-white/[0.06] dark:bg-[#14171F] dark:shadow-none">
+            <button
+              type="button"
+              onClick={handleReset}
+              disabled={selectedIds.length === 0}
+              className="flex w-full items-center justify-between px-5 py-4 text-left disabled:opacity-40"
+            >
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#F2F4F7] text-lg dark:bg-white/[0.06]">
+                  🗑️
+                </div>
+                <div>
+                  <div className="text-sm font-black text-[#DC2626] dark:text-red-400">
+                    Unfollow all clubs
+                  </div>
+                  <div className="text-[11px] font-medium text-zinc-400 dark:text-zinc-500">
+                    Clears your followed clubs on this device
+                  </div>
+                </div>
+              </div>
+            </button>
+          </div>
+        </section>
+
         <section>
           <h2 className="mb-3 px-1 text-xs font-black uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
             About
@@ -101,6 +170,24 @@ export default function Settings() {
               </span>
               <span className="text-sm font-black text-[#111318] dark:text-white">
                 v1.0
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between border-t border-zinc-100 px-5 py-4 dark:border-white/[0.06]">
+              <span className="text-sm font-bold text-zinc-500 dark:text-zinc-400">
+                Clubs tracked
+              </span>
+              <span className="text-sm font-black text-[#111318] dark:text-white">
+                {clubs.length}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between border-t border-zinc-100 px-5 py-4 dark:border-white/[0.06]">
+              <span className="text-sm font-bold text-zinc-500 dark:text-zinc-400">
+                Data source
+              </span>
+              <span className="text-sm font-black text-[#111318] dark:text-white">
+                football-data.org
               </span>
             </div>
           </div>

@@ -5,6 +5,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from "react
 type ClubsContextType = {
   selectedIds: string[];
   toggleClub: (id: string) => void;
+  resetClubs: () => void;
 };
 
 const ClubsContext = createContext<ClubsContextType | undefined>(undefined);
@@ -37,8 +38,12 @@ export function ClubsProvider({ children }: { children: ReactNode }) {
     );
   }
 
+  function resetClubs() {
+    setSelectedIds([]);
+  }
+
   return (
-    <ClubsContext.Provider value={{ selectedIds, toggleClub }}>
+    <ClubsContext.Provider value={{ selectedIds, toggleClub, resetClubs }}>
       {children}
     </ClubsContext.Provider>
   );
