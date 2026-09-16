@@ -396,3 +396,38 @@ internet access) - same as he mentioned already doing previously. So the
 end-of-day flow is: Claude stages + commits everything locally, then Ilai
 runs the actual `git push` (or clicks "Sync/Push" in VS Code's Source
 Control panel) to actually make it go live on GitHub/Vercel.
+
+## Onboarding follow-ups: real icon badge, phone crests fixed, then background redesigned entirely
+
+**Status: done, 2026-09-16 (committed locally as 733a04f, b2f8956, c4893f3, eafe989 -
+not yet pushed, same push note as above applies).**
+
+Several rounds of fixes to the onboarding welcome screen after the previous
+entry above, based on Ilai actually looking at it on his phone and at
+different desktop window sizes:
+
+- Swapped the leftover blue gradient "C" placeholder badge for Ilai's real
+  icon (`/brand/clubside-mark.png`) - this had been flagged as "left open"
+  in the note above but should have been done at the same time as the rest
+  of the page; my mistake for not doing it then.
+- The spread-out crests from before were only visible above a certain
+  screen width (Tailwind's `sm`/`lg`/`xl` breakpoints) - on an actual phone
+  only 4 crests (the corner ones) were showing, bunched in the corners
+  instead of spread out. Patched once (added a phone-specific crest tier),
+  then found a second gap - a range of desktop widths between two
+  breakpoints where a whole tier vanished, leaving empty space in the
+  middle of the page.
+- Rather than keep patching individual breakpoints, replaced the whole
+  approach: the background is now a single CSS grid that auto-tiles crest
+  logos across the *entire* page at any screen size (phone or desktop, no
+  breakpoints at all), at very low opacity/grayscale as a "ghost" texture,
+  with the page's real text sitting on top of it - including directly over
+  crests in the middle, which is intentional this time rather than an area
+  the crests were avoiding. Verified the tiling actually covers the full
+  screen with no gaps, at both a phone size and a wide desktop size,
+  before shipping it.
+- That tiling first used the same small hardcoded list of 18 clubs, which
+  meant each one repeated about 23 times across the page. Changed it to
+  pull crest images from the app's real, full club list in
+  `src/data/clubs.ts` (~130 clubs) instead, so each club now only repeats
+  roughly every 130 tiles instead of every 18 - much more variety.
