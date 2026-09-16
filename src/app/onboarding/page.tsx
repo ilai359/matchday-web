@@ -24,9 +24,12 @@ import { useRouter } from "next/navigation";
 //   (lg breakpoint and up) - this is what used to be two empty side
 //   walls with dead space top/center/bottom; now the top and bottom
 //   edges carry crests across their full width too.
-// - SPREAD_XL_CRESTS: an extra side-rail pair plus a closer-in ring,
-//   only once the window is properly wide (xl breakpoint) - any
-//   narrower and these would start overlapping the text column.
+// - SPREAD_XL_CRESTS: an extra side-rail pair plus a closer-in ring
+//   that sits right beside the text - shown at the same lg breakpoint
+//   as SPREAD_LG_CRESTS, so the two appear together (this used to be
+//   gated to xl, one breakpoint later, which left a real gap: wide
+//   enough for SPREAD_LG_CRESTS but not yet this ring, so the space
+//   right beside the text stayed empty).
 const CORNER_CRESTS = [
   { id: "arsenal", crest: "https://crests.football-data.org/57.png", position: "left-4 top-16" },
   { id: "real-madrid", crest: "https://crests.football-data.org/86.png", position: "right-4 top-16" },
@@ -66,9 +69,11 @@ const SPREAD_LG_CRESTS = [
   { id: "porto", crest: "https://crests.football-data.org/503.png", position: "right-[4%] top-[50%]" },
 ];
 
-// A second side-rail level plus a closer-in ring level with the text.
-// Only safe once the window is properly wide (xl breakpoint) - any
-// narrower and these would start overlapping the text column.
+// A second side-rail level plus a closer-in ring level with the text -
+// the tier that actually closes the horizontal gap next to the
+// centered column. Same lg breakpoint as SPREAD_LG_CRESTS (not xl -
+// that left a window where the wider tier showed but this one didn't,
+// leaving the middle looking empty).
 const SPREAD_XL_CRESTS = [
   { id: "ac-milan", crest: "https://crests.football-data.org/98.png", position: "left-[6%] top-[26%]" },
   { id: "inter-milan", crest: "https://crests.football-data.org/108.png", position: "right-[6%] top-[26%]" },
@@ -137,7 +142,7 @@ export default function OnboardingWelcome() {
         </div>
       ))}
       {SPREAD_XL_CRESTS.map((club) => (
-        <div key={club.id} className={`absolute z-0 hidden xl:block ${club.position}`}>
+        <div key={club.id} className={`absolute z-0 hidden lg:block ${club.position}`}>
           <CrestChip crest={club.crest} size={64} />
         </div>
       ))}
