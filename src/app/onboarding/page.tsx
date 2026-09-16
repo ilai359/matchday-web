@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { clubs } from "../../data/clubs";
 
 // First screen a brand-new visitor sees (also reachable any time at
 // /onboarding). Previously this page WAS a full club-picker list, built
@@ -13,37 +14,23 @@ import { useRouter } from "next/navigation";
 // Real, recognizable clubs, tiled as a full-page background pattern - a
 // faint "ghost" texture behind everything, including straight through
 // the middle where the text sits on top of it. Not meant to be read
-// individually, just texture, so the exact 18 clubs don't matter much
-// beyond giving it variety. This replaced an earlier version that hand-
-// placed a couple dozen crests at fixed spots for different screen
-// widths - it kept needing another round of fixes every time the window
-// was a size that fell between two of those fixed breakpoints. A CSS
-// grid tiles automatically at ANY size, phone or desktop, with no
-// breakpoints to get wrong.
-const CREST_URLS = [
-  "https://crests.football-data.org/57.png", // Arsenal
-  "https://crests.football-data.org/86.png", // Real Madrid
-  "https://crests.football-data.org/81.png", // Barcelona
-  "https://crests.football-data.org/64.png", // Liverpool
-  "https://crests.football-data.org/66.png", // Manchester United
-  "https://crests.football-data.org/61.png", // Chelsea
-  "https://crests.football-data.org/5.png", // Bayern Munich
-  "https://crests.football-data.org/109.png", // Juventus
-  "https://crests.football-data.org/4.png", // Borussia Dortmund
-  "https://crests.football-data.org/503.png", // Porto
-  "https://crests.football-data.org/65.png", // Manchester City
-  "https://crests.football-data.org/524.png", // Paris Saint-Germain
-  "https://crests.football-data.org/98.png", // AC Milan
-  "https://crests.football-data.org/108.png", // Inter Milan
-  "https://crests.football-data.org/678.png", // Ajax
-  "https://crests.football-data.org/73.png", // Tottenham
-  "https://crests.football-data.org/113.png", // Napoli
-  "https://crests.football-data.org/78.png", // Atletico Madrid
-];
+// individually, just texture. Pulled from the app's real club list (every
+// club we track, ~130 of them) instead of a small hand-picked set, so the
+// pattern cycles through way more clubs before any of them repeats. This
+// replaced an earlier version that hand-placed a couple dozen crests at
+// fixed spots for different screen widths - it kept needing another round
+// of fixes every time the window was a size that fell between two of
+// those fixed breakpoints. A CSS grid tiles automatically at ANY size,
+// phone or desktop, with no breakpoints to get wrong.
+const CREST_URLS = clubs
+  .map((club) => club.crest)
+  .filter((crest): crest is string => Boolean(crest));
 
 // Repeated enough times to fully tile a large desktop window - CSS grid
 // plus overflow-hidden just clips whatever doesn't fit on a smaller
-// screen, so the same list works at any size.
+// screen, so the same list works at any size. With ~130 real clubs to
+// draw from (instead of 18), each one only repeats every ~130 tiles
+// instead of every 18.
 const CREST_TILE = Array.from({ length: 420 }, (_, i) => ({
   key: i,
   crest: CREST_URLS[i % CREST_URLS.length],
