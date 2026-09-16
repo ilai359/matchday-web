@@ -34,6 +34,19 @@ const CORNER_CRESTS = [
   { id: "paris-saint-germain", crest: "https://crests.football-data.org/524.png", position: "right-4 bottom-28" },
 ];
 
+// Phone-only: fills the top and bottom margins with a proper spread
+// (not just the 4 corners) on screens too narrow for OUTER_BAND_CRESTS
+// and up. Hidden again from sm upward, where those wider tiers take
+// over with a bigger, fuller layout.
+const MOBILE_SPREAD_CRESTS = [
+  { id: "barcelona-m", crest: "https://crests.football-data.org/81.png", position: "left-[24%] top-[3%]" },
+  { id: "bayern-munich-m", crest: "https://crests.football-data.org/5.png", position: "left-1/2 top-[6%] -translate-x-1/2" },
+  { id: "liverpool-m", crest: "https://crests.football-data.org/64.png", position: "right-[24%] top-[3%]" },
+  { id: "manchester-united-m", crest: "https://crests.football-data.org/66.png", position: "left-[24%] top-[97%] -translate-y-full" },
+  { id: "juventus-m", crest: "https://crests.football-data.org/109.png", position: "left-1/2 top-[94%] -translate-x-1/2 -translate-y-full" },
+  { id: "chelsea-m", crest: "https://crests.football-data.org/61.png", position: "right-[24%] top-[97%] -translate-y-full" },
+];
+
 const OUTER_BAND_CRESTS = [
   { id: "barcelona", crest: "https://crests.football-data.org/81.png", position: "left-[9%] top-[6%]" },
   { id: "liverpool", crest: "https://crests.football-data.org/64.png", position: "right-[9%] top-[6%]" },
@@ -108,6 +121,11 @@ export default function OnboardingWelcome() {
           <CrestChip crest={club.crest} size={52} />
         </div>
       ))}
+      {MOBILE_SPREAD_CRESTS.map((club) => (
+        <div key={club.id} className={`absolute z-0 sm:hidden ${club.position}`}>
+          <CrestChip crest={club.crest} size={44} />
+        </div>
+      ))}
       {OUTER_BAND_CRESTS.map((club) => (
         <div key={club.id} className={`absolute z-0 hidden sm:block ${club.position}`}>
           <CrestChip crest={club.crest} size={72} />
@@ -126,14 +144,15 @@ export default function OnboardingWelcome() {
 
       {/* CONTENT */}
       <div className="relative z-10 flex min-h-screen flex-col items-center justify-center px-6 text-center">
-        <div
-          className="mb-6 flex h-24 w-24 items-center justify-center rounded-[26px] shadow-[0_16px_40px_rgba(0,0,0,0.35)]"
-          style={{
-            background: "linear-gradient(135deg, #4F46E5 0%, #0B0F1A 130%)",
-          }}
-        >
-          <span className="text-[44px] font-black leading-none">C</span>
-        </div>
+        {/* eslint-disable-next-line @next/next/no-img-element -- static brand mark, not worth next/image's overhead here */}
+        <img
+          src="/brand/clubside-mark.png"
+          alt=""
+          aria-hidden="true"
+          width={96}
+          height={96}
+          className="mb-6 h-24 w-24 drop-shadow-[0_16px_40px_rgba(0,0,0,0.35)]"
+        />
 
         <h1 className="text-[32px] font-black leading-none tracking-[-0.03em]">
           Clubside
