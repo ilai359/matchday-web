@@ -128,9 +128,9 @@ export default function Home() {
                 Welcome to
               </div>
               <h1 className="text-6xl font-black tracking-[-0.06em] sm:text-7xl">
-                Match
+                Club
                 <span className="bg-gradient-to-r from-blue-400 to-violet-400 bg-clip-text text-transparent">
-                  day
+                  side
                 </span>
               </h1>
             </div>
