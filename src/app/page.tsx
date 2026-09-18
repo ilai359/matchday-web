@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { matches } from "../data/matches";
 import { useClubs } from "../context/ClubsContext";
@@ -17,7 +18,8 @@ import ClubBadge from "../components/ClubBadge";
 import YourClubs from "../components/YourClubs";
 
 export default function Home() {
-  const { selectedIds } = useClubs();
+  const { selectedIds, loaded } = useClubs();
+  const router = useRouter();
   const [liveMatches, setLiveMatches] = useState<LiveMatch[]>([]);
   const [liveLoading, setLiveLoading] = useState(true);
 
@@ -27,6 +29,19 @@ export default function Home() {
       .catch(() => {})
       .finally(() => setLiveLoading(false));
   }, []);
+
+  // Onboarding is the one, real "welcome" screen now - a brand-new visitor
+  // (nothing followed yet) is sent straight there instead of this page
+  // showing its own separate welcome screen. Waits for "loaded" first:
+  // selectedIds briefly looks empty for every returning visitor too, for
+  // the instant before their real saved list loads in from the browser -
+  // without that check, this would bounce existing users out to
+  // /onboarding and back on every single visit.
+  useEffect(() => {
+    if (loaded && selectedIds.length === 0) {
+      router.replace("/onboarding");
+    }
+  }, [loaded, selectedIds, router]);
 
   const myLiveMatches = liveMatches
     .filter(
@@ -107,64 +122,12 @@ export default function Home() {
   const nextMatch = futureMatches[0];
   const upcomingMatches = futureMatches.slice(1, 5);
 
-  if (selectedIds.length === 0) {
-    return (
-      <main className="relative min-h-screen overflow-hidden bg-[#070A12] text-white">
-        <div className="pointer-events-none absolute inset-0">
-          <div className="absolute -left-40 -top-44 h-[420px] w-[420px] rounded-full bg-blue-600/25 blur-[100px]" />
-          <div className="absolute -right-44 top-32 h-[430px] w-[430px] rounded-full bg-violet-600/25 blur-[110px]" />
-          <div className="absolute bottom-[-180px] left-1/2 h-[430px] w-[430px] -translate-x-1/2 rounded-full bg-emerald-500/15 blur-[110px]" />
-        </div>
-        <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-2xl flex-col justify-center px-5 py-12">
-          <div className="mx-auto w-full max-w-md text-center">
-            <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.07] px-4 py-2 backdrop-blur-xl">
-              <span className="h-2 w-2 rounded-full bg-emerald-400" />
-              <span className="text-xs font-bold tracking-wide text-white/80">
-                YOUR FOOTBALL. YOUR FEED.
-              </span>
-            </div>
-            <div className="mb-5">
-              <div className="mb-2 text-sm font-black uppercase tracking-[0.32em] text-blue-300/80">
-                Welcome to
-              </div>
-              <h1 className="text-6xl font-black tracking-[-0.06em] sm:text-7xl">
-                Club
-                <span className="bg-gradient-to-r from-blue-400 to-violet-400 bg-clip-text text-transparent">
-                  side
-                </span>
-              </h1>
-            </div>
-            <h2 className="mb-3 text-2xl font-black tracking-tight">
-              Never miss what matters.
-            </h2>
-            <p className="mx-auto mb-9 max-w-sm text-base leading-7 text-white/55">
-              Matches, injuries, transfers, press updates and everything
-              happening around the clubs you care about.
-            </p>
-            <button
-              onClick={() => {
-                window.location.href = "/onboarding";
-              }}
-              className="group w-full rounded-2xl bg-white px-6 py-4 text-base font-black text-black shadow-2xl shadow-blue-500/10 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-blue-500/20 active:scale-[0.98]"
-            >
-              <span className="flex items-center justify-center gap-2">
-                Choose my clubs
-                <span className="transition-transform duration-200 group-hover:translate-x-1">
-                  →
-                </span>
-              </span>
-            </button>
-            <div className="mt-8 flex items-center justify-center gap-6 text-xs font-semibold text-white/35">
-              <span>Matches</span>
-              <span className="h-1 w-1 rounded-full bg-white/20" />
-              <span>News</span>
-              <span className="h-1 w-1 rounded-full bg-white/20" />
-              <span>Updates</span>
-            </div>
-          </div>
-        </div>
-      </main>
-    );
+  // Either we don't know yet whether this person has followed clubs
+  // (still reading the saved list), or they haven't and are about to be
+  // sent to /onboarding (effect above) - either way, show nothing rather
+  // than flash a UI that's about to be replaced a moment later.
+  if (!loaded || selectedIds.length === 0) {
+    return <main className="min-h-screen bg-[#070A12]" />;
   }
 
   const homeClub = nextMatch ? getClub(nextMatch.homeClubId) : undefined;

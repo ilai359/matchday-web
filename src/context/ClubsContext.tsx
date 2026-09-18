@@ -6,6 +6,12 @@ type ClubsContextType = {
   selectedIds: string[];
   toggleClub: (id: string) => void;
   resetClubs: () => void;
+  // True once the saved selection has been read from the browser. Pages
+  // that decide what to show based on "has this person picked any clubs
+  // yet" (the home page, redirecting to /onboarding) need this - without
+  // it, selectedIds briefly looks empty for every returning visitor too,
+  // for the instant before their real saved list loads in.
+  loaded: boolean;
 };
 
 const ClubsContext = createContext<ClubsContextType | undefined>(undefined);
@@ -43,7 +49,9 @@ export function ClubsProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <ClubsContext.Provider value={{ selectedIds, toggleClub, resetClubs }}>
+    <ClubsContext.Provider
+      value={{ selectedIds, toggleClub, resetClubs, loaded }}
+    >
       {children}
     </ClubsContext.Provider>
   );
