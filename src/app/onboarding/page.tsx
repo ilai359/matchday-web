@@ -69,6 +69,13 @@ export default function OnboardingWelcome() {
 
       {/* CONTENT */}
       <div className="relative z-10 flex min-h-screen flex-col items-center justify-center px-6 text-center">
+        <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.07] px-4 py-2 backdrop-blur-xl">
+          <span className="h-2 w-2 rounded-full bg-emerald-400" />
+          <span className="text-[11px] font-bold tracking-wide text-white/80">
+            YOUR FOOTBALL. YOUR FEED.
+          </span>
+        </div>
+
         {/* eslint-disable-next-line @next/next/no-img-element -- static brand mark, not worth next/image's overhead here */}
         <img
           src="/brand/clubside-mark.png"
@@ -79,10 +86,13 @@ export default function OnboardingWelcome() {
           className="mb-6 h-24 w-24 drop-shadow-[0_16px_40px_rgba(0,0,0,0.35)]"
         />
 
-        <h1 className="text-[32px] font-black leading-none tracking-[-0.03em]">
-          Clubside
+        <h1 className="text-[36px] font-black leading-none tracking-[-0.03em]">
+          Club
+          <span className="bg-gradient-to-r from-blue-400 to-violet-400 bg-clip-text text-transparent">
+            side
+          </span>
         </h1>
-        <p className="mt-2 text-sm font-semibold text-white/45">
+        <p className="mt-2.5 text-sm font-bold text-blue-300/80">
           Never miss what matters.
         </p>
 
