@@ -87,8 +87,8 @@ export default function OnboardingWelcome() {
         </p>
 
         <p className="mt-6 max-w-xs text-[13px] leading-relaxed text-white/45">
-          Follow your clubs to get their fixtures, results, and news, all in
-          one place.
+          Fixtures, injuries, transfers and press updates - everything
+          happening around the clubs you care about, all in one place.
         </p>
 
         <button
@@ -98,6 +98,14 @@ export default function OnboardingWelcome() {
         >
           Choose your clubs →
         </button>
+
+        <div className="mt-8 flex items-center justify-center gap-6 text-xs font-semibold text-white/35">
+          <span>Matches</span>
+          <span className="h-1 w-1 rounded-full bg-white/20" />
+          <span>News</span>
+          <span className="h-1 w-1 rounded-full bg-white/20" />
+          <span>Updates</span>
+        </div>
       </div>
     </main>
   );
