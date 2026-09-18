@@ -431,3 +431,81 @@ different desktop window sizes:
   pull crest images from the app's real, full club list in
   `src/data/clubs.ts` (~130 clubs) instead, so each club now only repeats
   roughly every 130 tiles instead of every 18 - much more variety.
+
+## iOS search bar zoom, Settings page rebuild, and news update investigation
+
+**Status: iOS fix and Settings rebuild done and committed (f83d021, 1acf686,
+f185b2c, b50ebfa, 1422c65). Caching fix (below) done and committed, not yet
+pushed - same push note as always applies.**
+
+- Fixed the clubs search box auto-zooming the whole page when tapped on an
+  iPhone. Cause: iOS Safari zooms in on any text input with a font size
+  under 16px, and the search box was using a 14px size. Fixed by bumping
+  it to 16px on phones only, keeping the smaller size on desktop.
+- Settings page was empty/placeholder before. Rebuilt it with actual
+  working content, through a few rounds of Ilai's feedback: first added
+  "Your Clubs" (with real crest badges + which leagues they cover),
+  "Appearance" (existing light/dark toggle), "Data" (an "unfollow all
+  clubs" reset, with a confirm step), and "About". Tried adding a
+  "Coverage" stats section (clubs/leagues/countries tracked) and a "Send
+  Feedback" email button, but Ilai correctly called both out as not
+  interesting/not useful (the feedback button would have shipped with no
+  actual email address behind it, which would have been confusing) - both
+  were removed. Final Settings page: Your Clubs, Appearance, Data, About.
+
+### Investigated: "almost no updates" and articles always showing as "yesterday"
+
+Ilai asked why real news articles (not the AI-written ones) are almost
+always dated the day before, and why updates feel sparse. Two separate
+findings, both confirmed rather than guessed at:
+
+1. **"Always yesterday" - NewsData.io's own limitation, not a bug.** Our
+   news source (NewsData.io, free plan) delays newly-published articles by
+   12 hours before they're available through their API - confirmed
+   directly in their own dashboard. Combined with our 3-hour cache, this
+   means freshly-published articles realistically won't show up as "today"
+   until well into the same day at the earliest, and often read as
+   "yesterday." Not fixable without upgrading NewsData.io's plan (a real
+   cost - not something to do without discussing first).
+2. **"Almost no updates" - likely caused by a real caching bug, now
+   fixed (see below).** Checked NewsData.io's own usage dashboard first
+   to rule out running out of API credits: only 33 of 200 monthly credits
+   used, so that's not the cause. The remaining likely explanation: the
+   AI relevance-matching step (which double-checks that a fetched article
+   is actually about a club you follow) was using a cache that only lives
+   in a single server's memory. Vercel (where the app is hosted) runs
+   many short-lived server copies behind the scenes, so most requests
+   never saw the shared cache and the AI step may have been silently
+   failing or being skipped more than intended.
+
+**Fix applied:** Replaced the in-memory cache (`src/lib/cache.ts`) with
+Upstash Redis - a small free shared-storage service every server copy can
+actually read from. If the Upstash connection details aren't set up yet,
+the code automatically falls back to the old in-memory behavior, so
+nothing breaks in the meantime.
+
+**Still needed from Ilai to actually turn this on:**
+1. Sign up for a free Upstash account (upstash.com) - no credit card
+   needed for the free tier.
+2. Create a Redis database there (a couple of clicks).
+3. Copy its "REST URL" and "REST TOKEN" values.
+4. Add them as environment variables named `UPSTASH_REDIS_REST_URL` and
+   `UPSTASH_REDIS_REST_TOKEN` - both in Vercel's project settings (so the
+   live site picks them up) and in the local `.env.local` file (so it
+   works when testing locally too).
+5. Run `npm install @upstash/redis` once in Terminal, in the project
+   folder, to actually install the new package (Claude can't run installs
+   from this environment - no internet access on that side).
+6. Push the code as usual once ready.
+
+### Credit usage, explained for reference
+
+Ilai also asked what actually drives NewsData.io credit usage, in case
+user growth becomes a problem. Answer: a credit is spent per distinct club
+name queried, not per user and not per app visit - because the fetched
+articles for a given club are cached and shared across every user
+following that club for a few hours. So the real thing to watch, if the
+app grows, is the total number of *different* clubs being actively
+followed/checked across all users at once (out of the ~130 tracked), not
+raw user count or how often people open the app. At current usage (33/200
+credits over about 4 weeks) this is nowhere close to a real constraint.

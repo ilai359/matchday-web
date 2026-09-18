@@ -1,28 +1,30 @@
 /**
- * Very small in-memory TTL cache with in-flight request coalescing.
+ * Small TTL cache with in-flight request coalescing.
  *
  * Used to share expensive/rate-limited upstream calls (right now, just
  * the Claude relevance/summary call in news-relevance) across every
  * visitor requesting the same thing, instead of each visitor paying for
  * and waiting on their own separate call.
  *
- * Coalescing matters as much as the TTL does: without it, if several
- * visitors ask for the same thing within the same few milliseconds, all
- * of them would see an empty cache and all of them would fire off their
- * own upstream call before any of them finished — exactly the
- * multiplication problem this cache exists to prevent. Storing the
- * in-flight promise (not just the resolved value) closes that gap: later
- * callers await the same promise instead of starting a new call.
+ * Backing store: if UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN
+ * are set (see Vercel/​.env.local), this uses Upstash Redis, a small
+ * shared store that every server instance can read and write. That's
+ * required on Vercel, where each request can land on a different,
+ * short-lived server process — a plain in-memory cache would look empty
+ * to most requests and silently stop doing its job.
  *
- * IMPORTANT: this cache lives in the memory of a single running server
- * process. That's fine for a single persistent server (a single Node
- * process, e.g. one Render/Railway instance, or `next start` on one
- * machine) but it will NOT be shared across multiple server instances or
- * serverless cold starts (e.g. Vercel functions scaled out). If this app
- * is ever deployed that way, swap this out for a shared store like Redis
- * (Upstash has a free tier with a very similar get/set API) — call sites
- * wouldn't need to change much, only the implementation of getOrSet below.
+ * If those env vars are NOT set (e.g. running locally without Upstash
+ * configured), this falls back to a plain in-memory Map. That's fine for
+ * local development (a single process), but note it behaves like the old
+ * cache: not shared across multiple instances.
+ *
+ * In-flight coalescing still happens in-process either way: if several
+ * requests on the *same* running server ask for the same key within the
+ * same few milliseconds, only the first actually calls `fetcher` — the
+ * rest await that same promise instead of starting their own call.
  */
+
+import { Redis } from "@upstash/redis";
 
 type CacheEntry<T> = {
   value: T;
@@ -31,6 +33,12 @@ type CacheEntry<T> = {
 
 const store = new Map<string, CacheEntry<unknown>>();
 const inFlight = new Map<string, Promise<unknown>>();
+
+const redisUrl = process.env.UPSTASH_REDIS_REST_URL;
+const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
+
+const redis =
+  redisUrl && redisToken ? new Redis({ url: redisUrl, token: redisToken }) : null;
 
 /**
  * Returns a cached value for `key` if it hasn't expired yet. Otherwise
@@ -45,13 +53,6 @@ export async function getOrSet<T>(
   ttlMs: number,
   fetcher: () => Promise<T>
 ): Promise<T> {
-  const now = Date.now();
-  const existing = store.get(key);
-
-  if (existing && existing.expiresAt > now) {
-    return existing.value as T;
-  }
-
   const pending = inFlight.get(key);
   if (pending) {
     return pending as Promise<T>;
@@ -59,6 +60,24 @@ export async function getOrSet<T>(
 
   const promise = (async () => {
     try {
+      if (redis) {
+        const cached = await redis.get<T>(key);
+        if (cached !== null && cached !== undefined) {
+          return cached;
+        }
+
+        const value = await fetcher();
+        // px = expiry in milliseconds from now.
+        await redis.set(key, value as unknown, { px: ttlMs });
+        return value;
+      }
+
+      const now = Date.now();
+      const existing = store.get(key);
+      if (existing && existing.expiresAt > now) {
+        return existing.value as T;
+      }
+
       const value = await fetcher();
       store.set(key, { value, expiresAt: Date.now() + ttlMs });
       return value;
@@ -71,7 +90,7 @@ export async function getOrSet<T>(
   return promise;
 }
 
-/** Exposed for tests / debugging only. */
+/** Exposed for tests / debugging only. Only clears the in-memory fallback. */
 export function _clearCacheForTests() {
   store.clear();
   inFlight.clear();
