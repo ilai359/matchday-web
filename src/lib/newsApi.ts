@@ -367,9 +367,34 @@ const ENGLISH_MARKER_WORDS = new Set([
   "will",
 ]);
 
+// Many WordPress-based sites append an English syndication footer -
+// "The post <title> appeared first on <site>." - to every article they
+// publish, in whatever language the article itself is actually written
+// in. That footer alone is enough English text to fool a naive "does
+// this contain any English word" check, which is how a French Bayern
+// Munich article once slipped through: its only English words were from
+// this exact footer. Stripping it out before checking the language (and
+// before displaying the summary, since it's not part of the actual
+// article and looks like clutter) closes that gap.
+const SYNDICATION_BOILERPLATE_PATTERN =
+  /\s*the post .*? appeared first on .*?\.?\s*$/i;
+
+function stripSyndicationBoilerplate(text: string): string {
+  return text.replace(SYNDICATION_BOILERPLATE_PATTERN, "").trim();
+}
+
+// NewsData.io's own language filter (the ?language=en request param, and
+// each article's own `language` field checked above) isn't fully
+// reliable - non-English articles occasionally slip through it. As a
+// backstop, require the article to contain at least two different common
+// English words, not just one - a single stray match (a club name, a
+// player's name, a syndication footer) shouldn't be enough to call
+// something "English" when the rest of the text isn't.
 function isLikelyEnglish(text: string): boolean {
-  const words = text.toLowerCase().match(/[a-z']+/g) ?? [];
-  return words.some((word) => ENGLISH_MARKER_WORDS.has(word));
+  const cleaned = stripSyndicationBoilerplate(text);
+  const words = cleaned.toLowerCase().match(/[a-z']+/g) ?? [];
+  const matches = new Set(words.filter((word) => ENGLISH_MARKER_WORDS.has(word)));
+  return matches.size >= 2;
 }
 
 function countOccurrences(haystack: string, needle: string): number {
@@ -561,7 +586,7 @@ export async function fetchLiveUpdates(
     if (Number.isNaN(publishedTime)) continue;
     if (now - publishedTime > MAX_AGE_MS) continue;
 
-    const description = article.description ?? "";
+    const description = stripSyndicationBoilerplate(article.description ?? "");
     const text = `${article.title} ${description}`;
     if (!isLikelyEnglish(text)) continue;
     if (looksLikeNonFootballContent(text)) continue;
