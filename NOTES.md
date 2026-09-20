@@ -585,3 +585,86 @@ no matter how many people look at it.
 Not done yet (discussed with Ilai, chose this first): per-player stats on
 a club's own page (e.g. minutes played, ratings) alongside the existing
 Top Scorers/Top Assists - that's the next thing to build.
+
+## Removed match stats and Europa/Conference League (API-Football's free plan doesn't cover current seasons), then several fixes
+
+**Status: all committed (5f33742, 5a2154c, 5a014b4, 0f8ede3, 090eb33,
+d20a5c5), not yet pushed - same push note as always applies.**
+
+### Removed: match stats, and Europa/Conference League matches
+
+The live match stats feature described above never actually worked, and
+neither did Europa/Conference League matches - both depended on
+API-Football, and its free plan turned out to reject any request for the
+current season outright ("Free plans do not have access to this season,
+try from 2022 to 2024"), confirmed from Ilai's own terminal output. That
+applied uniformly to every league it was used for, not just the newly
+added domestic ones. Paid upgrades were priced out (API-Football's Pro
+plan or football-data.org's Statistics Add-on, roughly $19-27/mo) and
+Ilai decided the cost wasn't worth it, so both features were removed
+cleanly rather than left silently broken. All API-Football code is
+deleted from the app.
+
+### Fixed: favicon different between the live site and local dev
+
+The browser tab icon was still the old default `favicon.ico`, out of
+sync with the real logo (`icon.png`) used everywhere else. Regenerated
+`favicon.ico` from the real logo.
+
+### Fixed: "Match not found" for already-played matches
+
+Clicking into a finished or in-progress match (via a club's recent-form
+list, for example) could show "Match not found" instead of the match,
+because the page only ever looked for the match inside the
+currently-fetched live/upcoming list. Added a direct by-id lookup as a
+fallback, plus score/status fallback fields, so finished matches resolve
+correctly. Doesn't cover Europa/Conference League matches specifically
+(different id scheme) - not fixed, since that whole feature was removed
+anyway.
+
+### Added: auto-refreshing live scores on the Matches page
+
+The Matches page only fetched scores once, on load - a match that went
+live while the page was open stayed frozen until a manual refresh. It now
+polls every 45 seconds, but only while at least one match in the list is
+actually within a plausible "could be live" window (15 minutes before
+kickoff to 3 hours after) - once nothing in the list is live anymore, it
+stops polling on its own.
+
+### Fixed: live matches disappearing from the Matches list entirely
+
+Found while answering Ilai's "will this be a problem at scale" question,
+not reported by him: `/api/matches` only ever asked football-data.org for
+`status=SCHEDULED` matches, which (per their docs) excludes `IN_PLAY`/
+`PAUSED` matches entirely - so a match didn't just miss a score update
+once live, it vanished from the list altogether. Now queries both
+`SCHEDULED` and their `LIVE` pseudo-status (covers `IN_PLAY` + `PAUSED`)
+separately per competition and merges the results - their docs only
+confirm single-status examples, so two confirmed-working requests were
+used instead of guessing at comma-separated syntax. Also dropped that
+route's cache from 1 hour to 60 seconds so the new polling above actually
+gets fresh data.
+
+### Redesigned: Match Details card, second attempt
+
+Ilai pointed out that every card in the app (including the ticket-stub
+Match Details card from the redesign above) uses the same white-card-
+plus-color-stripe look, and asked to see this one section done
+differently just to see what it would look like. Replaced it with a dark
+panel (matching the page header's dark background rather than the white
+body cards), soft team-color glow accents in the corners, and a plain
+icon/label/value row for date, kickoff, and venue instead of the
+calendar-tile-and-dashed-line layout.
+
+### Technical snag: this environment's delete permission
+
+Partway through this session, the sandbox lost the ability to delete
+*any* file on this machine (confirmed with a blank test file, not just
+old ones) - no workaround exists for that from this end. This blocked
+git itself, since git needs to remove its own stale `.git/HEAD.lock`/
+`.git/index.lock` files as part of committing. Ilai had to manually run
+an `rm -f` command a couple of times mid-session to clear those. If a
+future session's commits suddenly fail with "Unable to create
+.git/HEAD.lock: File exists" or similar, that's what's happening - just
+`rm -f` the named `.lock` file from Terminal and it'll go through.
+
