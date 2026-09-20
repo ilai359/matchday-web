@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { matches } from "../../../data/matches";
 import { useClubs } from "../../../context/ClubsContext";
 import { getClub, getClubName } from "../../../lib/clubHelpers";
@@ -247,6 +247,37 @@ function HeadToHeadRow({
           </span>
         </div>
       </div>
+    </div>
+  );
+}
+
+// One row of the Match details card: an icon badge (matching the same
+// icon-badge pattern used elsewhere in the app, e.g. Settings) plus a
+// label on the left and the value on the right. Pulled out as its own
+// component so five near-identical rows don't repeat the same markup
+// five times over.
+function MatchDetailRow({
+  icon,
+  label,
+  children,
+}: {
+  icon: string;
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 border-t border-zinc-100 px-4 py-3.5 first:border-t-0 dark:border-white/[0.06]">
+      <div className="flex min-w-0 items-center gap-3">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#F2F4F7] text-base dark:bg-white/[0.06]">
+          {icon}
+        </div>
+        <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400">
+          {label}
+        </span>
+      </div>
+      <span className="truncate text-sm font-black text-[#111318] dark:text-white">
+        {children}
+      </span>
     </div>
   );
 }
@@ -644,40 +675,25 @@ export default function MatchDetailClient({ id }: { id: string }) {
               <div className="mb-4 text-xs font-black uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
                 Match details
               </div>
-              <div className="flex flex-col gap-3">
-                <div className="flex items-center justify-between rounded-2xl bg-[#F8F9FB] px-4 py-3 dark:bg-white/[0.04]">
-                  <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400">Date</span>
-                  <span className="text-sm font-black text-[#111318] dark:text-white">
-                    {formatFullDate(displayMatch.kickoff)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between rounded-2xl bg-[#F8F9FB] px-4 py-3 dark:bg-white/[0.04]">
-                  <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400">Kickoff</span>
-                  <span className="text-sm font-black text-[#111318] dark:text-white">
-                    {formatTime(displayMatch.kickoff)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between rounded-2xl bg-[#F8F9FB] px-4 py-3 dark:bg-white/[0.04]">
-                  <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400">Competition</span>
-                  <span className="text-sm font-black text-[#111318] dark:text-white">
-                    {displayMatch.competition}
-                  </span>
-                </div>
+              <div className="overflow-hidden rounded-[26px] border border-black/[0.045] bg-white shadow-[0_6px_24px_rgba(0,0,0,0.045)] dark:border-white/[0.06] dark:bg-[#14171F] dark:shadow-none">
+                <MatchDetailRow icon="📅" label="Date">
+                  {formatFullDate(displayMatch.kickoff)}
+                </MatchDetailRow>
+                <MatchDetailRow icon="⏰" label="Kickoff">
+                  {formatTime(displayMatch.kickoff)}
+                </MatchDetailRow>
+                <MatchDetailRow icon="🏆" label="Competition">
+                  {displayMatch.competition}
+                </MatchDetailRow>
                 {effectiveVenue && (
-                  <div className="flex items-center justify-between rounded-2xl bg-[#F8F9FB] px-4 py-3 dark:bg-white/[0.04]">
-                    <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400">Venue</span>
-                    <span className="text-sm font-black text-[#111318] dark:text-white">
-                      {effectiveVenue}
-                    </span>
-                  </div>
+                  <MatchDetailRow icon="🏟️" label="Venue">
+                    {effectiveVenue}
+                  </MatchDetailRow>
                 )}
                 {displayMatch.city && (
-                  <div className="flex items-center justify-between rounded-2xl bg-[#F8F9FB] px-4 py-3 dark:bg-white/[0.04]">
-                    <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400">City</span>
-                    <span className="text-sm font-black text-[#111318] dark:text-white">
-                      {displayMatch.city}
-                    </span>
-                  </div>
+                  <MatchDetailRow icon="📍" label="City">
+                    {displayMatch.city}
+                  </MatchDetailRow>
                 )}
               </div>
             </div>
