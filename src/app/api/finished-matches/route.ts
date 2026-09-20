@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { fetchWithRetry } from "@/lib/fetchWithRetry";
 import {
   EURO_COMPETITION_NAMES,
   EuroCompetitionCode,
@@ -54,7 +55,7 @@ export async function GET(request: Request) {
   }
   try {
     const seasonParam = season ? `&season=${season}` : "";
-    const response = await fetch(
+    const response = await fetchWithRetry(
       `https://api.football-data.org/v4/competitions/${competition}/matches?status=FINISHED${seasonParam}`,
       { headers: { "X-Auth-Token": apiKey }, next: { revalidate: 3600 } }
     );

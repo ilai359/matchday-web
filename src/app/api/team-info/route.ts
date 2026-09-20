@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getOrSet } from "@/lib/cache";
+import { fetchWithRetry } from "@/lib/fetchWithRetry";
 
 // Used only as a fallback for clubs outside our own 132-club list (e.g. a
 // Champions League opponent we don't track) when football-data.org's
@@ -26,7 +27,7 @@ export async function GET(request: Request) {
       `team-info:${id}`,
       1000 * 60 * 60 * 24 * 30,
       async () => {
-        const response = await fetch(`https://api.football-data.org/v4/teams/${id}`, {
+        const response = await fetchWithRetry(`https://api.football-data.org/v4/teams/${id}`, {
           headers: { "X-Auth-Token": apiKey },
         });
         if (!response.ok) {

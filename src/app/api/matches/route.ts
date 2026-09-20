@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { fetchWithRetry } from "@/lib/fetchWithRetry";
 import {
   EURO_COMPETITION_NAMES,
   EuroCompetitionCode,
@@ -34,7 +35,7 @@ export async function GET() {
 
   try {
     const requests = COMPETITIONS.map((code) =>
-      fetch(
+      fetchWithRetry(
         `https://api.football-data.org/v4/competitions/${code}/matches?status=SCHEDULED`,
         {
           headers: { "X-Auth-Token": apiKey },

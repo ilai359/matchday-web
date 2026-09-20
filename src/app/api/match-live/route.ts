@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { fetchWithRetry } from "@/lib/fetchWithRetry";
 
 export async function GET(request: Request) {
   const apiKey = process.env.FOOTBALL_DATA_API_KEY;
@@ -11,7 +12,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Missing match id" }, { status: 400 });
   }
   try {
-    const response = await fetch(
+    const response = await fetchWithRetry(
       `https://api.football-data.org/v4/matches/${id}`,
       { headers: { "X-Auth-Token": apiKey }, cache: "no-store" }
     );

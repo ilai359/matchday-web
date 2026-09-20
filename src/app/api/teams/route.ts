@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { fetchWithRetry } from "@/lib/fetchWithRetry";
 
 const COMPETITIONS = ["PL", "PD", "BL1", "FL1", "SA", "CL", "DED", "PPL"];
 
@@ -11,7 +12,7 @@ export async function GET() {
 
   try {
     const requests = COMPETITIONS.map((code) =>
-      fetch(`https://api.football-data.org/v4/competitions/${code}/teams`, {
+      fetchWithRetry(`https://api.football-data.org/v4/competitions/${code}/teams`, {
         headers: { "X-Auth-Token": apiKey },
         next: { revalidate: 86400 },
       }).then((res) => (res.ok ? res.json() : { teams: [] }))
