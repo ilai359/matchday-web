@@ -405,6 +405,33 @@ export async function fetchStandings(
   }));
 }
 
+// The API groups tied teams under the same position number. Within each
+// tied group, move the given club's row to the front, then renumber
+// everything sequentially so no two teams ever show the same position.
+// Shared by anything that needs a specific club's actual league position
+// (the Your Clubs cards, the Settings stats) so they always agree.
+export function applyClubTieBreak(
+  rows: StandingsRow[],
+  clubId: string
+): StandingsRow[] {
+  const groups: StandingsRow[][] = [];
+  for (const row of rows) {
+    const lastGroup = groups[groups.length - 1];
+    if (lastGroup && lastGroup[0].position === row.position) {
+      lastGroup.push(row);
+    } else {
+      groups.push([row]);
+    }
+  }
+  const reordered = groups.flatMap((group) => {
+    if (group.length <= 1) return group;
+    const clubRow = group.find((r) => r.clubId === clubId);
+    if (!clubRow) return group;
+    return [clubRow, ...group.filter((r) => r !== clubRow)];
+  });
+  return reordered.map((row, i) => ({ ...row, position: i + 1 }));
+}
+
 export type Scorer = {
   playerName: string;
   teamName: string;

@@ -1,10 +1,17 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useTheme } from "../../context/ThemeContext";
 import { useClubs } from "../../context/ClubsContext";
-import { clubs } from "../../data/clubs";
+import { clubs, Club } from "../../data/clubs";
 import ClubBadge from "../../components/ClubBadge";
+import {
+  fetchStandings,
+  applyClubTieBreak,
+  LEAGUE_TO_CODE,
+  StandingsRow,
+} from "../../lib/footballApi";
 
 export default function Settings() {
   const { theme, setTheme } = useTheme();
@@ -14,6 +21,91 @@ export default function Settings() {
   const followedLeagues = [...new Set(followedClubs.map((club) => club.league))];
   const previewClubs = followedClubs.slice(0, 6);
   const extraCount = followedClubs.length - previewClubs.length;
+
+  const [standingsByLeague, setStandingsByLeague] = useState<
+    Record<string, StandingsRow[]>
+  >({});
+  const [standingsLoading, setStandingsLoading] = useState(true);
+
+  const supportedLeagues = Array.from(
+    new Set(followedLeagues.filter((league) => LEAGUE_TO_CODE[league]))
+  );
+  const supportedLeaguesKey = supportedLeagues.join(",");
+
+  useEffect(() => {
+    // Nothing to fetch - leave `standingsLoading` alone rather than
+    // setState-ing it from inside the effect for this branch; the "no
+    // supported leagues" case is instead folded into `isStandingsLoading`
+    // below, the same pattern YourClubs.tsx uses for the identical case.
+    if (supportedLeagues.length === 0) {
+      return;
+    }
+    let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setStandingsLoading(true);
+    Promise.all(
+      supportedLeagues.map(async (league) => {
+        const code = LEAGUE_TO_CODE[league];
+        const rows = await fetchStandings(code).catch(() => []);
+        return [league, rows] as const;
+      })
+    )
+      .then((results) => {
+        if (cancelled) return;
+        const next: Record<string, StandingsRow[]> = {};
+        for (const [league, rows] of results) {
+          next[league] = rows;
+        }
+        setStandingsByLeague(next);
+      })
+      .finally(() => {
+        if (!cancelled) setStandingsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supportedLeaguesKey]);
+
+  // Folds the "nothing to fetch" case in here instead of having the effect
+  // set state for it (see comment above) - avoids an extra render for no
+  // benefit, and keeps `standingsLoading`'s initial `true` from getting
+  // stuck forever when no followed club has a supported league.
+  const isStandingsLoading = standingsLoading && supportedLeagues.length > 0;
+
+  // For each followed club whose league we have a table for, find that
+  // club's own row - applying the same tied-position tie-break used
+  // elsewhere in the app (Your Clubs), so the position shown here always
+  // matches what the club's own page says.
+  const clubStandings: { club: Club; row: StandingsRow }[] = followedClubs
+    .map((club) => {
+      const rows = standingsByLeague[club.league];
+      if (!rows || rows.length === 0) return null;
+      const ranked = applyClubTieBreak(rows, club.id);
+      const row = ranked.find((r) => r.clubId === club.id);
+      return row ? { club, row } : null;
+    })
+    .filter((entry): entry is { club: Club; row: StandingsRow } => entry !== null);
+
+  const averagePosition =
+    clubStandings.length > 0
+      ? clubStandings.reduce((sum, entry) => sum + entry.row.position, 0) /
+        clubStandings.length
+      : null;
+
+  const bestPlaced =
+    clubStandings.length > 0
+      ? clubStandings.reduce((best, entry) =>
+          entry.row.position < best.row.position ? entry : best
+        )
+      : null;
+
+  const combinedPoints = clubStandings.reduce(
+    (sum, entry) => sum + entry.row.points,
+    0
+  );
+
+  const hasClubStats = !isStandingsLoading && clubStandings.length > 0;
 
   function handleReset() {
     const confirmed = window.confirm(
@@ -106,6 +198,77 @@ export default function Settings() {
             )}
           </div>
         </section>
+
+        {followedClubs.length > 0 && (isStandingsLoading || hasClubStats) && (
+          <section className="mb-6">
+            <h2 className="mb-3 px-1 text-xs font-black uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
+              Club Stats
+            </h2>
+
+            <div className="overflow-hidden rounded-[26px] border border-black/[0.045] bg-white shadow-[0_6px_24px_rgba(0,0,0,0.045)] dark:border-white/[0.06] dark:bg-[#14171F] dark:shadow-none">
+              {isStandingsLoading ? (
+                <div className="px-5 py-6 text-center text-xs font-medium text-zinc-400 dark:text-zinc-500">
+                  Loading league standings…
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 divide-x divide-zinc-100 dark:divide-white/[0.06]">
+                    <div className="px-4 py-4 text-center">
+                      <div className="text-2xl font-black text-[#111318] dark:text-white">
+                        {averagePosition?.toFixed(1)}
+                      </div>
+                      <div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+                        Avg. league position
+                      </div>
+                    </div>
+                    <div className="px-4 py-4 text-center">
+                      <div className="text-2xl font-black text-[#111318] dark:text-white">
+                        {combinedPoints}
+                      </div>
+                      <div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+                        Combined points
+                      </div>
+                    </div>
+                  </div>
+
+                  {bestPlaced && (
+                    <Link
+                      href={`/clubs/${bestPlaced.club.id}`}
+                      className="flex items-center gap-3 border-t border-zinc-100 px-5 py-4 dark:border-white/[0.06]"
+                    >
+                      <ClubBadge
+                        name={bestPlaced.club.name}
+                        crest={bestPlaced.club.crest}
+                        color={bestPlaced.club.primaryColor}
+                        size={38}
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-black text-[#111318] dark:text-white">
+                          {bestPlaced.club.name}
+                        </div>
+                        <div className="text-[11px] font-medium text-zinc-400 dark:text-zinc-500">
+                          Your best-placed club · {bestPlaced.club.league}
+                        </div>
+                      </div>
+                      <div className="shrink-0 text-lg font-black text-[#111318] dark:text-white">
+                        #{bestPlaced.row.position}
+                      </div>
+                    </Link>
+                  )}
+
+                  {clubStandings.length < followedClubs.length && (
+                    <div className="border-t border-zinc-100 px-5 py-3 text-center text-[10px] font-medium text-zinc-400 dark:border-white/[0.06] dark:text-zinc-500">
+                      Based on {clubStandings.length} of {followedClubs.length}{" "}
+                      followed {followedClubs.length === 1 ? "club" : "clubs"} -
+                      the rest aren&apos;t in a league we track standings for
+                      yet.
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </section>
+        )}
 
         <section className="mb-6">
           <h2 className="mb-3 px-1 text-xs font-black uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
