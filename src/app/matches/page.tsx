@@ -66,6 +66,30 @@ export default function Matches() {
       .finally(() => setLiveLoading(false));
   }, []);
 
+  // Keeps scores current for whatever's actually in progress, without
+  // polling forever for no reason: only bothers re-fetching while at
+  // least one match in the list is inside the same "could plausibly be
+  // live" window the match detail page itself uses (15 minutes before
+  // kickoff to 3 hours after). Re-runs each time liveMatches updates, so
+  // a poll's own result decides whether the next one is worth scheduling
+  // - once nothing in the list is live anymore, this naturally stops.
+  useEffect(() => {
+    const now = Date.now();
+    const hasMatchWorthPolling = liveMatches.some((m) => {
+      const kickoffTime = new Date(m.kickoff).getTime();
+      if (Number.isNaN(kickoffTime)) return false;
+      const minutesSinceKickoff = (now - kickoffTime) / 60000;
+      return minutesSinceKickoff >= -15 && minutesSinceKickoff <= 180;
+    });
+    if (!hasMatchWorthPolling) return;
+    const interval = setInterval(() => {
+      fetchLiveMatches()
+        .then(setLiveMatches)
+        .catch(() => {});
+    }, 45000);
+    return () => clearInterval(interval);
+  }, [liveMatches]);
+
   // Last-resort venue lookup for whichever of your followed clubs' matches
   // are against a club outside our own 132-club list (e.g. a Champions
   // League opponent), so those don't just show no venue at all. Looked up
