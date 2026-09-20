@@ -509,3 +509,79 @@ app grows, is the total number of *different* clubs being actively
 followed/checked across all users at once (out of the ~130 tracked), not
 raw user count or how often people open the app. At current usage (33/200
 credits over about 4 weeks) this is nowhere close to a real constraint.
+
+
+### Upstash Redis caching - finished and turned on
+
+The Upstash setup described above is done: Ilai created the free Upstash
+account and database, added UPSTASH_REDIS_REST_URL/UPSTASH_REDIS_REST_TOKEN
+to both Vercel and .env.local, and ran `npm install @upstash/redis`. The
+shared-cache fix is fully wired up now, pending a push to actually go live.
+
+### Fixed: npm security warnings
+
+`npm audit` flagged 3 vulnerabilities (2 high, 1 critical) after
+installing @upstash/redis - one of them a real Next.js security issue,
+not a false alarm. Fixed with `npm audit fix` and `npm audit fix --force`,
+which bumped Next.js from 16.3.0 to 16.3.5. Confirmed 0 vulnerabilities
+remain.
+
+### Fixed: a French article slipping past the "English only" filter
+
+Root cause: WordPress-based news sites append an English sentence
+("The post [title] appeared first on [site].") to the end of every
+article regardless of what language the article itself is written in.
+Our language filter only checked for any English word appearing anywhere
+in the text, so that boilerplate sentence alone was enough to fool it on
+an otherwise all-French article. Fixed by stripping that boilerplate
+before checking, and requiring 2 distinct English marker words to match
+(not just 1) - verified against the actual French Bayern Munich article
+that was reported.
+
+### Added: real Club Stats to Settings
+
+Settings now shows genuine stats about your followed clubs - average
+league position, combined points, and your best-placed club - pulled
+from the same live standings data used elsewhere in the app, not filler
+numbers.
+
+### Redesigned: Match Details on the match page (two attempts)
+
+First attempt turned the flat gray rows into icon-badged rows in one
+card - rejected as "still boring, just rows with icons now." Rebuilt from
+scratch as a "ticket stub" layout instead: a team-color gradient stripe,
+a calendar-page date tile, a competition pill, and a dashed tear-line
+with cut-out notches above the venue - genuinely different shapes instead
+of another stacked list.
+
+### Fixed: Form/Head-to-head not showing up until repeated refreshes
+
+Root cause, confirmed by reading the code rather than guessing: opening
+a match page fires up to 5 simultaneous requests to football-data.org,
+which only allows 10 requests/minute on the free plan - so several of
+those requests were getting rate-limited (HTTP 429) with no retry logic
+anywhere except the news pipeline. Fixed by adding a shared
+fetchWithRetry helper (retries only on 429/rate-limited or 5xx/server-
+error responses, a few times with a short delay) and using it in every
+football-data.org-backed API route.
+
+### Added: live match stats (possession, shots, corners, cards)
+
+Match pages for finished or live matches now show real stats - not just
+the score - sourced from API-Football: possession, shots, shots on
+target, corners, passes, fouls, and cards, shown as proportional home-
+vs-away bars. This extends API-Football (previously only used for
+Europa/Conference League, which football-data.org doesn't cover at all)
+to also resolve stats for the 7 regular domestic leagues, by matching a
+football-data.org match to its API-Football counterpart via team names
+and kickoff date.
+
+Kept well inside the free 100-requests/day API-Football limit: a
+finished match's stats are cached for 30 days (they never change again),
+a live match's for 60 seconds, and league-lookup results for a week - so
+the same match's stats are fetched from API-Football at most once, ever,
+no matter how many people look at it.
+
+Not done yet (discussed with Ilai, chose this first): per-player stats on
+a club's own page (e.g. minutes played, ratings) alongside the existing
+Top Scorers/Top Assists - that's the next thing to build.
