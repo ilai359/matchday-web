@@ -9,7 +9,6 @@ import {
   formatFullDate,
   formatFullDateWithYear,
   formatTime,
-  formatCalendarParts,
 } from "../../../lib/dateHelpers";
 import { formatCompetition } from "../../../lib/competitionNames";
 import {
@@ -671,64 +670,67 @@ export default function MatchDetailClient({ id }: { id: string }) {
                 Match details
               </div>
 
-              {/* A ticket-stub layout instead of another list of rows: a
-                  team-colored gradient stripe up top, a calendar-page tile
-                  for the date paired with the kickoff time and competition,
-                  then venue/city below a torn-ticket perforation line (the
-                  two notches cut into the card's edges reinforce that,
-                  colored to match the page background so they read as
-                  cut-outs rather than dots). */}
-              <div className="overflow-hidden rounded-[28px] bg-white shadow-[0_10px_30px_rgba(0,0,0,0.06)] dark:bg-[#14171F] dark:shadow-none">
+              {/* A different treatment on purpose - everywhere else on this
+                  page is a white/dark-surface card with a thin color
+                  stripe (see the ticket-stub version this replaced). This
+                  one is a dark panel that matches the header's dark
+                  background instead, with soft team-color glows behind a
+                  simple icon/label/value row layout. It stays dark
+                  regardless of light/dark mode on purpose - the point was
+                  to look and feel distinct, not like a themed variant of
+                  the same card pattern used everywhere else. */}
+              <div className="relative overflow-hidden rounded-[28px] bg-[#0B0E16] p-6 text-white shadow-[0_16px_40px_rgba(0,0,0,0.25)]">
                 <div
-                  className="h-2 w-full"
-                  style={{
-                    background: `linear-gradient(90deg, ${displayMatch.homeColor}, ${displayMatch.awayColor})`,
-                  }}
+                  className="pointer-events-none absolute -left-10 -top-10 h-40 w-40 rounded-full blur-3xl"
+                  style={{ backgroundColor: withAlpha(displayMatch.homeColor, "55") }}
+                />
+                <div
+                  className="pointer-events-none absolute -bottom-10 -right-10 h-40 w-40 rounded-full blur-3xl"
+                  style={{ backgroundColor: withAlpha(displayMatch.awayColor, "55") }}
                 />
 
-                <div className="flex items-center gap-4 p-5">
-                  <div className="flex w-[68px] shrink-0 flex-col overflow-hidden rounded-2xl border border-black/[0.045] dark:border-white/[0.08]">
-                    <div className="bg-[#111318] py-1 text-center text-[9px] font-black uppercase tracking-widest text-white dark:bg-white dark:text-[#111318]">
-                      {formatCalendarParts(displayMatch.kickoff).weekday}
-                    </div>
-                    <div className="flex flex-1 items-center justify-center bg-[#F8F9FB] py-2.5 dark:bg-white/[0.04]">
-                      <span className="text-2xl font-black leading-none text-[#111318] dark:text-white">
-                        {formatCalendarParts(displayMatch.kickoff).day}
-                      </span>
-                    </div>
+                <div className="relative">
+                  <div className="mb-5 inline-flex items-center rounded-full bg-white/10 px-3 py-1 text-[10px] font-black uppercase tracking-wide text-white/80">
+                    {displayMatch.competition}
                   </div>
 
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm font-black text-[#111318] dark:text-white">
-                      {formatFullDate(displayMatch.kickoff)}
+                  <div
+                    className={
+                      effectiveVenue || displayMatch.city
+                        ? "grid grid-cols-1 gap-5 sm:grid-cols-3"
+                        : "grid grid-cols-1 gap-5 sm:grid-cols-2"
+                    }
+                  >
+                    <div>
+                      <div className="text-[10px] font-black uppercase tracking-widest text-white/45">
+                        📅 Date
+                      </div>
+                      <div className="mt-1.5 text-sm font-black leading-snug">
+                        {formatFullDate(displayMatch.kickoff)}
+                      </div>
                     </div>
-                    <div className="mt-0.5 text-xs font-bold text-zinc-400 dark:text-zinc-500">
-                      Kicks off {formatTime(displayMatch.kickoff)}
+
+                    <div className="border-t border-white/10 pt-5 sm:border-l sm:border-t-0 sm:pl-5 sm:pt-0">
+                      <div className="text-[10px] font-black uppercase tracking-widest text-white/45">
+                        🕐 Kickoff
+                      </div>
+                      <div className="mt-1.5 text-sm font-black leading-snug tabular-nums">
+                        {formatTime(displayMatch.kickoff)}
+                      </div>
                     </div>
-                    <div
-                      className="mt-3 inline-flex max-w-full items-center truncate rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wide"
-                      style={{
-                        backgroundColor: withAlpha(displayMatch.homeColor, "1A"),
-                        color: displayMatch.homeColor,
-                      }}
-                    >
-                      {displayMatch.competition}
-                    </div>
+
+                    {(effectiveVenue || displayMatch.city) && (
+                      <div className="border-t border-white/10 pt-5 sm:border-l sm:border-t-0 sm:pl-5 sm:pt-0">
+                        <div className="text-[10px] font-black uppercase tracking-widest text-white/45">
+                          📍 Venue
+                        </div>
+                        <div className="mt-1.5 text-sm font-black leading-snug">
+                          {[effectiveVenue, displayMatch.city].filter(Boolean).join(", ")}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
-
-                {(effectiveVenue || displayMatch.city) && (
-                  <div className="relative border-t border-dashed border-zinc-200 px-5 py-4 dark:border-white/15">
-                    <div className="absolute -left-3 top-1/2 h-6 w-6 -translate-y-1/2 rounded-full bg-[#F5F6F8] dark:bg-[#0B0D12]" />
-                    <div className="absolute -right-3 top-1/2 h-6 w-6 -translate-y-1/2 rounded-full bg-[#F5F6F8] dark:bg-[#0B0D12]" />
-                    <div className="flex items-center gap-2 text-xs font-bold text-zinc-500 dark:text-zinc-400">
-                      <span>📍</span>
-                      <span className="truncate">
-                        {[effectiveVenue, displayMatch.city].filter(Boolean).join(", ")}
-                      </span>
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
 
