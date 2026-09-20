@@ -306,6 +306,27 @@ async function fetchJsonWithRetry<T = unknown>(
 // what's coming up or happening right now, not match history.
 const VISIBLE_STATUSES = new Set(["TIMED", "SCHEDULED", "IN_PLAY", "PAUSED"]);
 
+// A single match by its own id, regardless of status - unlike
+// fetchLiveMatches (which deliberately only returns what's upcoming or
+// live right now), this works for a match that's already finished too.
+// Reuses /api/match-live, the same route the live-score poller already
+// calls: it's just football-data.org's own "one match by id" lookup,
+// which was never restricted to live matches in the first place - only
+// the client-side polling helper (fetchLiveMatchStatus) that also calls
+// it only ever looked at the score/status fields it returned. Returns
+// null if the id isn't a real football-data.org match (e.g. a Europa/
+// Conference League match, which uses API-Football's own ids instead).
+export async function fetchMatchById(matchId: string): Promise<LiveMatch | null> {
+  try {
+    const response = await fetch(`/api/match-live?id=${matchId}`);
+    if (!response.ok) return null;
+    const data: RawApiMatch = await response.json();
+    return mapRawMatch(data);
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchLiveMatches(): Promise<LiveMatch[]> {
   const response = await fetch("/api/matches");
   if (!response.ok) {

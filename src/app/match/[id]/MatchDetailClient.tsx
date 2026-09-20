@@ -24,6 +24,7 @@ import {
   LEAGUE_TO_CODE,
   fetchMatchStats,
   MatchTeamStats,
+  fetchMatchById,
 } from "../../../lib/footballApi";
 import ClubBadge from "../../../components/ClubBadge";
 
@@ -43,6 +44,13 @@ type DisplayMatch = {
   venue?: string;
   city?: string;
   statusLabel: string;
+  // The score as already known from the initial fetch - not from live
+  // polling (see liveStatus below). Needed so a match that finished a
+  // while ago (reached e.g. from a club's "Recent form" list, well
+  // outside the -15min/+180min window live polling even bothers with)
+  // still shows its real final score instead of falling back to 0-0.
+  homeScore: number | null;
+  awayScore: number | null;
 };
 
 function buildFromMock(mockMatch: (typeof matches)[number]): DisplayMatch {
@@ -64,6 +72,8 @@ function buildFromMock(mockMatch: (typeof matches)[number]): DisplayMatch {
     venue: mockMatch.venue,
     city: mockMatch.city,
     statusLabel: "Scheduled",
+    homeScore: null,
+    awayScore: null,
   };
 }
 
@@ -96,6 +106,8 @@ function buildFromLive(liveMatch: LiveMatch): DisplayMatch {
     venue: liveMatch.venue,
     city: liveMatch.city || undefined,
     statusLabel: liveMatch.status === "TIMED" ? "Scheduled" : liveMatch.status,
+    homeScore: liveMatch.homeScore,
+    awayScore: liveMatch.awayScore,
   };
 }
 
@@ -340,8 +352,16 @@ export default function MatchDetailClient({ id }: { id: string }) {
     fetchLiveMatches()
       .then((live) => {
         const found = live.find((m) => m.id === id) ?? null;
-        setLiveMatch(found);
+        if (found) return found;
+        // Not upcoming or live - but that doesn't mean it isn't a real
+        // match. fetchLiveMatches deliberately only covers what's
+        // happening now or coming up soon, so a match that's already
+        // finished (e.g. someone tapping a result from a club's "Recent
+        // form" list) would otherwise come up empty here even though it
+        // really happened. Look it up directly by id before giving up.
+        return fetchMatchById(id);
       })
+      .then((found) => setLiveMatch(found))
       .catch(() => setLiveMatch(null))
       .finally(() => setLiveLoading(false));
   }, [id, mockMatch]);
@@ -491,7 +511,8 @@ export default function MatchDetailClient({ id }: { id: string }) {
   const [matchStatsLoading, setMatchStatsLoading] = useState(false);
   const isLiveForStats =
     liveStatus?.status === "IN_PLAY" || liveStatus?.status === "PAUSED";
-  const isFinishedForStats = liveStatus?.status === "FINISHED";
+  const isFinishedForStats =
+    liveStatus?.status === "FINISHED" || displayMatch?.statusLabel === "FINISHED";
   const wantsMatchStats = Boolean(leagueCode) && (isLiveForStats || isFinishedForStats);
 
   useEffect(() => {
@@ -577,7 +598,8 @@ export default function MatchDetailClient({ id }: { id: string }) {
     : false;
 
   const isLive = liveStatus?.status === "IN_PLAY" || liveStatus?.status === "PAUSED";
-  const isMatchFinished = liveStatus?.status === "FINISHED";
+  const isMatchFinished =
+    liveStatus?.status === "FINISHED" || displayMatch.statusLabel === "FINISHED";
   const statusPillLabel = isLive
     ? liveStatus?.status === "PAUSED"
       ? "Half-time"
@@ -727,9 +749,9 @@ export default function MatchDetailClient({ id }: { id: string }) {
                         : "Full-time"}
                     </div>
                     <div className="mt-1 whitespace-nowrap text-2xl font-black tracking-tight text-[#111318] dark:text-white">
-                      {liveStatus?.homeScore ?? 0}
+                      {liveStatus?.homeScore ?? displayMatch.homeScore ?? 0}
                       {" – "}
-                      {liveStatus?.awayScore ?? 0}
+                      {liveStatus?.awayScore ?? displayMatch.awayScore ?? 0}
                     </div>
                   </>
                 ) : (
