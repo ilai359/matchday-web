@@ -480,7 +480,18 @@ export default function MatchDetailClient({ id }: { id: string }) {
     ? selectedIds.includes(displayMatch.awayClubId)
     : false;
 
-  const isLive = liveStatus?.status === "IN_PLAY" || liveStatus?.status === "PAUSED";
+  // Falls back to the status we already knew about the match (from the
+  // list it was found in, or the by-id lookup) whenever the dedicated
+  // live-status poll hasn't returned anything yet - otherwise a match
+  // that's already known to be live shows as "not started" for the few
+  // seconds before that poll's first response comes back, which is
+  // exactly the confusing gap Ilai ran into.
+  const isLive =
+    liveStatus?.status === "IN_PLAY" ||
+    liveStatus?.status === "PAUSED" ||
+    (!liveStatus &&
+      (displayMatch.statusLabel === "IN_PLAY" ||
+        displayMatch.statusLabel === "PAUSED"));
   const isMatchFinished =
     liveStatus?.status === "FINISHED" || displayMatch.statusLabel === "FINISHED";
   const statusPillLabel = isLive
