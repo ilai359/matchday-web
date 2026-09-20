@@ -29,6 +29,23 @@ export function formatFullDateWithYear(iso: string) {
   });
 }
 
+// Weekday abbreviation ("TUE") and day-of-month number ("27") as two
+// separate pieces, rather than one formatted string - used by the match
+// page's calendar-tile date display, which lays them out as two stacked
+// rows inside a little calendar-page graphic instead of running them
+// together as prose.
+export function formatCalendarParts(iso: string): {
+  weekday: string;
+  day: string;
+} {
+  const date = new Date(iso);
+  const weekday = date
+    .toLocaleDateString(undefined, { weekday: "short" })
+    .toUpperCase();
+  const day = date.toLocaleDateString(undefined, { day: "numeric" });
+  return { weekday, day };
+}
+
 export function formatTime(iso: string) {
   const date = new Date(iso);
   return date.toLocaleTimeString(undefined, {

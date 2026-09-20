@@ -1,11 +1,16 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 import { matches } from "../../../data/matches";
 import { useClubs } from "../../../context/ClubsContext";
 import { getClub, getClubName } from "../../../lib/clubHelpers";
-import { formatFullDate, formatFullDateWithYear, formatTime } from "../../../lib/dateHelpers";
+import {
+  formatFullDate,
+  formatFullDateWithYear,
+  formatTime,
+  formatCalendarParts,
+} from "../../../lib/dateHelpers";
 import { formatCompetition } from "../../../lib/competitionNames";
 import {
   fetchLiveMatches,
@@ -247,37 +252,6 @@ function HeadToHeadRow({
           </span>
         </div>
       </div>
-    </div>
-  );
-}
-
-// One row of the Match details card: an icon badge (matching the same
-// icon-badge pattern used elsewhere in the app, e.g. Settings) plus a
-// label on the left and the value on the right. Pulled out as its own
-// component so five near-identical rows don't repeat the same markup
-// five times over.
-function MatchDetailRow({
-  icon,
-  label,
-  children,
-}: {
-  icon: string;
-  label: string;
-  children: ReactNode;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-3 border-t border-zinc-100 px-4 py-3.5 first:border-t-0 dark:border-white/[0.06]">
-      <div className="flex min-w-0 items-center gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#F2F4F7] text-base dark:bg-white/[0.06]">
-          {icon}
-        </div>
-        <span className="text-xs font-bold text-zinc-500 dark:text-zinc-400">
-          {label}
-        </span>
-      </div>
-      <span className="truncate text-sm font-black text-[#111318] dark:text-white">
-        {children}
-      </span>
     </div>
   );
 }
@@ -675,25 +649,64 @@ export default function MatchDetailClient({ id }: { id: string }) {
               <div className="mb-4 text-xs font-black uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
                 Match details
               </div>
-              <div className="overflow-hidden rounded-[26px] border border-black/[0.045] bg-white shadow-[0_6px_24px_rgba(0,0,0,0.045)] dark:border-white/[0.06] dark:bg-[#14171F] dark:shadow-none">
-                <MatchDetailRow icon="📅" label="Date">
-                  {formatFullDate(displayMatch.kickoff)}
-                </MatchDetailRow>
-                <MatchDetailRow icon="⏰" label="Kickoff">
-                  {formatTime(displayMatch.kickoff)}
-                </MatchDetailRow>
-                <MatchDetailRow icon="🏆" label="Competition">
-                  {displayMatch.competition}
-                </MatchDetailRow>
-                {effectiveVenue && (
-                  <MatchDetailRow icon="🏟️" label="Venue">
-                    {effectiveVenue}
-                  </MatchDetailRow>
-                )}
-                {displayMatch.city && (
-                  <MatchDetailRow icon="📍" label="City">
-                    {displayMatch.city}
-                  </MatchDetailRow>
+
+              {/* A ticket-stub layout instead of another list of rows: a
+                  team-colored gradient stripe up top, a calendar-page tile
+                  for the date paired with the kickoff time and competition,
+                  then venue/city below a torn-ticket perforation line (the
+                  two notches cut into the card's edges reinforce that,
+                  colored to match the page background so they read as
+                  cut-outs rather than dots). */}
+              <div className="overflow-hidden rounded-[28px] bg-white shadow-[0_10px_30px_rgba(0,0,0,0.06)] dark:bg-[#14171F] dark:shadow-none">
+                <div
+                  className="h-2 w-full"
+                  style={{
+                    background: `linear-gradient(90deg, ${displayMatch.homeColor}, ${displayMatch.awayColor})`,
+                  }}
+                />
+
+                <div className="flex items-center gap-4 p-5">
+                  <div className="flex w-[68px] shrink-0 flex-col overflow-hidden rounded-2xl border border-black/[0.045] dark:border-white/[0.08]">
+                    <div className="bg-[#111318] py-1 text-center text-[9px] font-black uppercase tracking-widest text-white dark:bg-white dark:text-[#111318]">
+                      {formatCalendarParts(displayMatch.kickoff).weekday}
+                    </div>
+                    <div className="flex flex-1 items-center justify-center bg-[#F8F9FB] py-2.5 dark:bg-white/[0.04]">
+                      <span className="text-2xl font-black leading-none text-[#111318] dark:text-white">
+                        {formatCalendarParts(displayMatch.kickoff).day}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-black text-[#111318] dark:text-white">
+                      {formatFullDate(displayMatch.kickoff)}
+                    </div>
+                    <div className="mt-0.5 text-xs font-bold text-zinc-400 dark:text-zinc-500">
+                      Kicks off {formatTime(displayMatch.kickoff)}
+                    </div>
+                    <div
+                      className="mt-3 inline-flex max-w-full items-center truncate rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wide"
+                      style={{
+                        backgroundColor: withAlpha(displayMatch.homeColor, "1A"),
+                        color: displayMatch.homeColor,
+                      }}
+                    >
+                      {displayMatch.competition}
+                    </div>
+                  </div>
+                </div>
+
+                {(effectiveVenue || displayMatch.city) && (
+                  <div className="relative border-t border-dashed border-zinc-200 px-5 py-4 dark:border-white/15">
+                    <div className="absolute -left-3 top-1/2 h-6 w-6 -translate-y-1/2 rounded-full bg-[#F5F6F8] dark:bg-[#0B0D12]" />
+                    <div className="absolute -right-3 top-1/2 h-6 w-6 -translate-y-1/2 rounded-full bg-[#F5F6F8] dark:bg-[#0B0D12]" />
+                    <div className="flex items-center gap-2 text-xs font-bold text-zinc-500 dark:text-zinc-400">
+                      <span>📍</span>
+                      <span className="truncate">
+                        {[effectiveVenue, displayMatch.city].filter(Boolean).join(", ")}
+                      </span>
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
