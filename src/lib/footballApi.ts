@@ -554,3 +554,46 @@ export async function fetchLiveMatchStatus(
     awayScore: data.score?.fullTime?.away ?? null,
   };
 }
+
+// --- Match-page stats (possession, shots, corners, cards, fouls) ---
+
+export type MatchTeamStats = {
+  teamId: number | null;
+  teamName: string | null;
+  stats: Record<string, string | number | null>;
+};
+
+// Only ever worth asking for once a match is live or finished - there's
+// nothing to show before kickoff. Resolves to null (never throws) on
+// anything going wrong, or simply when API-Football doesn't have this
+// match (e.g. a lower-division game, or one from before our tracked
+// history) - callers should just hide the section in that case, the
+// same as every other "nice to have, not essential" data point in this
+// app.
+export async function fetchMatchStats(params: {
+  competition: string;
+  matchId: string;
+  finished: boolean;
+  season?: string;
+  homeTeam?: string;
+  awayTeam?: string;
+  kickoff?: string;
+}): Promise<MatchTeamStats[] | null> {
+  const query = new URLSearchParams({
+    competition: params.competition,
+    matchId: params.matchId,
+    finished: params.finished ? "1" : "0",
+  });
+  if (params.season) query.set("season", params.season);
+  if (params.homeTeam) query.set("homeTeam", params.homeTeam);
+  if (params.awayTeam) query.set("awayTeam", params.awayTeam);
+  if (params.kickoff) query.set("kickoff", params.kickoff);
+  try {
+    const response = await fetch(`/api/match-stats?${query.toString()}`);
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data.stats ?? null;
+  } catch {
+    return null;
+  }
+}

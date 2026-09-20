@@ -22,6 +22,8 @@ import {
   FinishedMatch,
   LiveMatchStatus,
   LEAGUE_TO_CODE,
+  fetchMatchStats,
+  MatchTeamStats,
 } from "../../../lib/footballApi";
 import ClubBadge from "../../../components/ClubBadge";
 
@@ -256,6 +258,75 @@ function HeadToHeadRow({
   );
 }
 
+// Which of API-Football's stat types we show, in this order, and the
+// short label each gets. Not every match has every one of these (a lower-
+// profile competition sometimes only returns a handful) - rows with
+// nothing on either side are simply left out, see statRows below.
+const MATCH_STAT_FIELDS: { key: string; label: string }[] = [
+  { key: "Ball Possession", label: "Possession" },
+  { key: "Total Shots", label: "Shots" },
+  { key: "Shots on Goal", label: "On target" },
+  { key: "Corner Kicks", label: "Corners" },
+  { key: "Total passes", label: "Passes" },
+  { key: "Fouls", label: "Fouls" },
+  { key: "Yellow Cards", label: "Yellow cards" },
+  { key: "Red Cards", label: "Red cards" },
+];
+
+// "%" values (possession) and plain numbers both need to become a real
+// number to size the two halves of the bar - a value like "0" (a team
+// with 0 corners) should still render an empty-but-present bar rather
+// than being treated as "no data" (that's why this returns 0 instead of
+// null for anything it can't parse, and the "no data for this stat at
+// all" check happens separately, before this is ever called).
+function parseStatNumber(value: string | number | null): number {
+  if (value === null || value === undefined) return 0;
+  if (typeof value === "number") return value;
+  const num = Number(value.replace("%", "").trim());
+  return Number.isFinite(num) ? num : 0;
+}
+
+// A proportional two-color bar instead of another plain row: the split
+// point itself shows who's ahead on this stat, not just the raw numbers
+// next to each other.
+function StatCompareBar({
+  label,
+  homeValue,
+  awayValue,
+  homeColor,
+  awayColor,
+}: {
+  label: string;
+  homeValue: string | number | null;
+  awayValue: string | number | null;
+  homeColor: string;
+  awayColor: string;
+}) {
+  const homeNum = parseStatNumber(homeValue);
+  const awayNum = parseStatNumber(awayValue);
+  const total = homeNum + awayNum;
+  const homePct = total > 0 ? (homeNum / total) * 100 : 50;
+  return (
+    <div>
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <span className="text-[13px] font-black" style={{ color: homeColor }}>
+          {homeValue ?? "–"}
+        </span>
+        <span className="text-[10px] font-bold uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
+          {label}
+        </span>
+        <span className="text-[13px] font-black" style={{ color: awayColor }}>
+          {awayValue ?? "–"}
+        </span>
+      </div>
+      <div className="flex h-2 w-full overflow-hidden rounded-full bg-zinc-100 dark:bg-white/10">
+        <div className="h-full" style={{ width: `${homePct}%`, backgroundColor: homeColor }} />
+        <div className="h-full" style={{ width: `${100 - homePct}%`, backgroundColor: awayColor }} />
+      </div>
+    </div>
+  );
+}
+
 export default function MatchDetailClient({ id }: { id: string }) {
   const { selectedIds } = useClubs();
   const mockMatch = matches.find((m) => m.id === id);
@@ -385,7 +456,6 @@ export default function MatchDetailClient({ id }: { id: string }) {
     // inside this effect (never during render), which is exactly where
     // reading the real current time belongs - it decides whether it's
     // worth polling at all, it doesn't affect what gets rendered directly.
-    // eslint-disable-next-line react-hooks/purity
     const minutesSinceKickoff = (Date.now() - kickoffTime) / 60000;
     const withinLiveWindow = minutesSinceKickoff >= -15 && minutesSinceKickoff <= 180;
     if (!withinLiveWindow) return;
@@ -412,6 +482,51 @@ export default function MatchDetailClient({ id }: { id: string }) {
       clearInterval(intervalId);
     };
   }, [id, kickoffForPolling]);
+
+  // --- Match stats (possession, shots, corners, cards, fouls) ---
+  // Only ever worth asking for once the match is live or finished - there
+  // is nothing to show before kickoff, so this simply never fires until
+  // then.
+  const [matchStats, setMatchStats] = useState<MatchTeamStats[] | null>(null);
+  const [matchStatsLoading, setMatchStatsLoading] = useState(false);
+  const isLiveForStats =
+    liveStatus?.status === "IN_PLAY" || liveStatus?.status === "PAUSED";
+  const isFinishedForStats = liveStatus?.status === "FINISHED";
+  const wantsMatchStats = Boolean(leagueCode) && (isLiveForStats || isFinishedForStats);
+
+  useEffect(() => {
+    if (!wantsMatchStats || !leagueCode || !displayMatch) {
+      return;
+    }
+    let cancelled = false;
+    // Same intentional exception as historyLoading above: the linter
+    // would rather this happen outside the effect, but there's no real
+    // downside to the extra render, and restructuring this well-
+    // understood pattern just to satisfy it would only make the code
+    // harder to follow.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMatchStatsLoading(true);
+    const season = String(getSeasonStartYear(new Date(displayMatch.kickoff)));
+    fetchMatchStats({
+      competition: leagueCode,
+      matchId: displayMatch.id,
+      finished: isFinishedForStats,
+      season,
+      homeTeam: displayMatch.homeName,
+      awayTeam: displayMatch.awayName,
+      kickoff: displayMatch.kickoff,
+    })
+      .then((stats) => {
+        if (!cancelled) setMatchStats(stats);
+      })
+      .finally(() => {
+        if (!cancelled) setMatchStatsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wantsMatchStats, leagueCode, displayMatch?.id, isFinishedForStats]);
 
   if (!mockMatch && liveLoading) {
     return (
@@ -512,6 +627,16 @@ export default function MatchDetailClient({ id }: { id: string }) {
   // that state itself (which just adds an extra render for no benefit),
   // it's simpler and just as correct to fold that condition in here.
   const isHistoryLoading = historyLoading && Boolean(leagueCode);
+
+  const homeStatsEntry = matchStats?.[0] ?? null;
+  const awayStatsEntry = matchStats?.[1] ?? null;
+  const statRows = MATCH_STAT_FIELDS.map(({ key, label }) => ({
+    key,
+    label,
+    homeValue: homeStatsEntry?.stats[key] ?? null,
+    awayValue: awayStatsEntry?.stats[key] ?? null,
+  })).filter((row) => row.homeValue !== null || row.awayValue !== null);
+  const showMatchStats = wantsMatchStats && (matchStatsLoading || statRows.length > 0);
 
   const effectiveVenue = displayMatch.venue || fallbackVenue;
 
@@ -786,6 +911,40 @@ export default function MatchDetailClient({ id }: { id: string }) {
                     </div>
                     <FormPills matches={awayForm} clubId={displayMatch.awayClubId} />
                   </div>
+                </div>
+              </div>
+            )}
+
+            {showMatchStats && (
+              <div className="mt-8 overflow-hidden rounded-[26px] bg-white shadow-[0_10px_30px_rgba(0,0,0,0.06)] dark:bg-[#14171F] dark:shadow-none">
+                <div
+                  className="h-2 w-full"
+                  style={{
+                    background: `linear-gradient(90deg, ${displayMatch.awayColor}, ${displayMatch.homeColor})`,
+                  }}
+                />
+                <div className="p-5">
+                  <div className="mb-5 text-center text-xs font-black uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
+                    Match stats
+                  </div>
+                  {matchStatsLoading ? (
+                    <div className="rounded-2xl bg-[#F5F6F8] py-4 text-center text-xs font-bold text-zinc-400 dark:bg-white/[0.04] dark:text-zinc-500">
+                      Loading stats…
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-4">
+                      {statRows.map((row) => (
+                        <StatCompareBar
+                          key={row.key}
+                          label={row.label}
+                          homeValue={row.homeValue}
+                          awayValue={row.awayValue}
+                          homeColor={displayMatch.homeColor}
+                          awayColor={displayMatch.awayColor}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             )}

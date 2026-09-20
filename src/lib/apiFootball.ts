@@ -12,6 +12,8 @@
 // finished season's results never change, so those are cached far
 // longer than the current, still-in-progress season.
 
+import { matchClubId } from "./footballApi";
+
 const API_FOOTBALL_BASE = "https://v3.football.api-sports.io";
 
 export type EuroCompetitionCode = "EL" | "ECL";
@@ -46,6 +48,7 @@ const PAST_SEASON_CACHE_SECONDS = 30 * 24 * 60 * 60;
 
 type ApiFootballLeagueEntry = {
   league?: { id?: number; name?: string };
+  country?: { name?: string };
 };
 
 async function searchLeagues(
@@ -113,6 +116,53 @@ export async function resolveLeagueId(
       entries.length,
       "results. Names seen:",
       entries.map((e) => e.league?.name)
+    );
+  }
+  return match?.league?.id ?? null;
+}
+
+// The 7 domestic leagues football-data.org already covers as our main
+// source - keyed by football-data.org's own competition code (see
+// LEAGUE_TO_CODE in footballApi.ts), since that's the code that already
+// flows through the match detail page. Several of these league names
+// aren't unique on API-Football by themselves - "Serie A" is both Italy's
+// and Brazil's top flight, for instance - so every lookup below checks
+// name AND country together, using the same country spelling our own
+// clubs.ts already uses.
+const DOMESTIC_LEAGUES: Record<string, { name: string; country: string }> = {
+  PL: { name: "Premier League", country: "England" },
+  PD: { name: "La Liga", country: "Spain" },
+  BL1: { name: "Bundesliga", country: "Germany" },
+  FL1: { name: "Ligue 1", country: "France" },
+  SA: { name: "Serie A", country: "Italy" },
+  DED: { name: "Eredivisie", country: "Netherlands" },
+  PPL: { name: "Primeira Liga", country: "Portugal" },
+};
+
+export function isDomesticLeagueCode(code: string): boolean {
+  return code in DOMESTIC_LEAGUES;
+}
+
+// Same idea as resolveLeagueId above, but for one of our 7 domestic
+// leagues, identified by football-data.org's own short code (e.g. "PL").
+export async function resolveDomesticLeagueId(
+  apiKey: string,
+  footballDataCode: string
+): Promise<number | null> {
+  const target = DOMESTIC_LEAGUES[footballDataCode];
+  if (!target) return null;
+  const entries = await searchLeagues(apiKey, target.name);
+  const match = entries.find((entry) => {
+    const name = entry.league?.name?.toLowerCase() ?? "";
+    const country = entry.country?.name?.toLowerCase() ?? "";
+    return name === target.name.toLowerCase() && country === target.country.toLowerCase();
+  });
+  if (!match) {
+    console.error(
+      `[apiFootball] Couldn't find a domestic league named "${target.name}" (${target.country}) among`,
+      entries.length,
+      "results. Names seen:",
+      entries.map((e) => `${e.league?.name} (${e.country?.name})`)
     );
   }
   return match?.league?.id ?? null;
@@ -292,4 +342,165 @@ export async function fetchFinishedFixtures(
     isCurrentSeason
   );
   return all.filter((match) => match.status === "FINISHED");
+}
+
+// --- Match-page stats (team-level: possession, shots, corners, cards) ---
+//
+// A football-data.org match and its API-Football counterpart have
+// different, unrelated id numbers, so before we can ask API-Football for
+// a match's stats we first have to find which of ITS fixture ids is the
+// same real-world match. There's no lookup for that directly - the only
+// things the two sources are guaranteed to agree on are the two teams
+// and roughly when they played - so this reuses the already-cached
+// season fixture list (fetchSeasonFixtures, same one "upcoming"/
+// "finished" already fetch) and finds the fixture whose teams and date
+// line up.
+
+// Strips the kind of club-suffix words that make the same club's name
+// look different between data sources (e.g. "Manchester United FC" vs
+// "Manchester United"), for the rare case a team isn't one of our 132
+// tracked clubs and matchClubId (below) has nothing to compare against.
+function normalizeTeamName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/\b(fc|cf|afc|sc|ac|cd|sd|as|ssd|ud|rc|calcio|club)\b/g, "")
+    .replace(/[^a-z0-9]/g, "")
+    .trim();
+}
+
+// Prefers matching through our own curated club-alias list (matchClubId,
+// already built for this exact "same club, different spelling" problem)
+// since it's the most reliable option we have; only falls back to a
+// looser normalized-string comparison for a team neither side recognizes
+// as one of our tracked clubs (e.g. two mid-table sides in a competition
+// we don't otherwise track closely).
+function sameTeam(apiFootballName: string, footballDataName: string): boolean {
+  const idA = matchClubId(apiFootballName);
+  const idB = matchClubId(footballDataName);
+  if (idA && idB) return idA === idB;
+  const normalizedA = normalizeTeamName(apiFootballName);
+  const normalizedB = normalizeTeamName(footballDataName);
+  return Boolean(normalizedA) && normalizedA === normalizedB;
+}
+
+export async function findFixtureId(
+  apiKey: string,
+  leagueId: number,
+  season: string,
+  homeTeam: string,
+  awayTeam: string,
+  kickoffIso: string
+): Promise<number | null> {
+  const isCurrentSeason = Number(season) === getCurrentSeasonYear();
+  const all = await fetchSeasonFixtures(apiKey, leagueId, season, "", isCurrentSeason);
+  const kickoffTime = new Date(kickoffIso).getTime();
+  if (Number.isNaN(kickoffTime)) return null;
+
+  const match = all.find((fixture) => {
+    const fixtureTime = new Date(fixture.utcDate).getTime();
+    if (Number.isNaN(fixtureTime)) return false;
+    // A generous 36-hour window rather than an exact-time match: the two
+    // data sources occasionally disagree by a day on a postponed or
+    // rescheduled fixture, and the team-name check above is already
+    // doing the real work of finding the right match.
+    const withinWindow = Math.abs(fixtureTime - kickoffTime) < 36 * 60 * 60 * 1000;
+    return (
+      withinWindow &&
+      sameTeam(fixture.homeTeam.name, homeTeam) &&
+      sameTeam(fixture.awayTeam.name, awayTeam)
+    );
+  });
+  return match?.id ?? null;
+}
+
+export type FixtureStatValue = string | number | null;
+
+export type FixtureTeamStatistics = {
+  teamId: number | null;
+  teamName: string | null;
+  stats: Record<string, FixtureStatValue>;
+};
+
+// A finished match's stats never change again, so they're cached for as
+// long as Vercel/Next's fetch cache will reasonably hold anything - no
+// reason to ever ask API-Football for the same finished match twice. A
+// live match's stats obviously do change, so those get a short cache
+// instead, just enough to avoid re-fetching on every single render.
+const FINISHED_FIXTURE_STATS_CACHE_SECONDS = 30 * 24 * 60 * 60;
+const LIVE_FIXTURE_STATS_CACHE_SECONDS = 60;
+
+export function fixtureStatsCacheSeconds(isFinished: boolean): number {
+  return isFinished ? FINISHED_FIXTURE_STATS_CACHE_SECONDS : LIVE_FIXTURE_STATS_CACHE_SECONDS;
+}
+
+type ApiFootballStatEntry = { type?: string; value?: string | number | null };
+type ApiFootballFixtureStatsEntry = {
+  team?: { id?: number; name?: string };
+  statistics?: ApiFootballStatEntry[];
+};
+
+export async function fetchFixtureStatistics(
+  apiKey: string,
+  fixtureId: number,
+  cacheSeconds: number
+): Promise<FixtureTeamStatistics[]> {
+  try {
+    const response = await fetch(
+      `${API_FOOTBALL_BASE}/fixtures/statistics?fixture=${fixtureId}`,
+      {
+        headers: { "x-apisports-key": apiKey },
+        next: { revalidate: cacheSeconds },
+      }
+    );
+    if (!response.ok) {
+      const body = await response.text();
+      console.error(
+        `[apiFootball] /fixtures/statistics?fixture=${fixtureId} returned ${response.status}:`,
+        body.slice(0, 500)
+      );
+      return [];
+    }
+    const data = await response.json();
+    if (Array.isArray(data.errors) ? data.errors.length > 0 : data.errors) {
+      console.error(
+        `[apiFootball] /fixtures/statistics?fixture=${fixtureId} reported errors:`,
+        data.errors
+      );
+    }
+    const raw: ApiFootballFixtureStatsEntry[] = data.response ?? [];
+    return raw.map((entry) => ({
+      teamId: entry.team?.id ?? null,
+      teamName: entry.team?.name ?? null,
+      stats: Object.fromEntries(
+        (entry.statistics ?? [])
+          .filter((s: ApiFootballStatEntry): s is { type: string; value: FixtureStatValue } =>
+            Boolean(s.type)
+          )
+          .map((s: { type: string; value: FixtureStatValue }) => [s.type, s.value ?? null])
+      ),
+    }));
+  } catch (error) {
+    console.error(`[apiFootball] /fixtures/statistics?fixture=${fixtureId} threw:`, error);
+    return [];
+  }
+}
+
+// The two team-stat objects /fixtures/statistics returns are normally
+// already in home-then-away order, but that's never guaranteed by the
+// API - so rather than trust it silently, this checks and swaps them if
+// needed, using the same club-matching logic as findFixtureId. Getting
+// this wrong would show a stat comparison with the two sides swapped,
+// which is worse than not showing it at all, so callers should always
+// run stats through this before displaying them.
+export function orderFixtureStatsForMatch(
+  stats: FixtureTeamStatistics[],
+  homeTeam: string,
+  awayTeam: string
+): FixtureTeamStatistics[] {
+  if (stats.length !== 2) return stats;
+  const [first, second] = stats;
+  const firstIsAway = first.teamName ? sameTeam(first.teamName, awayTeam) : false;
+  const secondIsHome = second.teamName ? sameTeam(second.teamName, homeTeam) : false;
+  if (firstIsAway && secondIsHome) return [second, first];
+  return stats;
 }
