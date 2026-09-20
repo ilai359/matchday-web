@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ClubsProvider } from "../context/ClubsContext";
@@ -18,6 +18,23 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Clubside",
   description: "Never miss what matters.",
+  // Lets "Add to Home Screen" on iOS open the app full-screen (no Safari
+  // address bar/tabs) instead of just bookmarking the page. The app icon
+  // itself already comes from apple-icon.png via Next's file convention -
+  // this only affects how it behaves once opened. "default" status bar
+  // (rather than an overlay style) avoids clipping content under the
+  // notch, since the app doesn't have safe-area padding set up yet.
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Clubside",
+  },
+};
+
+export const viewport: Viewport = {
+  // Matches the dark background used elsewhere in the app - colors the
+  // browser/OS chrome (e.g. Android's toolbar) when installed.
+  themeColor: "#0B0D12",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
