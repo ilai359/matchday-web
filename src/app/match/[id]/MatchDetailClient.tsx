@@ -151,10 +151,25 @@ function getSeasonStartYear(date: Date): number {
 function FormPills({
   matches: formMatches,
   clubId,
+  isLoading,
 }: {
   matches: FinishedMatch[];
   clubId?: string;
+  isLoading: boolean;
 }) {
+  // Was showing "No matches played" the instant the page opened, before
+  // the history fetch had even come back - formMatches is just as empty
+  // while loading as when there's genuinely nothing to show, so without
+  // this the loading state and the empty state were indistinguishable
+  // and it always guessed "empty" first. Matches the "Loading history…"
+  // treatment already used for the head-to-head list above.
+  if (isLoading) {
+    return (
+      <div className="text-[11px] font-medium text-zinc-400 dark:text-zinc-500">
+        Loading…
+      </div>
+    );
+  }
   if (!clubId || formMatches.length === 0) {
     return (
       <div className="text-[11px] font-medium text-zinc-400 dark:text-zinc-500">
@@ -494,8 +509,14 @@ export default function MatchDetailClient({ id }: { id: string }) {
         displayMatch.statusLabel === "PAUSED"));
   const isMatchFinished =
     liveStatus?.status === "FINISHED" || displayMatch.statusLabel === "FINISHED";
+  // Same fallback idea as isLive above: half-time should still show as
+  // half-time even before the poll has answered, if that's what the
+  // status we already had says.
+  const isHalftime =
+    liveStatus?.status === "PAUSED" ||
+    (!liveStatus && displayMatch.statusLabel === "PAUSED");
   const statusPillLabel = isLive
-    ? liveStatus?.status === "PAUSED"
+    ? isHalftime
       ? "Half-time"
       : "Live"
     : isMatchFinished
@@ -625,7 +646,7 @@ export default function MatchDetailClient({ id }: { id: string }) {
                       }`}
                     >
                       {isLive
-                        ? liveStatus?.status === "PAUSED"
+                        ? isHalftime
                           ? "Half-time"
                           : liveStatus?.minute
                           ? `${liveStatus.minute}'`
@@ -803,7 +824,7 @@ export default function MatchDetailClient({ id }: { id: string }) {
                         {displayMatch.homeName} form
                       </span>
                     </div>
-                    <FormPills matches={homeForm} clubId={displayMatch.homeClubId} />
+                    <FormPills matches={homeForm} clubId={displayMatch.homeClubId} isLoading={isHistoryLoading} />
                   </div>
                   <div
                     className="rounded-2xl p-3 shadow-sm dark:shadow-none"
@@ -818,7 +839,7 @@ export default function MatchDetailClient({ id }: { id: string }) {
                         {displayMatch.awayName} form
                       </span>
                     </div>
-                    <FormPills matches={awayForm} clubId={displayMatch.awayClubId} />
+                    <FormPills matches={awayForm} clubId={displayMatch.awayClubId} isLoading={isHistoryLoading} />
                   </div>
                 </div>
               </div>
