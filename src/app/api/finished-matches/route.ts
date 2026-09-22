@@ -61,6 +61,13 @@ export async function GET(request: Request) {
 
     return NextResponse.json(data);
   } catch (error) {
+    // Logged so a real failure (as opposed to the Redis hiccups getOrSet
+    // now recovers from on its own) is visible in Vercel's Logs with its
+    // actual cause, not just a generic 500 with no trail to follow.
+    console.error(
+      `finished-matches failed for competition=${competition} season=${season}`,
+      error
+    );
     return NextResponse.json(
       { error: "Something went wrong", details: String(error) },
       { status: 500 }
