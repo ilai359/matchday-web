@@ -376,24 +376,25 @@ export default function MatchDetailClient({ id }: { id: string }) {
     const currentSeasonYear = getSeasonStartYear(new Date());
     const previousSeasonYear = currentSeasonYear - 1;
     const twoSeasonsAgoYear = currentSeasonYear - 2;
-    Promise.all([
+    Promise.allSettled([
       fetchFinishedMatches(leagueCode, String(currentSeasonYear)),
       fetchFinishedMatches(leagueCode, String(previousSeasonYear)),
       fetchFinishedMatches(leagueCode, String(twoSeasonsAgoYear)),
     ])
       .then(([current, previous, twoAgo]) => {
-        if (!cancelled) {
-          setCurrentSeasonMatches(current);
-          setPreviousSeasonMatches(previous);
-          setTwoSeasonsAgoMatches(twoAgo);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setCurrentSeasonMatches([]);
-          setPreviousSeasonMatches([]);
-          setTwoSeasonsAgoMatches([]);
-        }
+        if (cancelled) return;
+        // Each season is applied independently, so one failed request
+        // (eg. hitting football-data.org's shared rate limit) no longer
+        // wipes out the other two seasons' worth of data. This used to
+        // use Promise.all, which discards EVERY result - even ones that
+        // succeeded - the moment any one of the three requests fails.
+        // That's exactly why Form and Head-to-head were showing "no
+        // matches" for teams that had clearly played plenty of games
+        // this season: one rate-limited request out of three was enough
+        // to blank the whole section. Found 2026-09-22.
+        setCurrentSeasonMatches(current.status === "fulfilled" ? current.value : []);
+        setPreviousSeasonMatches(previous.status === "fulfilled" ? previous.value : []);
+        setTwoSeasonsAgoMatches(twoAgo.status === "fulfilled" ? twoAgo.value : []);
       })
       .finally(() => {
         if (!cancelled) setHistoryLoading(false);
