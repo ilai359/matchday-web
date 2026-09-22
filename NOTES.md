@@ -776,3 +776,49 @@ the old broken empty result for the same match - good evidence the fix
 itself works, pending a push to go live.
 
 Committed as `dc0f59d`, not yet pushed.
+
+(Update: the fix above was pushed and confirmed live.)
+
+### Added: a daily background job that pre-loads match history before anyone asks for it
+
+Ilai asked for something closer to "always instant, no delay" for Form/
+Head-to-head, and to know what football-data.org's paid tier costs as
+the alternative. Both, straight:
+
+**football-data.org paid pricing** (for reference, not acted on - costs
+money, so that's Ilai's call): the cheapest plan above Free is "Free w/
+Livescores" at EUR 12/month, raising the rate limit from 10 to 20
+requests/minute. Above that: "Free + Deep Data" EUR 29/month (30 req/min),
+Standard EUR 49/month (60 req/min), Advanced EUR 99/month (100 req/min),
+Pro EUR 199/month (120 req/min). Prices may be subject to VAT. Not
+recommended to act on this now - the free option below covers the same
+problem for EUR 0.
+
+**What was built instead (free):** a new route,
+`src/app/api/cron/warm-finished-matches/route.ts`, that quietly fetches
+and caches all 8 competitions' finished-match history (current season +
+2 seasons back = 24 requests total) once a day, paced with a short pause
+between each request so the warming job itself can't trip the same rate
+limit it exists to avoid. `vercel.json` schedules it to run once daily at
+06:00 UTC via Vercel's built-in Cron Jobs feature. Also pulled the
+competitions list into a shared `src/lib/competitions.ts` file so the
+matches route and this new job can't drift out of sync.
+
+Honest limit, not oversold: Vercel's free "Hobby" plan only allows cron
+jobs to run once a day (more frequent schedules need a paid Vercel plan -
+separate from football-data.org's own pricing above). Past-season data
+barely matters here since it's cached 30 days and never changes once a
+season's over, so daily warming keeps it permanently warm in practice.
+The *current* season's cache still resets every hour, so there are still
+hours later in the day where it could go cold before the next warm-up -
+that gap is already covered by the earlier fix (failed fetches retry and
+are never cached), so the worst case is a rare, brief hiccup for one
+visitor, not a repeat of the original bug.
+
+**One manual step still needed, not done yet:** this route is protected
+by a secret so random bots can't hit it and burn through the rate-limit
+budget it's trying to protect. Ilai needs to add an environment variable
+in Vercel's project settings named `CRON_SECRET` with any random value
+(like a password) - Vercel automatically sends it along whenever it
+triggers this job. Without it, the job will run but every attempt will
+be rejected with "Unauthorized" (fails safely closed, not open).

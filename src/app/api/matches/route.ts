@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { fetchWithRetry } from "@/lib/fetchWithRetry";
-
-const COMPETITIONS = ["PL", "PD", "BL1", "FL1", "SA", "CL", "DED", "PPL"];
+import { COMPETITIONS } from "@/lib/competitions";
 
 // football-data.org's docs only ever show a single status value in their
 // examples (e.g. "?status=FINISHED"), so combining values in one request
