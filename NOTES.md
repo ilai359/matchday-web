@@ -667,4 +667,77 @@ an `rm -f` command a couple of times mid-session to clear those. If a
 future session's commits suddenly fail with "Unable to create
 .git/HEAD.lock: File exists" or similar, that's what's happening - just
 `rm -f` the named `.lock` file from Terminal and it'll go through.
+## PWA installability, then a few real bugs found from Ilai's own phone testing
+
+**Status: PWA + the "not started" live fix + NOTES update all pushed and
+live (7fdd83f and earlier). The half-time/form-loading fix (d813be3) and
+the corner-radius fix (not yet committed as of this writing - blocked by
+the same lock issue, code is written and verified) are NOT pushed yet.
+Ilai needs to clear the lock, let this session commit the corner fix,
+then push both.**
+
+### Added: installable as an app (PWA)
+
+Added a web app manifest (Next's `manifest.ts` file convention) and
+192/512/maskable icons generated from the real logo, plus iOS-specific
+metadata so "Add to Home Screen" opens Clubside full-screen instead of
+just bookmarking the page. Chrome's own install icon/menu entry only
+appears after real engagement (a click + 30+ seconds on the page) - it's
+not missing, just gated by Chrome's own anti-spam heuristic.
+
+### Fixed: match page showing "not started" for an already-live match
+
+`isLive` only trusted the dedicated live-status poll's own answer,
+ignoring the status the page already had from wherever it found the
+match. A match already known to be live could show the pre-match
+"Kickoff" view for the few seconds before that poll's first response -
+or indefinitely, if that one poll failed. Now falls back to the
+already-known status until the poll answers.
+
+### Fixed: half-time label, and Form boxes showing "no matches" before they'd loaded
+
+Two more real bugs, found from Ilai reporting real behavior on his
+phone rather than guessed at: the half-time label had the exact same
+gap as the bug above (only checked the poll's own answer, not the
+fallback), so a match at half-time could still just say "Live". And the
+Form boxes next to Head-to-head had no loading state at all - unlike
+Head-to-head right above them (which already said "Loading history…"),
+Form just checked "is the list empty?", which is indistinguishable from
+"hasn't loaded yet" - so it always flashed "No matches played in this
+competition yet" on every single page load before real data arrived.
+Both fixed; Form now shows "Loading…" until it's actually known.
+
+Important lesson from this: a fix sitting committed locally but not yet
+pushed looks, from Ilai's side, identical to the bug still existing -
+confirmed this directly caused a round of "it doesn't work!!" that was
+really just "it's not live yet." Worth being explicit about push status
+going forward, not just commit status.
+
+### Fixed: Match Details card's corners looking square instead of round (mobile Chrome)
+
+The two soft color glows in the card's corners used a `blur-3xl` CSS
+filter, which has a known bug on mobile browsers: it can bleed straight
+past a parent's `overflow-hidden` + rounded corners instead of being
+clipped to that shape - exactly why the top-left and bottom-right
+corners looked cut off on Ilai's phone specifically (this kind of bug
+is often invisible on desktop, so testing only on desktop wouldn't have
+caught it). Replaced with radial-gradient backgrounds instead, which
+fade out on their own without a blur filter and actually respect the
+card's rounded shape.
+
+### Investigated: match page slow to load / can't see Form or Head-to-head on the live site
+
+Directly tested the actual football-data.org-backed API route the app
+uses for this (not just theorized) - it returns real, correct Premier
+League history for both the current season and two seasons back, so the
+data source itself isn't broken. The most likely explanation for what
+Ilai saw is the not-yet-pushed fix above (Form showing the wrong "no
+matches" message isn't the same failure as data never arriving - it
+just looks the same). If slowness/emptiness persists after that fix is
+actually live, football-data.org's shared 10-requests/minute free-tier
+limit is the next suspect - a single match page fires 4-5 of these
+requests on its own, and that's shared across every visitor, not
+per-person. Not confirmed as the cause yet; would need real evidence
+(timing, or it recurring after the fix above is live) before acting on
+it, same standard as everything else this session.
 

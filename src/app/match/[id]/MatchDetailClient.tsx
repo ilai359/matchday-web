@@ -712,13 +712,33 @@ export default function MatchDetailClient({ id }: { id: string }) {
                   to look and feel distinct, not like a themed variant of
                   the same card pattern used everywhere else. */}
               <div className="relative overflow-hidden rounded-[28px] bg-[#0B0E16] p-6 text-white shadow-[0_16px_40px_rgba(0,0,0,0.25)]">
+                {/* These used to be small circles with a `blur-3xl` filter,
+                    which is what was making the top-left and bottom-right
+                    corners of this card look cut off instead of rounded on
+                    Ilai's phone (Chrome). That's a known rendering quirk on
+                    mobile browsers: a CSS blur filter on a child can bleed
+                    past `overflow-hidden` + `rounded-[…]` on its parent
+                    instead of being clipped to the rounded shape.
+                    Radial gradients fade out on their own without a blur
+                    filter, giving the same soft-glow look while actually
+                    respecting the rounded corners. */}
                 <div
-                  className="pointer-events-none absolute -left-10 -top-10 h-40 w-40 rounded-full blur-3xl"
-                  style={{ backgroundColor: withAlpha(displayMatch.homeColor, "55") }}
+                  className="pointer-events-none absolute -left-16 -top-16 h-56 w-56 rounded-full"
+                  style={{
+                    background: `radial-gradient(circle, ${withAlpha(
+                      displayMatch.homeColor,
+                      "70"
+                    )}, transparent 70%)`,
+                  }}
                 />
                 <div
-                  className="pointer-events-none absolute -bottom-10 -right-10 h-40 w-40 rounded-full blur-3xl"
-                  style={{ backgroundColor: withAlpha(displayMatch.awayColor, "55") }}
+                  className="pointer-events-none absolute -bottom-16 -right-16 h-56 w-56 rounded-full"
+                  style={{
+                    background: `radial-gradient(circle, ${withAlpha(
+                      displayMatch.awayColor,
+                      "70"
+                    )}, transparent 70%)`,
+                  }}
                 />
 
                 <div className="relative">
