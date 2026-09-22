@@ -741,3 +741,38 @@ per-person. Not confirmed as the cause yet; would need real evidence
 (timing, or it recurring after the fix above is live) before acting on
 it, same standard as everything else this session.
 
+
+### Fixed: Form/Head-to-head still empty after the 30-day cache fix - the cache was likely caching failures, not just successes
+
+After the 30-day caching fix above went live, Ilai retested and got the
+exact same broken result (Augsburg/Bayern, then also Man City/PSG and
+Bayern/RB Leipzig on the live site) - "haven't met in the last three
+seasons" / "no matches played." Confirmed via direct testing that
+football-data.org's free-tier rate limit (10 requests/minute, shared
+across every visitor) was still actively returning real 429 errors on
+the live endpoint.
+
+The likely cause: that fix used Next.js's own fetch cache
+(`next: { revalidate: N }`), which isn't documented anywhere to skip
+caching non-OK responses. If the very first request after that fix
+deployed happened to land during a rate limit, the FAILED/empty result
+could have gotten cached for the full TTL - up to 30 days for a past
+season - which would explain the same broken data persisting no matter
+how many times Ilai reloaded.
+
+Fix: switched `finished-matches/route.ts` to use the existing `getOrSet`
+Redis helper (`src/lib/cache.ts`) instead of raw `fetch`/`next.revalidate`.
+That helper already powers team-info and news-relevance in production and
+explicitly guarantees a failed fetch is never cached - only a real
+successful result gets stored, so a rate-limit hit just means the next
+request tries again fresh instead of locking in a bad answer for weeks.
+Also set `cache: "no-store"` on the underlying fetch so Next's own cache
+doesn't also get involved and disagree with the Redis cache.
+
+Confirmed via Ilai's own screenshots: localhost (which picks up local
+code changes immediately) showed correct Bayern/RB Leipzig head-to-head
+and form data at the same time the still-not-yet-pushed live site showed
+the old broken empty result for the same match - good evidence the fix
+itself works, pending a push to go live.
+
+Committed as `dc0f59d`, not yet pushed.
