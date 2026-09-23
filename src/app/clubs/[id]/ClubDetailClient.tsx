@@ -563,7 +563,7 @@ export default function ClubDetailClient({ id }: { id: string }) {
         {/* TOP SCORERS / ASSISTS */}
         {!loading && (clubScorers.length > 0 || clubAssists.length > 0) && (
           <section className="mb-6">
-            <SectionHeading icon="⚽" title="Club stats" />
+            <SectionHeading icon="⚽" title="Club stats (League)" />
             <div className="grid grid-cols-1 gap-5 rounded-[24px] border border-black/[0.045] bg-white p-4 shadow-sm dark:border-white/[0.06] dark:bg-[#14171F] dark:shadow-none sm:grid-cols-2">
               <PlayerStatList title="Top scorers" icon="⚽" items={clubScorers} statKey="goals" club={club} />
               <PlayerStatList title="Top assists" icon="🎯" items={clubAssists} statKey="assists" club={club} />

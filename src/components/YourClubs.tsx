@@ -451,14 +451,14 @@ function ClubStatsCard({
       {!loading && (topScorers.length > 0 || topAssists.length > 0) && (
         <div className="grid grid-cols-1 gap-5 p-4 pt-5 sm:grid-cols-2">
           <StatList
-            title="Top scorers"
+            title="Top scorers (League)"
             icon="⚽"
             items={topScorers}
             statKey="goals"
             club={club}
           />
           <StatList
-            title="Top assists"
+            title="Top assists (League)"
             icon="🎯"
             items={topAssists}
             statKey="assists"
