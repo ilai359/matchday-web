@@ -347,8 +347,51 @@ export default function ClubDetailClient({ id }: { id: string }) {
 
       <div className="mx-auto w-full max-w-2xl px-5 pt-6">
         {loading && (
-          <div className="py-16 text-center text-sm font-medium text-zinc-400 dark:text-zinc-500">
-            Loading club info…
+          <div className="animate-pulse" aria-hidden="true">
+            <div className="mb-6">
+              <div className="mb-3 h-3.5 w-28 rounded-full bg-black/[0.06] dark:bg-white/[0.08]" />
+              <div className="mb-3 flex gap-1.5">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="h-8 w-8 rounded-full bg-black/[0.06] dark:bg-white/[0.08]"
+                  />
+                ))}
+              </div>
+              <div className="flex flex-col gap-2">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center gap-3 rounded-2xl border border-black/[0.045] bg-white px-3.5 py-3 shadow-sm dark:border-white/[0.06] dark:bg-[#14171F] dark:shadow-none"
+                  >
+                    <div className="h-7 w-7 shrink-0 rounded-full bg-black/[0.06] dark:bg-white/[0.08]" />
+                    <div className="h-8 w-8 shrink-0 rounded-full bg-black/[0.06] dark:bg-white/[0.08]" />
+                    <div className="min-w-0 flex-1">
+                      <div className="mb-2 h-3 w-2/3 rounded-full bg-black/[0.06] dark:bg-white/[0.08]" />
+                      <div className="h-2.5 w-1/3 rounded-full bg-black/[0.05] dark:bg-white/[0.06]" />
+                    </div>
+                    <div className="h-4 w-10 shrink-0 rounded-full bg-black/[0.06] dark:bg-white/[0.08]" />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <div className="mb-3 h-3.5 w-32 rounded-full bg-black/[0.06] dark:bg-white/[0.08]" />
+              <div className="overflow-hidden rounded-2xl border border-black/[0.045] bg-white dark:border-white/[0.06] dark:bg-[#14171F]">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center gap-3 border-b border-black/[0.03] px-3.5 py-3 last:border-b-0 dark:border-white/[0.04]"
+                  >
+                    <div className="h-5 w-5 shrink-0 rounded-full bg-black/[0.06] dark:bg-white/[0.08]" />
+                    <div className="h-4 w-4 shrink-0 rounded-full bg-black/[0.06] dark:bg-white/[0.08]" />
+                    <div className="h-3 flex-1 rounded-full bg-black/[0.06] dark:bg-white/[0.08]" />
+                    <div className="h-3 w-6 shrink-0 rounded-full bg-black/[0.05] dark:bg-white/[0.06]" />
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
 
