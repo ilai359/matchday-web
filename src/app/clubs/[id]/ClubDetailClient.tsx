@@ -237,7 +237,27 @@ export default function ClubDetailClient({ id }: { id: string }) {
 
   const spotlight = clubSpotlights.find((s) => s.clubId === club.id);
 
-  const tableRows = tableExpanded ? standings : standings.slice(0, 8);
+  // Collapsed view: 5 rows centered on the club's own position, not just
+  // the top of the table - a mid-table or relegation-zone club (like most
+  // of them, most of the time) previously never appeared in its own
+  // collapsed table at all, which was the actual point of putting a
+  // league table on a club's own page. Falls back to the top 5 only if
+  // this club's row isn't in the standings at all (shouldn't normally
+  // happen). Clamped at both ends so a club near #1 or the very bottom
+  // still gets a full 5-row window instead of running off the table.
+  const COLLAPSED_TABLE_ROWS = 5;
+  const thisClubId = club.id;
+  function centeredTableRows(rows: StandingsRow[], count: number): StandingsRow[] {
+    if (rows.length <= count) return rows;
+    const idx = rows.findIndex((row) => row.clubId === thisClubId);
+    if (idx === -1) return rows.slice(0, count);
+    let start = idx - Math.floor(count / 2);
+    start = Math.max(0, Math.min(start, rows.length - count));
+    return rows.slice(start, start + count);
+  }
+  const tableRows = tableExpanded
+    ? standings
+    : centeredTableRows(standings, COLLAPSED_TABLE_ROWS);
 
   const hasAnyData =
     !loading &&
@@ -511,7 +531,7 @@ export default function ClubDetailClient({ id }: { id: string }) {
                   );
                 })}
               </div>
-              {standings.length > 8 && (
+              {standings.length > COLLAPSED_TABLE_ROWS && (
                 <button
                   type="button"
                   onClick={() => setTableExpanded((v) => !v)}
