@@ -165,8 +165,13 @@ function FormPills({
   // treatment already used for the head-to-head list above.
   if (isLoading) {
     return (
-      <div className="text-[11px] font-medium text-zinc-400 dark:text-zinc-500">
-        Loading…
+      <div className="flex gap-1.5 animate-pulse" aria-hidden="true">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div
+            key={i}
+            className="h-8 w-8 rounded-full bg-black/[0.06] dark:bg-white/10"
+          />
+        ))}
       </div>
     );
   }
@@ -450,8 +455,24 @@ export default function MatchDetailClient({ id }: { id: string }) {
 
   if (!mockMatch && liveLoading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#F5F6F8] dark:bg-[#0B0D12]">
-        <div className="text-sm font-bold text-zinc-400 dark:text-zinc-500">Loading match…</div>
+      <main className="min-h-screen overflow-x-hidden bg-[#F5F6F8] pb-24 dark:bg-[#0B0D12]">
+        <header className="relative overflow-hidden bg-[#080B13] text-white">
+          <div className="relative z-10 mx-auto w-full max-w-2xl animate-pulse px-5 pb-8 pt-8" aria-hidden="true">
+            <div className="mb-6 h-4 w-36 rounded-full bg-white/10" />
+            <div className="mb-2 h-2.5 w-20 rounded-full bg-white/10" />
+            <div className="h-7 w-3/4 rounded-full bg-white/10" />
+          </div>
+        </header>
+        <div className="mx-auto w-full max-w-2xl animate-pulse px-5 pt-6" aria-hidden="true">
+          <div className="rounded-[30px] border border-black/[0.045] bg-white p-6 shadow-[0_6px_24px_rgba(0,0,0,0.045)] dark:border-white/[0.06] dark:bg-[#14171F] dark:shadow-none">
+            <div className="mb-6 flex items-center justify-center gap-8">
+              <div className="h-16 w-16 rounded-2xl bg-black/[0.06] dark:bg-white/[0.08]" />
+              <div className="h-8 w-16 rounded-full bg-black/[0.06] dark:bg-white/[0.08]" />
+              <div className="h-16 w-16 rounded-2xl bg-black/[0.06] dark:bg-white/[0.08]" />
+            </div>
+            <div className="mx-auto h-3 w-40 rounded-full bg-black/[0.05] dark:bg-white/[0.06]" />
+          </div>
+        </div>
       </main>
     );
   }
@@ -811,8 +832,26 @@ export default function MatchDetailClient({ id }: { id: string }) {
                   />
                 </div>
                 {isHistoryLoading ? (
-                  <div className="rounded-2xl bg-white/85 py-4 text-center text-xs font-bold text-zinc-400 dark:bg-white/[0.08] dark:text-zinc-300">
-                    Loading history…
+                  <div className="flex flex-col gap-2 animate-pulse" aria-hidden="true">
+                    {Array.from({ length: 2 }).map((_, i) => (
+                      <div
+                        key={i}
+                        className="rounded-2xl bg-white/85 px-3 py-3 dark:bg-white/[0.08]"
+                      >
+                        <div className="mx-auto mb-2 h-2.5 w-20 rounded-full bg-black/[0.06] dark:bg-white/10" />
+                        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                          <div className="flex items-center justify-end gap-2">
+                            <div className="h-3 w-16 rounded-full bg-black/[0.06] dark:bg-white/10" />
+                            <div className="h-[34px] w-[34px] shrink-0 rounded-full bg-black/[0.06] dark:bg-white/10" />
+                          </div>
+                          <div className="h-6 w-12 rounded-full bg-black/[0.06] dark:bg-white/10" />
+                          <div className="flex items-center gap-2">
+                            <div className="h-[34px] w-[34px] shrink-0 rounded-full bg-black/[0.06] dark:bg-white/10" />
+                            <div className="h-3 w-16 rounded-full bg-black/[0.06] dark:bg-white/10" />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 ) : headToHeadMatches.length > 0 ? (
                   <div className="flex flex-col gap-2">

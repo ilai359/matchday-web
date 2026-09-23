@@ -360,8 +360,18 @@ function ClubStatsCard({
       </Link>
 
       {loading && (
-        <div className="p-6 text-center text-xs font-medium text-zinc-400 dark:text-zinc-500">
-          Loading league info…
+        <div className="animate-pulse p-4 pt-4" aria-hidden="true">
+          <div className="mb-1.5 h-2.5 w-24 rounded-full bg-black/[0.06] dark:bg-white/10" />
+          <div className="flex flex-col gap-0.5">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-2 rounded-xl px-2 py-1.5">
+                <div className="h-5 w-5 shrink-0 rounded-full bg-black/[0.06] dark:bg-white/10" />
+                <div className="h-4 w-4 shrink-0 rounded-full bg-black/[0.06] dark:bg-white/10" />
+                <div className="h-3 flex-1 rounded-full bg-black/[0.06] dark:bg-white/10" />
+                <div className="h-3 w-16 shrink-0 rounded-full bg-black/[0.05] dark:bg-white/[0.08]" />
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

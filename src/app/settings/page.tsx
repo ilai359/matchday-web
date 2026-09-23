@@ -207,8 +207,25 @@ export default function Settings() {
 
             <div className="overflow-hidden rounded-[26px] border border-black/[0.045] bg-white shadow-[0_6px_24px_rgba(0,0,0,0.045)] dark:border-white/[0.06] dark:bg-[#14171F] dark:shadow-none">
               {isStandingsLoading ? (
-                <div className="px-5 py-6 text-center text-xs font-medium text-zinc-400 dark:text-zinc-500">
-                  Loading league standings…
+                <div className="animate-pulse" aria-hidden="true">
+                  <div className="grid grid-cols-2 divide-x divide-zinc-100 dark:divide-white/[0.06]">
+                    <div className="px-4 py-4 text-center">
+                      <div className="mx-auto h-7 w-10 rounded-full bg-black/[0.06] dark:bg-white/10" />
+                      <div className="mx-auto mt-2 h-2.5 w-20 rounded-full bg-black/[0.05] dark:bg-white/[0.08]" />
+                    </div>
+                    <div className="px-4 py-4 text-center">
+                      <div className="mx-auto h-7 w-10 rounded-full bg-black/[0.06] dark:bg-white/10" />
+                      <div className="mx-auto mt-2 h-2.5 w-24 rounded-full bg-black/[0.05] dark:bg-white/[0.08]" />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 border-t border-zinc-100 px-5 py-4 dark:border-white/[0.06]">
+                    <div className="h-[38px] w-[38px] shrink-0 rounded-full bg-black/[0.06] dark:bg-white/10" />
+                    <div className="min-w-0 flex-1">
+                      <div className="mb-2 h-3 w-2/3 rounded-full bg-black/[0.06] dark:bg-white/10" />
+                      <div className="h-2.5 w-1/3 rounded-full bg-black/[0.05] dark:bg-white/[0.08]" />
+                    </div>
+                    <div className="h-4 w-6 shrink-0 rounded-full bg-black/[0.06] dark:bg-white/10" />
+                  </div>
                 </div>
               ) : (
                 <>
