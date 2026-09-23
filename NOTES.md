@@ -822,3 +822,51 @@ in Vercel's project settings named `CRON_SECRET` with any random value
 (like a password) - Vercel automatically sends it along whenever it
 triggers this job. Without it, the job will run but every attempt will
 be rejected with "Unauthorized" (fails safely closed, not open).
+
+### Update 2026-09-22/23: the real root causes behind a full day of intermittent Form/Head-to-head failures
+
+The fix above (Upstash caching for finished-matches) wasn't the whole
+story - it just moved where the failures showed up. Found and fixed two
+more real bugs the same day, plus confirmed the daily warming job above
+is actually wired up correctly:
+
+**1. `src/lib/cache.ts`: Redis errors were treated as fatal.** `getOrSet`
+had no error handling around the actual Redis `get`/`set` calls, so any
+transient Upstash hiccup (not just a bad token - a dropped connection, a
+slow response, anything) failed the entire request as a 500, even when
+the real football-data.org data was fine. Fixed by wrapping each Redis
+call in its own try/catch that logs and falls through to fetching
+directly instead of failing the request.
+
+**2. `src/lib/cache.ts`: no fallback when the live fetch itself fails.**
+Even with Redis fixed, a request could still fail outright if
+football-data.org's shared 10-requests/minute rate limit got hit (very
+possible under any burst of traffic across several not-yet-cached
+competitions/seasons at once). Fixed by saving every successful fetch
+under a second, never-expiring `stale:<key>` copy. If a live fetch fails,
+`getOrSet` now falls back to that last known good value instead of
+throwing - a slightly out-of-date result (finished-match history barely
+changes minute to minute) beats a broken page, and the rate limit clears
+itself within about a minute anyway.
+
+**3. `src/app/match/[id]/MatchDetailClient.tsx`: one failed season wiped
+all three.** The match page fetches three seasons of finished-match
+history (current, -1, -2) in parallel with `Promise.all`, which rejects -
+discarding every result, even ones that succeeded - the moment any ONE
+of the three requests fails. That's exactly why Form and Head-to-head
+were showing "no matches" for teams that had clearly played plenty of
+games: one rate-limited request out of three was enough to blank the
+whole section. Switched to `Promise.allSettled` so each season is applied
+independently.
+
+**Cron job confirmed working, not just built.** Checked Vercel's Cron
+Jobs page directly (Project Settings -> Cron Jobs): `CRON_SECRET` is set,
+`/api/cron/warm-finished-matches` is listed, enabled, and scheduled for
+06:00 UTC daily. So the daily pre-warming described above is actually
+live, not just code sitting there unused.
+
+**Lesson for next time a "fix" doesn't fully stick:** today's mistake was
+declaring things fixed after a single successful check. The right way to
+verify caching/rate-limit fixes: test several different matches/leagues,
+more than once each, with a short wait in between - a single success
+proves nothing when the underlying problem is intermittent by nature.
