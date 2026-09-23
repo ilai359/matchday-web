@@ -411,10 +411,9 @@ export default function ClubDetailClient({ id }: { id: string }) {
                 const result = resultFor(m, club.id);
                 const opp = opponentOf(m, club.id);
                 return (
-                  <Link
+                  <div
                     key={m.id}
-                    href={`/match/${m.id}`}
-                    className="flex items-center gap-3 rounded-2xl border border-black/[0.045] bg-white px-3.5 py-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-white/[0.06] dark:bg-[#14171F] dark:shadow-none"
+                    className="flex items-center gap-3 rounded-2xl border border-black/[0.045] bg-white px-3.5 py-3 shadow-sm dark:border-white/[0.06] dark:bg-[#14171F] dark:shadow-none"
                   >
                     <div
                       className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-black ${resultPillClass(
@@ -436,7 +435,7 @@ export default function ClubDetailClient({ id }: { id: string }) {
                     <div className="shrink-0 text-sm font-black text-[#111318] dark:text-white">
                       {opp.isHome ? `${m.homeScore}–${m.awayScore}` : `${m.awayScore}–${m.homeScore}`}
                     </div>
-                  </Link>
+                  </div>
                 );
               })}
             </div>
