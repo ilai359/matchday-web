@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { getClub } from "../../../lib/clubHelpers";
 import { formatDate, formatTime } from "../../../lib/dateHelpers";
@@ -504,6 +505,21 @@ export default function ClubDetailClient({ id }: { id: string }) {
                       >
                         {row.position}
                       </div>
+                      {row.crest ? (
+                        <Image
+                          src={row.crest}
+                          alt=""
+                          width={16}
+                          height={16}
+                          className="h-4 w-4 shrink-0 object-contain"
+                        />
+                      ) : (
+                        // Keeps every row's team name aligned to the same
+                        // starting position whether or not that row has a
+                        // crest to show, instead of names shifting left on
+                        // rows for a club we don't track.
+                        <div className="h-4 w-4 shrink-0" />
+                      )}
                       <div
                         className={`min-w-0 flex-1 truncate text-[12px] ${
                           isClub

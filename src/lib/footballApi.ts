@@ -373,6 +373,7 @@ export type StandingsRow = {
   position: number;
   teamName: string;
   clubId: string | null;
+  crest?: string;
   playedGames: number;
   won: number;
   draw: number;
@@ -386,7 +387,7 @@ type RawStandingsResponse = {
     type: string;
     table: {
       position: number;
-      team: { name: string };
+      team: { name: string; crest?: string };
       playedGames: number;
       won: number;
       draw: number;
@@ -407,17 +408,26 @@ export async function fetchStandings(
   const data: RawStandingsResponse = await response.json();
   const totalTable =
     data.standings?.find((s) => s.type === "TOTAL")?.table ?? [];
-  return totalTable.map((row) => ({
-    position: row.position,
-    teamName: row.team.name,
-    clubId: matchClubId(row.team.name),
-    playedGames: row.playedGames,
-    won: row.won,
-    draw: row.draw,
-    lost: row.lost,
-    points: row.points,
-    goalDifference: row.goalDifference,
-  }));
+  return totalTable.map((row) => {
+    const clubId = matchClubId(row.team.name);
+    // Prefer our own crest for a club we track (consistent branding,
+    // already used everywhere else in the app) and only fall back to
+    // whatever football-data.org sent for a club we don't track - same
+    // convention as crestFor() on the match detail page.
+    const ownCrest = clubId ? clubs.find((c) => c.id === clubId)?.crest : undefined;
+    return {
+      position: row.position,
+      teamName: row.team.name,
+      clubId,
+      crest: ownCrest ?? row.team.crest ?? undefined,
+      playedGames: row.playedGames,
+      won: row.won,
+      draw: row.draw,
+      lost: row.lost,
+      points: row.points,
+      goalDifference: row.goalDifference,
+    };
+  });
 }
 
 // The API groups tied teams under the same position number. Within each
