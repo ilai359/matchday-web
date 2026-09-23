@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useClubs } from "../context/ClubsContext";
 import { getClub } from "../lib/clubHelpers";
 import {
@@ -402,6 +403,17 @@ function ClubStatsCard({
                   >
                     {row.position}
                   </div>
+                  {row.crest ? (
+                    <Image
+                      src={row.crest}
+                      alt=""
+                      width={16}
+                      height={16}
+                      className="h-4 w-4 shrink-0 object-contain"
+                    />
+                  ) : (
+                    <div className="h-4 w-4 shrink-0" />
+                  )}
                   <div
                     className={`min-w-0 flex-1 truncate text-[12px] ${
                       isClub
