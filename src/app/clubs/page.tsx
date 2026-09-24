@@ -1,9 +1,156 @@
 "use client";
 
 import { useLayoutEffect, useRef, useState } from "react";
-import { clubs } from "../../data/clubs";
+import { Club, clubs } from "../../data/clubs";
 import { useClubs } from "../../context/ClubsContext";
 import ClubBadge from "../../components/ClubBadge";
+
+// A handful of globally well-known clubs, shown as quick picks above the
+// full alphabetical list - without this, someone who doesn't already know
+// exactly which club they want has to scroll or search through all 132.
+// Real club ids only (checked against src/data/clubs.ts), spanning a mix
+// of leagues rather than just one.
+const POPULAR_CLUB_IDS = [
+  "real-madrid",
+  "barcelona",
+  "manchester-united",
+  "manchester-city",
+  "liverpool",
+  "arsenal",
+  "chelsea",
+  "bayern-munich",
+  "paris-saint-germain",
+  "juventus",
+];
+
+type ClubRowProps = {
+  club: Club;
+  isSelected: boolean;
+  onToggle: (id: string) => void;
+  registerRef: (id: string, element: HTMLDivElement | null) => void;
+};
+
+// Pulled out of the main component so the same row (and the same
+// select/deselect visuals) can be reused for both the "Popular clubs"
+// quick-pick section and the full list below, instead of maintaining two
+// near-identical copies of this markup.
+function ClubRow({ club, isSelected, onToggle, registerRef }: ClubRowProps) {
+  const clubColor = club.primaryColor ?? "#111827";
+
+  return (
+    <div
+      ref={(element) => registerRef(club.id, element)}
+      role="button"
+      tabIndex={0}
+      onClick={() => onToggle(club.id)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onToggle(club.id);
+        }
+      }}
+      className={`group relative w-full cursor-pointer overflow-hidden rounded-[24px] border p-4 text-left shadow-[0_5px_20px_rgba(0,0,0,0.035)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_30px_rgba(0,0,0,0.07)] active:scale-[0.995] dark:hover:shadow-none ${
+        isSelected
+          ? "border-transparent text-white"
+          : "border-black/[0.045] bg-white text-[#111318] dark:border-white/[0.06] dark:bg-[#14171F] dark:text-white"
+      }`}
+      style={
+        isSelected
+          ? {
+              background: `linear-gradient(135deg, ${clubColor}, #111827 85%)`,
+            }
+          : undefined
+      }
+    >
+      {/* COLOR STRIPE */}
+      {!isSelected && (
+        <div
+          className="absolute bottom-0 left-0 top-0 w-1"
+          style={{ backgroundColor: clubColor }}
+        />
+      )}
+
+      {/* SELECTED GLOWS */}
+      {isSelected && (
+        <>
+          <div className="pointer-events-none absolute -right-14 -top-16 h-40 w-40 rounded-full bg-white/15 blur-[45px]" />
+          <div className="pointer-events-none absolute -bottom-20 -left-12 h-40 w-40 rounded-full bg-black/20 blur-[45px]" />
+        </>
+      )}
+
+      <div className="relative z-10 flex items-center gap-4">
+        {/* CLUB LOGO - NOT CLICKABLE */}
+        <div
+          className="shrink-0 cursor-default"
+          onClick={(event) => {
+            event.stopPropagation();
+          }}
+        >
+          <ClubBadge
+            name={club.name}
+            crest={club.crest}
+            color={club.primaryColor}
+            size={48}
+          />
+        </div>
+
+        {/* CLUB DETAILS */}
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-[15px] font-black">
+            {club.name}
+          </div>
+
+          <div
+            className={`mt-1 flex min-w-0 items-center gap-1.5 text-xs ${
+              isSelected
+                ? "text-white/55"
+                : "text-zinc-400 dark:text-zinc-500"
+            }`}
+          >
+            <span className="truncate">
+              {club.country}
+            </span>
+
+            <span
+              className={
+                isSelected
+                  ? "text-white/25"
+                  : "text-zinc-300 dark:text-zinc-600"
+              }
+            >
+              ·
+            </span>
+
+            <span className="truncate">
+              {club.league}
+            </span>
+          </div>
+        </div>
+
+        {/* ADD / REMOVE BUTTON */}
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onToggle(club.id);
+          }}
+          aria-label={
+            isSelected
+              ? `Unfollow ${club.name}`
+              : `Follow ${club.name}`
+          }
+          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-lg font-black transition-all hover:scale-105 active:scale-90 ${
+            isSelected
+              ? "border border-white/10 bg-white/15 text-white hover:bg-white/25"
+              : "bg-[#F1F3F7] text-zinc-600 hover:bg-[#E4E7EC] dark:bg-white/10 dark:text-zinc-300 dark:hover:bg-white/20"
+          }`}
+        >
+          {isSelected ? "✓" : "+"}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function Clubs() {
   const [query, setQuery] = useState("");
@@ -22,8 +169,16 @@ export default function Clubs() {
 
   const normalizedQuery = query.trim().toLowerCase();
 
+  // Shown as its own "Popular clubs" section above the full list, only
+  // while not searching - once someone's searching they're looking for
+  // something specific, and the full results below already cover it.
+  const popularClubs: Club[] = POPULAR_CLUB_IDS.map((id) =>
+    clubs.find((club) => club.id === id)
+  ).filter((club): club is Club => Boolean(club));
+  const popularClubIdSet = new Set(POPULAR_CLUB_IDS);
+
   const filteredClubs = clubs.filter((club) => {
-    if (!normalizedQuery) return true;
+    if (!normalizedQuery) return !popularClubIdSet.has(club.id);
 
     return (
       club.name.toLowerCase().includes(normalizedQuery) ||
@@ -31,6 +186,10 @@ export default function Clubs() {
       club.league.toLowerCase().includes(normalizedQuery)
     );
   });
+
+  function registerClubRef(id: string, element: HTMLDivElement | null) {
+    clubRefs.current[id] = element;
+  }
 
   useLayoutEffect(() => {
     if (!clickedClub.current) return;
@@ -241,6 +400,30 @@ export default function Clubs() {
             )}
           </div>
 
+          {/* POPULAR CLUBS - quick picks for browsing, hidden while searching */}
+          {!normalizedQuery && popularClubs.length > 0 && (
+            <div className="mb-7">
+              <div className="mb-3 flex items-center gap-1.5 px-1">
+                <span className="text-sm">⭐</span>
+                <span className="text-[11px] font-black uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+                  Popular clubs
+                </span>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                {popularClubs.map((club) => (
+                  <ClubRow
+                    key={club.id}
+                    club={club}
+                    isSelected={selectedIds.includes(club.id)}
+                    onToggle={handleListToggle}
+                    registerRef={registerClubRef}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* SEARCH RESULT COUNT */}
           {query.trim() && filteredClubs.length > 0 && (
             <div className="mb-3 px-1 text-[11px] font-bold text-zinc-400 dark:text-zinc-500">
@@ -288,128 +471,21 @@ export default function Clubs() {
           )}
 
           {/* CLUB LIST */}
+          {!normalizedQuery && popularClubs.length > 0 && (
+            <div className="mb-3 px-1 text-[11px] font-bold text-zinc-400 dark:text-zinc-500">
+              All clubs
+            </div>
+          )}
           <div className="flex flex-col gap-3">
-            {filteredClubs.map((club) => {
-              const isSelected = selectedIds.includes(club.id);
-              const clubColor = club.primaryColor ?? "#111827";
-
-              return (
-                <div
-                  key={club.id}
-                  ref={(element) => {
-                    clubRefs.current[club.id] = element;
-                  }}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => handleListToggle(club.id)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      handleListToggle(club.id);
-                    }
-                  }}
-                  className={`group relative w-full cursor-pointer overflow-hidden rounded-[24px] border p-4 text-left shadow-[0_5px_20px_rgba(0,0,0,0.035)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_30px_rgba(0,0,0,0.07)] active:scale-[0.995] dark:hover:shadow-none ${
-                    isSelected
-                      ? "border-transparent text-white"
-                      : "border-black/[0.045] bg-white text-[#111318] dark:border-white/[0.06] dark:bg-[#14171F] dark:text-white"
-                  }`}
-                  style={
-                    isSelected
-                      ? {
-                          background: `linear-gradient(135deg, ${clubColor}, #111827 85%)`,
-                        }
-                      : undefined
-                  }
-                >
-                  {/* COLOR STRIPE */}
-                  {!isSelected && (
-                    <div
-                      className="absolute bottom-0 left-0 top-0 w-1"
-                      style={{ backgroundColor: clubColor }}
-                    />
-                  )}
-
-                  {/* SELECTED GLOWS */}
-                  {isSelected && (
-                    <>
-                      <div className="pointer-events-none absolute -right-14 -top-16 h-40 w-40 rounded-full bg-white/15 blur-[45px]" />
-                      <div className="pointer-events-none absolute -bottom-20 -left-12 h-40 w-40 rounded-full bg-black/20 blur-[45px]" />
-                    </>
-                  )}
-
-                  <div className="relative z-10 flex items-center gap-4">
-                    {/* CLUB LOGO - NOT CLICKABLE */}
-                    <div
-                      className="shrink-0 cursor-default"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                      }}
-                    >
-                      <ClubBadge
-                        name={club.name}
-                        crest={club.crest}
-                        color={club.primaryColor}
-                        size={48}
-                      />
-                    </div>
-
-                    {/* CLUB DETAILS */}
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-[15px] font-black">
-                        {club.name}
-                      </div>
-
-                      <div
-                        className={`mt-1 flex min-w-0 items-center gap-1.5 text-xs ${
-                          isSelected
-                            ? "text-white/55"
-                            : "text-zinc-400 dark:text-zinc-500"
-                        }`}
-                      >
-                        <span className="truncate">
-                          {club.country}
-                        </span>
-
-                        <span
-                          className={
-                            isSelected
-                              ? "text-white/25"
-                              : "text-zinc-300 dark:text-zinc-600"
-                          }
-                        >
-                          ·
-                        </span>
-
-                        <span className="truncate">
-                          {club.league}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* ADD / REMOVE BUTTON */}
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        handleListToggle(club.id);
-                      }}
-                      aria-label={
-                        isSelected
-                          ? `Unfollow ${club.name}`
-                          : `Follow ${club.name}`
-                      }
-                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-lg font-black transition-all hover:scale-105 active:scale-90 ${
-                        isSelected
-                          ? "border border-white/10 bg-white/15 text-white hover:bg-white/25"
-                          : "bg-[#F1F3F7] text-zinc-600 hover:bg-[#E4E7EC] dark:bg-white/10 dark:text-zinc-300 dark:hover:bg-white/20"
-                      }`}
-                    >
-                      {isSelected ? "✓" : "+"}
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+            {filteredClubs.map((club) => (
+              <ClubRow
+                key={club.id}
+                club={club}
+                isSelected={selectedIds.includes(club.id)}
+                onToggle={handleListToggle}
+                registerRef={registerClubRef}
+              />
+            ))}
           </div>
         </section>
       </div>
