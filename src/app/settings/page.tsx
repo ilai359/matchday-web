@@ -100,11 +100,12 @@ export default function Settings() {
         )
       : null;
 
-  // Win rate across every followed club's matches this season, rather than
-  // a raw points total - a points sum just grows with how many clubs you
-  // follow or how many games they've played, so two people following
-  // different numbers of clubs can't compare it at a glance. A percentage
-  // reads the same regardless of how many clubs or games are behind it.
+  // Win/draw/loss rate across every followed club's matches this season,
+  // rather than a raw points total - a points sum just grows with how many
+  // clubs you follow or how many games they've played, so two people
+  // following different numbers of clubs can't compare it at a glance. A
+  // percentage reads the same regardless of how many clubs or games are
+  // behind it.
   const totalPlayedGames = clubStandings.reduce(
     (sum, entry) => sum + entry.row.playedGames,
     0
@@ -113,8 +114,20 @@ export default function Settings() {
     (sum, entry) => sum + entry.row.won,
     0
   );
+  const totalDraws = clubStandings.reduce(
+    (sum, entry) => sum + entry.row.draw,
+    0
+  );
+  const totalLosses = clubStandings.reduce(
+    (sum, entry) => sum + entry.row.lost,
+    0
+  );
   const winRate =
     totalPlayedGames > 0 ? (totalWins / totalPlayedGames) * 100 : null;
+  const drawRate =
+    totalPlayedGames > 0 ? (totalDraws / totalPlayedGames) * 100 : null;
+  const lossRate =
+    totalPlayedGames > 0 ? (totalLosses / totalPlayedGames) * 100 : null;
 
   const hasClubStats = !isStandingsLoading && clubStandings.length > 0;
 
@@ -219,15 +232,13 @@ export default function Settings() {
             <div className="overflow-hidden rounded-[26px] border border-black/[0.045] bg-white shadow-[0_6px_24px_rgba(0,0,0,0.045)] dark:border-white/[0.06] dark:bg-[#14171F] dark:shadow-none">
               {isStandingsLoading ? (
                 <div className="animate-pulse" aria-hidden="true">
-                  <div className="grid grid-cols-2 divide-x divide-zinc-100 dark:divide-white/[0.06]">
-                    <div className="px-4 py-4 text-center">
-                      <div className="mx-auto h-7 w-10 rounded-full bg-black/[0.06] dark:bg-white/10" />
-                      <div className="mx-auto mt-2 h-2.5 w-20 rounded-full bg-black/[0.05] dark:bg-white/[0.08]" />
-                    </div>
-                    <div className="px-4 py-4 text-center">
-                      <div className="mx-auto h-7 w-10 rounded-full bg-black/[0.06] dark:bg-white/10" />
-                      <div className="mx-auto mt-2 h-2.5 w-24 rounded-full bg-black/[0.05] dark:bg-white/[0.08]" />
-                    </div>
+                  <div className="grid grid-cols-4 divide-x divide-zinc-100 dark:divide-white/[0.06]">
+                    {Array.from({ length: 4 }).map((_, i) => (
+                      <div key={i} className="px-2 py-4 text-center">
+                        <div className="mx-auto h-6 w-8 rounded-full bg-black/[0.06] dark:bg-white/10" />
+                        <div className="mx-auto mt-2 h-2.5 w-10 rounded-full bg-black/[0.05] dark:bg-white/[0.08]" />
+                      </div>
+                    ))}
                   </div>
                   <div className="flex items-center gap-3 border-t border-zinc-100 px-5 py-4 dark:border-white/[0.06]">
                     <div className="h-[38px] w-[38px] shrink-0 rounded-full bg-black/[0.06] dark:bg-white/10" />
@@ -240,21 +251,37 @@ export default function Settings() {
                 </div>
               ) : (
                 <>
-                  <div className="grid grid-cols-2 divide-x divide-zinc-100 dark:divide-white/[0.06]">
-                    <div className="px-4 py-4 text-center">
-                      <div className="text-2xl font-black text-[#111318] dark:text-white">
+                  <div className="grid grid-cols-4 divide-x divide-zinc-100 dark:divide-white/[0.06]">
+                    <div className="px-2 py-4 text-center">
+                      <div className="text-xl font-black text-[#111318] dark:text-white">
                         {averagePosition?.toFixed(1)}
                       </div>
-                      <div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
-                        Avg. league position
+                      <div className="mt-1 text-[9px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+                        Avg. pos.
                       </div>
                     </div>
-                    <div className="px-4 py-4 text-center">
-                      <div className="text-2xl font-black text-[#111318] dark:text-white">
+                    <div className="px-2 py-4 text-center">
+                      <div className="text-xl font-black text-emerald-600 dark:text-emerald-400">
                         {winRate !== null ? `${winRate.toFixed(0)}%` : "–"}
                       </div>
-                      <div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
-                        Win rate
+                      <div className="mt-1 text-[9px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+                        Win
+                      </div>
+                    </div>
+                    <div className="px-2 py-4 text-center">
+                      <div className="text-xl font-black text-zinc-500 dark:text-zinc-300">
+                        {drawRate !== null ? `${drawRate.toFixed(0)}%` : "–"}
+                      </div>
+                      <div className="mt-1 text-[9px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+                        Draw
+                      </div>
+                    </div>
+                    <div className="px-2 py-4 text-center">
+                      <div className="text-xl font-black text-red-500 dark:text-red-400">
+                        {lossRate !== null ? `${lossRate.toFixed(0)}%` : "–"}
+                      </div>
+                      <div className="mt-1 text-[9px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+                        Loss
                       </div>
                     </div>
                   </div>
