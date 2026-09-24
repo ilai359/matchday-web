@@ -100,10 +100,21 @@ export default function Settings() {
         )
       : null;
 
-  const combinedPoints = clubStandings.reduce(
-    (sum, entry) => sum + entry.row.points,
+  // Win rate across every followed club's matches this season, rather than
+  // a raw points total - a points sum just grows with how many clubs you
+  // follow or how many games they've played, so two people following
+  // different numbers of clubs can't compare it at a glance. A percentage
+  // reads the same regardless of how many clubs or games are behind it.
+  const totalPlayedGames = clubStandings.reduce(
+    (sum, entry) => sum + entry.row.playedGames,
     0
   );
+  const totalWins = clubStandings.reduce(
+    (sum, entry) => sum + entry.row.won,
+    0
+  );
+  const winRate =
+    totalPlayedGames > 0 ? (totalWins / totalPlayedGames) * 100 : null;
 
   const hasClubStats = !isStandingsLoading && clubStandings.length > 0;
 
@@ -240,10 +251,10 @@ export default function Settings() {
                     </div>
                     <div className="px-4 py-4 text-center">
                       <div className="text-2xl font-black text-[#111318] dark:text-white">
-                        {combinedPoints}
+                        {winRate !== null ? `${winRate.toFixed(0)}%` : "–"}
                       </div>
                       <div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
-                        Combined points
+                        Win rate
                       </div>
                     </div>
                   </div>
