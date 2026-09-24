@@ -430,6 +430,16 @@ export default function Settings() {
                 v1.0
               </span>
             </div>
+            <div className="h-px bg-black/[0.045] dark:bg-white/[0.06]" />
+            <Link
+              href="/privacy"
+              className="flex items-center justify-between px-5 py-4"
+            >
+              <span className="text-sm font-bold text-zinc-500 dark:text-zinc-400">
+                Privacy Policy
+              </span>
+              <span className="text-zinc-300 dark:text-zinc-600">›</span>
+            </Link>
           </div>
         </section>
       </div>
