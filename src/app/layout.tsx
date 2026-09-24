@@ -18,11 +18,6 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Clubside",
   description: "Never miss what matters.",
-  // Points browsers (mainly Android/desktop Chrome) at manifest.json, which
-  // is what actually makes "Install app" / "Add to Home Screen" offer a real
-  // standalone app instead of just a bookmark - the icons it points to
-  // (public/icons/) already existed, just weren't wired up to anything yet.
-  manifest: "/manifest.json",
   // Lets "Add to Home Screen" on iOS open the app full-screen (no Safari
   // address bar/tabs) instead of just bookmarking the page. The app icon
   // itself already comes from apple-icon.png via Next's file convention -
