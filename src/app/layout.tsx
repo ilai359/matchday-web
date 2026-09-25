@@ -23,7 +23,7 @@ export const metadata: Metadata = {
   // itself already comes from apple-icon.png via Next's file convention -
   // this only affects how it behaves once opened. "default" status bar
   // (rather than an overlay style) avoids clipping content under the
-  // notch, since the app doesn't have safe-area padding set up yet.
+  // notch.
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
@@ -35,6 +35,11 @@ export const viewport: Viewport = {
   // Matches the dark background used elsewhere in the app - colors the
   // browser/OS chrome (e.g. Android's toolbar) when installed.
   themeColor: "#0B0D12",
+  // Lets the page draw behind the iPhone home indicator instead of Safari
+  // reserving a plain white/black strip there - required for the bottom
+  // nav bar's own safe-area padding (see Navigation.tsx) to have any
+  // effect. Without this, env(safe-area-inset-bottom) is always 0.
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -59,7 +64,15 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         />
         <ThemeProvider>
           <ClubsProvider>
-            <div className="flex-1 pb-20 bg-[#F5F6F8] dark:bg-[#0B0D12]">
+            <div
+              className="flex-1 bg-[#F5F6F8] dark:bg-[#0B0D12]"
+              // Reserves enough space above the fixed nav bar (see
+              // Navigation.tsx) so page content never sits underneath it -
+              // an inline style rather than a Tailwind class since it
+              // needs the same env(safe-area-inset-bottom) calc the nav
+              // bar itself uses, kept in sync with its height.
+              style={{ paddingBottom: "calc(4.5rem + env(safe-area-inset-bottom, 0px))" }}
+            >
               {children}
             </div>
             <Navigation />
