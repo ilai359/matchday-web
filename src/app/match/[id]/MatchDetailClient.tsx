@@ -639,31 +639,34 @@ export default function MatchDetailClient({ id }: { id: string }) {
             </div>
             <div className="grid grid-cols-[1fr_80px_1fr] items-start gap-3">
               <div className="min-w-0 text-center">
-                <div className="mb-3 flex justify-center">
-                  <ClubBadge
-                    name={displayMatch.homeName}
-                    crest={displayMatch.homeCrest}
-                    color={displayMatch.homeColor}
-                    size={64}
-                  />
-                </div>
                 {isHomeFollowed && displayMatch.homeClubId ? (
-                  <Link
-                    href={`/clubs/${displayMatch.homeClubId}`}
-                    className="break-words text-[16px] font-black leading-tight text-[#111318] underline decoration-zinc-300 underline-offset-2 dark:text-white dark:decoration-zinc-600"
-                  >
-                    {displayMatch.homeName}
+                  <Link href={`/clubs/${displayMatch.homeClubId}`} className="block">
+                    <div className="mb-3 flex justify-center transition hover:-translate-y-0.5">
+                      <ClubBadge
+                        name={displayMatch.homeName}
+                        crest={displayMatch.homeCrest}
+                        color={displayMatch.homeColor}
+                        size={64}
+                      />
+                    </div>
+                    <div className="break-words text-[16px] font-black leading-tight text-[#111318] underline decoration-zinc-300 underline-offset-2 dark:text-white dark:decoration-zinc-600">
+                      {displayMatch.homeName}
+                    </div>
                   </Link>
                 ) : (
-                  <div
-                    className={`break-words leading-tight ${
-                      isHomeFollowed
-                        ? "text-[16px] font-black text-[#111318] dark:text-white"
-                        : "text-[14px] font-medium text-zinc-400 dark:text-zinc-500"
-                    }`}
-                  >
-                    {displayMatch.homeName}
-                  </div>
+                  <>
+                    <div className="mb-3 flex justify-center">
+                      <ClubBadge
+                        name={displayMatch.homeName}
+                        crest={displayMatch.homeCrest}
+                        color={displayMatch.homeColor}
+                        size={64}
+                      />
+                    </div>
+                    <div className="break-words text-[14px] font-medium leading-tight text-zinc-400 dark:text-zinc-500">
+                      {displayMatch.homeName}
+                    </div>
+                  </>
                 )}
                 <div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
                   Home
@@ -706,31 +709,34 @@ export default function MatchDetailClient({ id }: { id: string }) {
                 </div>
               </div>
               <div className="min-w-0 text-center">
-                <div className="mb-3 flex justify-center">
-                  <ClubBadge
-                    name={displayMatch.awayName}
-                    crest={displayMatch.awayCrest}
-                    color={displayMatch.awayColor}
-                    size={64}
-                  />
-                </div>
                 {isAwayFollowed && displayMatch.awayClubId ? (
-                  <Link
-                    href={`/clubs/${displayMatch.awayClubId}`}
-                    className="break-words text-[16px] font-black leading-tight text-[#111318] underline decoration-zinc-300 underline-offset-2 dark:text-white dark:decoration-zinc-600"
-                  >
-                    {displayMatch.awayName}
+                  <Link href={`/clubs/${displayMatch.awayClubId}`} className="block">
+                    <div className="mb-3 flex justify-center transition hover:-translate-y-0.5">
+                      <ClubBadge
+                        name={displayMatch.awayName}
+                        crest={displayMatch.awayCrest}
+                        color={displayMatch.awayColor}
+                        size={64}
+                      />
+                    </div>
+                    <div className="break-words text-[16px] font-black leading-tight text-[#111318] underline decoration-zinc-300 underline-offset-2 dark:text-white dark:decoration-zinc-600">
+                      {displayMatch.awayName}
+                    </div>
                   </Link>
                 ) : (
-                  <div
-                    className={`break-words leading-tight ${
-                      isAwayFollowed
-                        ? "text-[16px] font-black text-[#111318] dark:text-white"
-                        : "text-[14px] font-medium text-zinc-400 dark:text-zinc-500"
-                    }`}
-                  >
-                    {displayMatch.awayName}
-                  </div>
+                  <>
+                    <div className="mb-3 flex justify-center">
+                      <ClubBadge
+                        name={displayMatch.awayName}
+                        crest={displayMatch.awayCrest}
+                        color={displayMatch.awayColor}
+                        size={64}
+                      />
+                    </div>
+                    <div className="break-words text-[14px] font-medium leading-tight text-zinc-400 dark:text-zinc-500">
+                      {displayMatch.awayName}
+                    </div>
+                  </>
                 )}
                 <div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
                   Away
