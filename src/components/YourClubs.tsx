@@ -462,7 +462,7 @@ function ClubStatsCard({
       )}
 
       {!loading && (topScorers.length > 0 || topAssists.length > 0) && (
-        <div className="grid grid-cols-1 gap-3 p-3.5 pt-3.5 sm:grid-cols-2">
+        <div className="grid grid-cols-2 gap-2.5 p-3.5 pt-3.5">
           <StatList
             title="Top scorers (League)"
             icon="⚽"
