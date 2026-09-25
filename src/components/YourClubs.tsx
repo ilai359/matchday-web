@@ -9,6 +9,7 @@ import {
   fetchStandings,
   fetchScorers,
   applyClubTieBreak,
+  prefetchClubPage,
   LEAGUE_TO_CODE,
   StandingsRow,
   Scorer,
@@ -309,6 +310,8 @@ function ClubStatsCard({
     <div className="overflow-hidden rounded-[28px] bg-white shadow-[0_10px_30px_rgba(0,0,0,0.06)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_45px_rgba(0,0,0,0.1)] dark:bg-[#14171F] dark:shadow-none">
       <Link
         href={`/clubs/${club.id}`}
+        onMouseEnter={() => prefetchClubPage(club.id)}
+        onTouchStart={() => prefetchClubPage(club.id)}
         className="relative block overflow-hidden p-5 text-white transition hover:brightness-[1.08] active:brightness-95"
         style={{
           background: `linear-gradient(135deg, ${club.primaryColor} 0%, #0B0F1A 130%)`,

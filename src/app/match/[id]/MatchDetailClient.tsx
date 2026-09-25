@@ -18,6 +18,7 @@ import {
   fetchLiveMatchStatus,
   fetchTeamInfo,
   extractTeamId,
+  prefetchClubPage,
   LiveMatch,
   FinishedMatch,
   LiveMatchStatus,
@@ -640,7 +641,12 @@ export default function MatchDetailClient({ id }: { id: string }) {
             <div className="grid grid-cols-[1fr_80px_1fr] items-start gap-3">
               <div className="min-w-0 text-center">
                 {isHomeFollowed && displayMatch.homeClubId ? (
-                  <Link href={`/clubs/${displayMatch.homeClubId}`} className="block">
+                  <Link
+                    href={`/clubs/${displayMatch.homeClubId}`}
+                    onMouseEnter={() => prefetchClubPage(displayMatch.homeClubId!)}
+                    onTouchStart={() => prefetchClubPage(displayMatch.homeClubId!)}
+                    className="block"
+                  >
                     <div className="mb-3 flex justify-center transition hover:-translate-y-0.5">
                       <ClubBadge
                         name={displayMatch.homeName}
@@ -710,7 +716,12 @@ export default function MatchDetailClient({ id }: { id: string }) {
               </div>
               <div className="min-w-0 text-center">
                 {isAwayFollowed && displayMatch.awayClubId ? (
-                  <Link href={`/clubs/${displayMatch.awayClubId}`} className="block">
+                  <Link
+                    href={`/clubs/${displayMatch.awayClubId}`}
+                    onMouseEnter={() => prefetchClubPage(displayMatch.awayClubId!)}
+                    onTouchStart={() => prefetchClubPage(displayMatch.awayClubId!)}
+                    className="block"
+                  >
                     <div className="mb-3 flex justify-center transition hover:-translate-y-0.5">
                       <ClubBadge
                         name={displayMatch.awayName}

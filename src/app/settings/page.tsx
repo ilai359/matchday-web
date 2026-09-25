@@ -9,6 +9,7 @@ import ClubBadge from "../../components/ClubBadge";
 import {
   fetchStandings,
   applyClubTieBreak,
+  prefetchClubPage,
   LEAGUE_TO_CODE,
   StandingsRow,
 } from "../../lib/footballApi";
@@ -289,6 +290,8 @@ export default function Settings() {
                   {bestPlaced && (
                     <Link
                       href={`/clubs/${bestPlaced.club.id}`}
+                      onMouseEnter={() => prefetchClubPage(bestPlaced.club.id)}
+                      onTouchStart={() => prefetchClubPage(bestPlaced.club.id)}
                       className="flex items-center gap-3 border-t border-zinc-100 px-5 py-4 dark:border-white/[0.06]"
                     >
                       <ClubBadge

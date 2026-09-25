@@ -1,5 +1,6 @@
 import { clubs } from "../data/clubs";
 import { STADIUMS } from "../data/stadiums";
+import { cachedFetch } from "./clientCache";
 export type LiveMatch = {
   id: string;
   competition: string;
@@ -328,15 +329,20 @@ export async function fetchMatchById(matchId: string): Promise<LiveMatch | null>
 }
 
 export async function fetchLiveMatches(): Promise<LiveMatch[]> {
-  const response = await fetch("/api/matches");
-  if (!response.ok) {
-    throw new Error("Failed to fetch live matches");
-  }
-  const data = await response.json();
-  const rawMatches: RawApiMatch[] = data.matches ?? [];
-  return rawMatches
-    .map(mapRawMatch)
-    .filter((match) => VISIBLE_STATUSES.has(match.status));
+  // Short cache (30s) - long enough to make a quick back-and-forth
+  // between pages feel instant, short enough that live scores still
+  // update at essentially the same pace as before.
+  return cachedFetch("client:live-matches", 30 * 1000, async () => {
+    const response = await fetch("/api/matches");
+    if (!response.ok) {
+      throw new Error("Failed to fetch live matches");
+    }
+    const data = await response.json();
+    const rawMatches: RawApiMatch[] = data.matches ?? [];
+    return rawMatches
+      .map(mapRawMatch)
+      .filter((match) => VISIBLE_STATUSES.has(match.status));
+  });
 }
 
 // Every upcoming or in-progress match for one club, across every
@@ -344,15 +350,21 @@ export async function fetchLiveMatches(): Promise<LiveMatch[]> {
 // their main league) - so cup runs and continental competitions show up
 // too, whenever the plan covers them.
 export async function fetchTeamMatches(teamId: string): Promise<LiveMatch[]> {
-  const response = await fetch(`/api/team-matches?id=${teamId}`);
-  if (!response.ok) {
-    return [];
-  }
-  const data = await response.json();
-  const rawMatches: RawApiMatch[] = data.matches ?? [];
-  return rawMatches
-    .map(mapRawMatch)
-    .filter((match) => VISIBLE_STATUSES.has(match.status));
+  // Cached in the browser for a few minutes - a team's upcoming fixture
+  // list barely changes, so re-asking the network every single time
+  // someone revisits the same club in one browsing session just adds
+  // wait time for no real benefit.
+  return cachedFetch(`client:team-matches:${teamId}`, 3 * 60 * 1000, async () => {
+    const response = await fetch(`/api/team-matches?id=${teamId}`);
+    if (!response.ok) {
+      return [];
+    }
+    const data = await response.json();
+    const rawMatches: RawApiMatch[] = data.matches ?? [];
+    return rawMatches
+      .map(mapRawMatch)
+      .filter((match) => VISIBLE_STATUSES.has(match.status));
+  });
 }
 
 // --- League table & top scorers/assists ---
@@ -401,32 +413,38 @@ type RawStandingsResponse = {
 export async function fetchStandings(
   competitionCode: string
 ): Promise<StandingsRow[]> {
-  const response = await fetch(`/api/standings?competition=${competitionCode}`);
-  if (!response.ok) {
-    throw new Error("Failed to fetch standings");
-  }
-  const data: RawStandingsResponse = await response.json();
-  const totalTable =
-    data.standings?.find((s) => s.type === "TOTAL")?.table ?? [];
-  return totalTable.map((row) => {
-    const clubId = matchClubId(row.team.name);
-    // Prefer our own crest for a club we track (consistent branding,
-    // already used everywhere else in the app) and only fall back to
-    // whatever football-data.org sent for a club we don't track - same
-    // convention as crestFor() on the match detail page.
-    const ownCrest = clubId ? clubs.find((c) => c.id === clubId)?.crest : undefined;
-    return {
-      position: row.position,
-      teamName: row.team.name,
-      clubId,
-      crest: ownCrest ?? row.team.crest ?? undefined,
-      playedGames: row.playedGames,
-      won: row.won,
-      draw: row.draw,
-      lost: row.lost,
-      points: row.points,
-      goalDifference: row.goalDifference,
-    };
+  // Cached in the browser for a few minutes - a league table barely
+  // changes minute to minute, so revisiting the same league within one
+  // browsing session (e.g. checking a few different clubs in the same
+  // league) shouldn't have to wait on the network again each time.
+  return cachedFetch(`client:standings:${competitionCode}`, 3 * 60 * 1000, async () => {
+    const response = await fetch(`/api/standings?competition=${competitionCode}`);
+    if (!response.ok) {
+      throw new Error("Failed to fetch standings");
+    }
+    const data: RawStandingsResponse = await response.json();
+    const totalTable =
+      data.standings?.find((s) => s.type === "TOTAL")?.table ?? [];
+    return totalTable.map((row) => {
+      const clubId = matchClubId(row.team.name);
+      // Prefer our own crest for a club we track (consistent branding,
+      // already used everywhere else in the app) and only fall back to
+      // whatever football-data.org sent for a club we don't track - same
+      // convention as crestFor() on the match detail page.
+      const ownCrest = clubId ? clubs.find((c) => c.id === clubId)?.crest : undefined;
+      return {
+        position: row.position,
+        teamName: row.team.name,
+        clubId,
+        crest: ownCrest ?? row.team.crest ?? undefined,
+        playedGames: row.playedGames,
+        won: row.won,
+        draw: row.draw,
+        lost: row.lost,
+        points: row.points,
+        goalDifference: row.goalDifference,
+      };
+    });
   });
 }
 
@@ -475,19 +493,24 @@ type RawScorersResponse = {
 };
 
 export async function fetchScorers(competitionCode: string): Promise<Scorer[]> {
-  const response = await fetch(`/api/scorers?competition=${competitionCode}`);
-  if (!response.ok) {
-    throw new Error("Failed to fetch scorers");
-  }
-  const data: RawScorersResponse = await response.json();
-  const rawScorers = data.scorers ?? [];
-  return rawScorers.map((s) => ({
-    playerName: s.player.name,
-    teamName: s.team.name,
-    clubId: matchClubId(s.team.name),
-    goals: s.goals,
-    assists: s.assists ?? null,
-  }));
+  // Same idea as fetchStandings above - top scorers/assists for a league
+  // don't change from one click to the next, so this is cached in the
+  // browser for a few minutes too.
+  return cachedFetch(`client:scorers:${competitionCode}`, 3 * 60 * 1000, async () => {
+    const response = await fetch(`/api/scorers?competition=${competitionCode}`);
+    if (!response.ok) {
+      throw new Error("Failed to fetch scorers");
+    }
+    const data: RawScorersResponse = await response.json();
+    const rawScorers = data.scorers ?? [];
+    return rawScorers.map((s) => ({
+      playerName: s.player.name,
+      teamName: s.team.name,
+      clubId: matchClubId(s.team.name),
+      goals: s.goals,
+      assists: s.assists ?? null,
+    }));
+  });
 }
 
 // --- Finished matches (head-to-head history & recent form) ---
@@ -522,29 +545,39 @@ export async function fetchFinishedMatches(
   season?: string
 ): Promise<FinishedMatch[]> {
   const seasonParam = season ? `&season=${season}` : "";
-  const data = await fetchJsonWithRetry<{ matches?: RawFinishedMatch[] }>(
-    `/api/finished-matches?competition=${competitionCode}${seasonParam}`
+  // Already cached hard on the server (see /api/finished-matches), but
+  // caching it in the browser too skips even that network round trip
+  // when revisiting a club during the same session.
+  return cachedFetch(
+    `client:finished-matches:${competitionCode}:${season ?? "current"}`,
+    3 * 60 * 1000,
+    async () => {
+      const data = await fetchJsonWithRetry<{ matches?: RawFinishedMatch[] }>(
+        `/api/finished-matches?competition=${competitionCode}${seasonParam}`
+      );
+      const rawMatches: RawFinishedMatch[] = data.matches ?? [];
+      return rawMatches.map((match) => ({
+        id: String(match.id),
+        competition: match.competition.name,
+        // Same fallback as mapRawMatch above: if this team isn't one of our
+        // 132 tracked clubs, use their name itself as a stand-in ID rather
+        // than null. Without this, a tracked club's own "recent form" pills
+        // would wrongly come up empty for every match they played against a
+        // club we don't track (e.g. a Champions League game vs.
+        // Galatasaray), because this list of past matches couldn't be
+        // matched back to the club at all.
+        homeClubId: matchClubId(match.homeTeam.name) ?? match.homeTeam.name,
+        awayClubId: matchClubId(match.awayTeam.name) ?? match.awayTeam.name,
+        homeTeamName: match.homeTeam.name,
+        awayTeamName: match.awayTeam.name,
+        homeCrest: match.homeTeam.crest ?? null,
+        awayCrest: match.awayTeam.crest ?? null,
+        homeScore: match.score?.fullTime?.home ?? null,
+        awayScore: match.score?.fullTime?.away ?? null,
+        kickoff: match.utcDate,
+      }));
+    }
   );
-  const rawMatches: RawFinishedMatch[] = data.matches ?? [];
-  return rawMatches.map((match) => ({
-    id: String(match.id),
-    competition: match.competition.name,
-    // Same fallback as mapRawMatch above: if this team isn't one of our
-    // 132 tracked clubs, use their name itself as a stand-in ID rather than
-    // null. Without this, a tracked club's own "recent form" pills would
-    // wrongly come up empty for every match they played against a club we
-    // don't track (e.g. a Champions League game vs. Galatasaray), because
-    // this list of past matches couldn't be matched back to the club at all.
-    homeClubId: matchClubId(match.homeTeam.name) ?? match.homeTeam.name,
-    awayClubId: matchClubId(match.awayTeam.name) ?? match.awayTeam.name,
-    homeTeamName: match.homeTeam.name,
-    awayTeamName: match.awayTeam.name,
-    homeCrest: match.homeTeam.crest ?? null,
-    awayCrest: match.awayTeam.crest ?? null,
-    homeScore: match.score?.fullTime?.home ?? null,
-    awayScore: match.score?.fullTime?.away ?? null,
-    kickoff: match.utcDate,
-  }));
 }
 
 // --- Live match polling (for the match detail page) ---
@@ -580,3 +613,31 @@ export async function fetchLiveMatchStatus(
   };
 }
 
+// --- Prefetching a club's page ahead of a click ---
+
+// Warms the client-side cache for everything a club's own page needs
+// (league table, top scorers/assists, recent results, live matches) a
+// moment before someone actually navigates there - called on hover
+// (desktop) or touch-start (mobile) from a "View club" link. If it
+// finishes before the click lands, the club page below can render with
+// no wait at all; if it doesn't, the page just fetches normally like
+// before, so this is a pure head start, never something a page depends
+// on. Errors are silently ignored for the same reason.
+export function prefetchClubPage(clubId: string): void {
+  const club = clubs.find((c) => c.id === clubId);
+  if (!club) return;
+
+  const code = LEAGUE_TO_CODE[club.league];
+  if (code) {
+    fetchStandings(code).catch(() => {});
+    fetchScorers(code).catch(() => {});
+    // Same July-June season-start rule used on the club and match detail
+    // pages themselves.
+    const now = new Date();
+    const currentSeasonYear = String(
+      now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1
+    );
+    fetchFinishedMatches(code, currentSeasonYear).catch(() => {});
+  }
+  fetchLiveMatches().catch(() => {});
+}
