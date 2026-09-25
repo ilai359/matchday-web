@@ -232,7 +232,7 @@ export default function Clubs() {
 
   return (
     <main
-      className="min-h-screen overflow-x-hidden bg-[#F5F6F8] pb-24 dark:bg-[#0B0D12]"
+      className="min-h-screen overflow-x-hidden bg-[#F5F6F8] pb-4 dark:bg-[#0B0D12]"
       style={{ overflowAnchor: "none" }}
     >
       {/* HEADER */}

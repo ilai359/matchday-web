@@ -269,7 +269,7 @@ export default function ClubDetailClient({ id }: { id: string }) {
       news.length > 0);
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-[#F5F6F8] pb-24 dark:bg-[#0B0D12]">
+    <main className="min-h-screen overflow-x-hidden bg-[#F5F6F8] pb-4 dark:bg-[#0B0D12]">
       <header
         className="relative overflow-hidden text-white"
         style={{

@@ -5,7 +5,7 @@ import Link from "next/link";
 // ever needs updating after a real change to what data the app uses.
 export default function Privacy() {
   return (
-    <main className="min-h-screen overflow-x-hidden bg-[#F5F6F8] pb-24 dark:bg-[#0B0D12]">
+    <main className="min-h-screen overflow-x-hidden bg-[#F5F6F8] pb-4 dark:bg-[#0B0D12]">
       <header className="relative overflow-hidden bg-[#080B13] text-white">
         <div className="pointer-events-none absolute inset-0">
           <div className="absolute -left-24 -top-28 h-72 w-72 rounded-full bg-blue-600/25 blur-[90px]" />

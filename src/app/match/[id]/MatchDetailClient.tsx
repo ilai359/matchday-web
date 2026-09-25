@@ -457,17 +457,17 @@ export default function MatchDetailClient({ id }: { id: string }) {
 
   if (!mockMatch && liveLoading) {
     return (
-      <main className="min-h-screen overflow-x-hidden bg-[#F5F6F8] pb-24 dark:bg-[#0B0D12]">
+      <main className="min-h-screen overflow-x-hidden bg-[#F5F6F8] pb-4 dark:bg-[#0B0D12]">
         <header className="relative overflow-hidden bg-[#080B13] text-white">
-          <div className="relative z-10 mx-auto w-full max-w-2xl animate-pulse px-5 pb-8 pt-8" aria-hidden="true">
-            <div className="mb-6 h-4 w-36 rounded-full bg-white/10" />
+          <div className="relative z-10 mx-auto w-full max-w-2xl animate-pulse px-5 pb-6 pt-6" aria-hidden="true">
+            <div className="mb-4 h-4 w-36 rounded-full bg-white/10" />
             <div className="mb-2 h-2.5 w-20 rounded-full bg-white/10" />
-            <div className="h-7 w-3/4 rounded-full bg-white/10" />
+            <div className="h-6 w-3/4 rounded-full bg-white/10" />
           </div>
         </header>
-        <div className="mx-auto w-full max-w-2xl animate-pulse px-5 pt-6" aria-hidden="true">
-          <div className="rounded-[30px] border border-black/[0.045] bg-white p-6 shadow-[0_6px_24px_rgba(0,0,0,0.045)] dark:border-white/[0.06] dark:bg-[#14171F] dark:shadow-none">
-            <div className="mb-6 flex items-center justify-center gap-8">
+        <div className="mx-auto w-full max-w-2xl animate-pulse px-5 pt-5" aria-hidden="true">
+          <div className="rounded-[30px] border border-black/[0.045] bg-white p-5 shadow-[0_6px_24px_rgba(0,0,0,0.045)] dark:border-white/[0.06] dark:bg-[#14171F] dark:shadow-none">
+            <div className="mb-5 flex items-center justify-center gap-8">
               <div className="h-16 w-16 rounded-2xl bg-black/[0.06] dark:bg-white/[0.08]" />
               <div className="h-8 w-16 rounded-full bg-black/[0.06] dark:bg-white/[0.08]" />
               <div className="h-16 w-16 rounded-2xl bg-black/[0.06] dark:bg-white/[0.08]" />
@@ -592,30 +592,30 @@ export default function MatchDetailClient({ id }: { id: string }) {
   const effectiveVenue = displayMatch.venue || fallbackVenue;
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-[#F5F6F8] pb-24 dark:bg-[#0B0D12]">
+    <main className="min-h-screen overflow-x-hidden bg-[#F5F6F8] pb-4 dark:bg-[#0B0D12]">
       <header className="relative overflow-hidden bg-[#080B13] text-white">
         <div className="pointer-events-none absolute inset-0">
           <div className="absolute -left-24 -top-28 h-72 w-72 rounded-full bg-blue-600/25 blur-[90px]" />
           <div className="absolute -right-24 -top-10 h-72 w-72 rounded-full bg-violet-600/20 blur-[90px]" />
         </div>
-        <div className="relative z-10 mx-auto w-full max-w-2xl px-5 pb-8 pt-8">
+        <div className="relative z-10 mx-auto w-full max-w-2xl px-5 pb-6 pt-6">
           <button
             type="button"
             onClick={goBackToMatches}
-            className="mb-6 inline-flex items-center gap-1.5 text-xs font-bold text-white/60 transition hover:text-white/90"
+            className="mb-4 inline-flex items-center gap-1.5 text-xs font-bold text-white/60 transition hover:text-white/90"
           >
             ← Back to Matches
           </button>
           <div className="mb-1.5 text-[10px] font-black uppercase tracking-[0.28em] text-blue-300/70">
             {displayMatch.competition}
           </div>
-          <h1 className="text-[28px] font-black leading-tight tracking-[-0.03em]">
+          <h1 className="text-[24px] font-black leading-tight tracking-[-0.03em]">
             {displayMatch.homeName} vs {displayMatch.awayName}
           </h1>
         </div>
       </header>
 
-      <div className="mx-auto w-full max-w-2xl px-5 pt-6">
+      <div className="mx-auto w-full max-w-2xl px-5 pt-5">
         <article className="relative overflow-hidden rounded-[30px] border border-black/[0.045] bg-white shadow-[0_6px_24px_rgba(0,0,0,0.045)] dark:border-white/[0.06] dark:bg-[#14171F] dark:shadow-none">
           <div
             className="h-1.5 w-full"
@@ -623,8 +623,8 @@ export default function MatchDetailClient({ id }: { id: string }) {
               background: `linear-gradient(90deg, ${displayMatch.homeColor}, ${displayMatch.awayColor})`,
             }}
           />
-          <div className="p-6">
-            <div className="mb-6 flex items-center justify-center">
+          <div className="p-5">
+            <div className="mb-5 flex items-center justify-center">
               <div
                 className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-black uppercase tracking-wider ${
                   isLive
@@ -647,12 +647,12 @@ export default function MatchDetailClient({ id }: { id: string }) {
                     onTouchStart={() => prefetchClubPage(displayMatch.homeClubId!)}
                     className="block"
                   >
-                    <div className="mb-3 flex justify-center transition hover:-translate-y-0.5">
+                    <div className="mb-2 flex justify-center transition hover:-translate-y-0.5">
                       <ClubBadge
                         name={displayMatch.homeName}
                         crest={displayMatch.homeCrest}
                         color={displayMatch.homeColor}
-                        size={64}
+                        size={56}
                       />
                     </div>
                     <div className="break-words text-[16px] font-black leading-tight text-[#111318] underline decoration-zinc-300 underline-offset-2 dark:text-white dark:decoration-zinc-600">
@@ -661,12 +661,12 @@ export default function MatchDetailClient({ id }: { id: string }) {
                   </Link>
                 ) : (
                   <>
-                    <div className="mb-3 flex justify-center">
+                    <div className="mb-2 flex justify-center">
                       <ClubBadge
                         name={displayMatch.homeName}
                         crest={displayMatch.homeCrest}
                         color={displayMatch.homeColor}
-                        size={64}
+                        size={56}
                       />
                     </div>
                     <div className="break-words text-[14px] font-medium leading-tight text-zinc-400 dark:text-zinc-500">
@@ -722,12 +722,12 @@ export default function MatchDetailClient({ id }: { id: string }) {
                     onTouchStart={() => prefetchClubPage(displayMatch.awayClubId!)}
                     className="block"
                   >
-                    <div className="mb-3 flex justify-center transition hover:-translate-y-0.5">
+                    <div className="mb-2 flex justify-center transition hover:-translate-y-0.5">
                       <ClubBadge
                         name={displayMatch.awayName}
                         crest={displayMatch.awayCrest}
                         color={displayMatch.awayColor}
-                        size={64}
+                        size={56}
                       />
                     </div>
                     <div className="break-words text-[16px] font-black leading-tight text-[#111318] underline decoration-zinc-300 underline-offset-2 dark:text-white dark:decoration-zinc-600">
@@ -736,12 +736,12 @@ export default function MatchDetailClient({ id }: { id: string }) {
                   </Link>
                 ) : (
                   <>
-                    <div className="mb-3 flex justify-center">
+                    <div className="mb-2 flex justify-center">
                       <ClubBadge
                         name={displayMatch.awayName}
                         crest={displayMatch.awayCrest}
                         color={displayMatch.awayColor}
-                        size={64}
+                        size={56}
                       />
                     </div>
                     <div className="break-words text-[14px] font-medium leading-tight text-zinc-400 dark:text-zinc-500">
@@ -755,8 +755,8 @@ export default function MatchDetailClient({ id }: { id: string }) {
               </div>
             </div>
 
-            <div className="mt-8 border-t border-zinc-100 pt-6 dark:border-white/10">
-              <div className="mb-4 text-xs font-black uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
+            <div className="mt-6 border-t border-zinc-100 pt-5 dark:border-white/10">
+              <div className="mb-3 text-xs font-black uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
                 Match details
               </div>
 
@@ -769,7 +769,7 @@ export default function MatchDetailClient({ id }: { id: string }) {
                   regardless of light/dark mode on purpose - the point was
                   to look and feel distinct, not like a themed variant of
                   the same card pattern used everywhere else. */}
-              <div className="relative overflow-hidden rounded-[28px] bg-[#0B0E16] p-6 text-white shadow-[0_16px_40px_rgba(0,0,0,0.25)]">
+              <div className="relative overflow-hidden rounded-[28px] bg-[#0B0E16] p-5 text-white shadow-[0_16px_40px_rgba(0,0,0,0.25)]">
                 {/* These used to be small circles with a `blur-3xl` filter,
                     which is what was making the top-left and bottom-right
                     corners of this card look cut off instead of rounded on
@@ -800,41 +800,41 @@ export default function MatchDetailClient({ id }: { id: string }) {
                 />
 
                 <div className="relative">
-                  <div className="mb-5 inline-flex items-center rounded-full bg-white/10 px-3 py-1 text-[10px] font-black uppercase tracking-wide text-white/80">
+                  <div className="mb-4 inline-flex items-center rounded-full bg-white/10 px-3 py-1 text-[10px] font-black uppercase tracking-wide text-white/80">
                     {displayMatch.competition}
                   </div>
 
                   <div
                     className={
                       effectiveVenue || displayMatch.city
-                        ? "grid grid-cols-1 gap-5 sm:grid-cols-3"
-                        : "grid grid-cols-1 gap-5 sm:grid-cols-2"
+                        ? "grid grid-cols-1 gap-4 sm:grid-cols-3"
+                        : "grid grid-cols-1 gap-4 sm:grid-cols-2"
                     }
                   >
                     <div>
                       <div className="text-[10px] font-black uppercase tracking-widest text-white/45">
                         📅 Date
                       </div>
-                      <div className="mt-1.5 text-sm font-black leading-snug">
+                      <div className="mt-1 text-sm font-black leading-snug">
                         {formatFullDate(displayMatch.kickoff)}
                       </div>
                     </div>
 
-                    <div className="border-t border-white/10 pt-5 sm:border-l sm:border-t-0 sm:pl-5 sm:pt-0">
+                    <div className="border-t border-white/10 pt-4 sm:border-l sm:border-t-0 sm:pl-4 sm:pt-0">
                       <div className="text-[10px] font-black uppercase tracking-widest text-white/45">
                         🕐 Kickoff
                       </div>
-                      <div className="mt-1.5 text-sm font-black leading-snug tabular-nums">
+                      <div className="mt-1 text-sm font-black leading-snug tabular-nums">
                         {formatTime(displayMatch.kickoff)}
                       </div>
                     </div>
 
                     {(effectiveVenue || displayMatch.city) && (
-                      <div className="border-t border-white/10 pt-5 sm:border-l sm:border-t-0 sm:pl-5 sm:pt-0">
+                      <div className="border-t border-white/10 pt-4 sm:border-l sm:border-t-0 sm:pl-4 sm:pt-0">
                         <div className="text-[10px] font-black uppercase tracking-widest text-white/45">
                           📍 Venue
                         </div>
-                        <div className="mt-1.5 text-sm font-black leading-snug">
+                        <div className="mt-1 text-sm font-black leading-snug">
                           {[effectiveVenue, displayMatch.city].filter(Boolean).join(", ")}
                         </div>
                       </div>
@@ -846,7 +846,7 @@ export default function MatchDetailClient({ id }: { id: string }) {
 
             {leagueCode && (
               <div
-                className="mt-8 overflow-hidden rounded-[26px] p-5"
+                className="mt-6 overflow-hidden rounded-[26px] p-4"
                 style={{
                   background: `linear-gradient(135deg, ${withAlpha(
                     displayMatch.homeColor,
@@ -854,7 +854,7 @@ export default function MatchDetailClient({ id }: { id: string }) {
                   )}, ${withAlpha(displayMatch.awayColor, "40")})`,
                 }}
               >
-                <div className="mb-4 flex items-center justify-center gap-2">
+                <div className="mb-3 flex items-center justify-center gap-2">
                   <span
                     className="h-2.5 w-2.5 rounded-full"
                     style={{ backgroundColor: displayMatch.homeColor }}
@@ -906,7 +906,7 @@ export default function MatchDetailClient({ id }: { id: string }) {
                   </div>
                 )}
 
-                <div className="mt-6 grid grid-cols-2 gap-3">
+                <div className="mt-5 grid grid-cols-2 gap-3">
                   <div
                     className="rounded-2xl p-3 shadow-sm dark:shadow-none"
                     style={{ backgroundColor: withAlpha(displayMatch.homeColor, "1f") }}
@@ -942,7 +942,7 @@ export default function MatchDetailClient({ id }: { id: string }) {
             )}
 
             {!isLive && !isMatchFinished && (
-              <div className="mt-8 text-center text-[11px] font-medium text-zinc-300 dark:text-zinc-600">
+              <div className="mt-6 text-center text-[11px] font-medium text-zinc-300 dark:text-zinc-600">
                 Live score updates automatically once kickoff arrives.
               </div>
             )}

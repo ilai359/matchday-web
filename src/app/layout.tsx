@@ -71,7 +71,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               // an inline style rather than a Tailwind class since it
               // needs the same env(safe-area-inset-bottom) calc the nav
               // bar itself uses, kept in sync with its height.
-              style={{ paddingBottom: "calc(4.5rem + env(safe-area-inset-bottom, 0px))" }}
+              style={{ paddingBottom: "calc(4rem + env(safe-area-inset-bottom, 0px))" }}
             >
               {children}
             </div>

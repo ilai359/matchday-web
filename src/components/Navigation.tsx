@@ -39,10 +39,10 @@ export default function Navigation() {
         className="fixed left-5 z-50 flex h-12 w-12 items-center justify-center rounded-full text-white shadow-[0_8px_20px_rgba(0,0,0,0.25)] transition active:scale-95"
         style={{
           backgroundColor: isProfileActive ? "#2563EB" : "#111318",
-          // Stays clear of the taller nav bar below (see its own comment)
-          // on every device, including the ones with an iPhone-style home
+          // Stays clear of the nav bar below (see its own comment) on
+          // every device, including the ones with an iPhone-style home
           // indicator that the nav bar's padding now leaves room for.
-          bottom: "calc(5.5rem + env(safe-area-inset-bottom, 0px))",
+          bottom: "calc(4.25rem + env(safe-area-inset-bottom, 0px))",
           transform: "translateZ(0)",
           WebkitTransform: "translateZ(0)",
         }}
@@ -51,7 +51,7 @@ export default function Navigation() {
       </Link>
 
       <nav
-        className="fixed bottom-0 left-0 right-0 z-40 flex justify-around border-t border-zinc-200 bg-white pt-2 dark:border-white/10 dark:bg-[#0B0D12]"
+        className="fixed bottom-0 left-0 right-0 z-40 flex justify-around border-t border-zinc-200 bg-white pt-1.5 dark:border-white/10 dark:bg-[#0B0D12]"
         style={{
           transform: "translateZ(0)",
           WebkitTransform: "translateZ(0)",
@@ -76,7 +76,7 @@ export default function Navigation() {
               // Extra vertical padding here (not just on <nav>) so each
               // tab's own tap target is taller, not only the bar around
               // it - the text itself was the entire clickable area before.
-              className={`px-1 py-2.5 text-sm font-medium ${
+              className={`px-1 py-1.5 text-sm font-medium ${
                 isActive
                   ? "text-black dark:text-white"
                   : "text-[#6B6B6B] dark:text-zinc-500"
