@@ -21,7 +21,13 @@ export async function GET(request: Request) {
       `https://api.football-data.org/v4/competitions/${competition}/scorers?limit=100`,
       {
         headers: { "X-Auth-Token": apiKey },
-        next: { revalidate: 3600 },
+        // Goal/assist tallies only change once a match actually finishes,
+        // and matches aren't continuous - refreshing hourly around the
+        // clock was checking far more often than the data could ever
+        // actually change. 6 hours still catches updates several times a
+        // day without polling for no reason overnight or between
+        // matchdays.
+        next: { revalidate: 21600 },
       }
     );
     if (!response.ok) {
