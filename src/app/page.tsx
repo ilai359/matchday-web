@@ -124,10 +124,21 @@ export default function Home() {
 
   // Either we don't know yet whether this person has followed clubs
   // (still reading the saved list), or they haven't and are about to be
-  // sent to /onboarding (effect above) - either way, show nothing rather
-  // than flash a UI that's about to be replaced a moment later.
+  // sent to /onboarding (effect above) - either way, this is only ever on
+  // screen for an instant (reading the saved list is near-instant; this
+  // is really just covering the moment the app's JS is still starting
+  // up). A plain empty screen made that instant look like the app had
+  // stalled, so this shows the same wordmark as the real header instead -
+  // recognizably "Clubside is opening", not a blank flash - without
+  // showing any actual data that's about to be replaced.
   if (!loaded || selectedIds.length === 0) {
-    return <main className="min-h-screen bg-[#070A12]" />;
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#070A12]">
+        <h1 className="animate-pulse text-[32px] font-black leading-none tracking-[-0.05em] text-white">
+          Club<span className="text-blue-400">side</span>
+        </h1>
+      </main>
+    );
   }
 
   const homeClub = nextMatch ? getClub(nextMatch.homeClubId) : undefined;
