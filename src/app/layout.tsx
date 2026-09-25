@@ -4,6 +4,7 @@ import "./globals.css";
 import { ClubsProvider } from "../context/ClubsContext";
 import { ThemeProvider } from "../context/ThemeContext";
 import Navigation from "../components/Navigation";
+import ServiceWorkerRegister from "../components/ServiceWorkerRegister";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -62,6 +63,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             `,
           }}
         />
+        <ServiceWorkerRegister />
         <ThemeProvider>
           <ClubsProvider>
             <div
