@@ -285,6 +285,7 @@ const WOMENS_FOOTBALL_MARKERS = [
   "wsl",
   "nwsl",
   "uwcl",
+  "wcl",
   "wfc",
   "w-league",
 ];
