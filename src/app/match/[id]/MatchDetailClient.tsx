@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { matches } from "../../../data/matches";
 import { useClubs } from "../../../context/ClubsContext";
@@ -646,15 +647,24 @@ export default function MatchDetailClient({ id }: { id: string }) {
                     size={64}
                   />
                 </div>
-                <div
-                  className={`break-words leading-tight ${
-                    isHomeFollowed
-                      ? "text-[16px] font-black text-[#111318] dark:text-white"
-                      : "text-[14px] font-medium text-zinc-400 dark:text-zinc-500"
-                  }`}
-                >
-                  {displayMatch.homeName}
-                </div>
+                {isHomeFollowed && displayMatch.homeClubId ? (
+                  <Link
+                    href={`/clubs/${displayMatch.homeClubId}`}
+                    className="break-words text-[16px] font-black leading-tight text-[#111318] underline decoration-zinc-300 underline-offset-2 dark:text-white dark:decoration-zinc-600"
+                  >
+                    {displayMatch.homeName}
+                  </Link>
+                ) : (
+                  <div
+                    className={`break-words leading-tight ${
+                      isHomeFollowed
+                        ? "text-[16px] font-black text-[#111318] dark:text-white"
+                        : "text-[14px] font-medium text-zinc-400 dark:text-zinc-500"
+                    }`}
+                  >
+                    {displayMatch.homeName}
+                  </div>
+                )}
                 <div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
                   Home
                 </div>
@@ -704,15 +714,24 @@ export default function MatchDetailClient({ id }: { id: string }) {
                     size={64}
                   />
                 </div>
-                <div
-                  className={`break-words leading-tight ${
-                    isAwayFollowed
-                      ? "text-[16px] font-black text-[#111318] dark:text-white"
-                      : "text-[14px] font-medium text-zinc-400 dark:text-zinc-500"
-                  }`}
-                >
-                  {displayMatch.awayName}
-                </div>
+                {isAwayFollowed && displayMatch.awayClubId ? (
+                  <Link
+                    href={`/clubs/${displayMatch.awayClubId}`}
+                    className="break-words text-[16px] font-black leading-tight text-[#111318] underline decoration-zinc-300 underline-offset-2 dark:text-white dark:decoration-zinc-600"
+                  >
+                    {displayMatch.awayName}
+                  </Link>
+                ) : (
+                  <div
+                    className={`break-words leading-tight ${
+                      isAwayFollowed
+                        ? "text-[16px] font-black text-[#111318] dark:text-white"
+                        : "text-[14px] font-medium text-zinc-400 dark:text-zinc-500"
+                    }`}
+                  >
+                    {displayMatch.awayName}
+                  </div>
+                )}
                 <div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
                   Away
                 </div>

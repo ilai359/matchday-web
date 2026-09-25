@@ -526,6 +526,15 @@ export default function ClubDetailClient({ id }: { id: string }) {
               <div className="flex flex-col gap-0.5">
                 {tableRows.map((row) => {
                   const isClub = row.clubId === club.id;
+                  // Besides the club this page is about (filled highlight
+                  // above), also mark any *other* team in this table that
+                  // the person follows - just a light outline in that
+                  // team's own color, so it doesn't compete with the main
+                  // highlight but is still easy to spot at a glance.
+                  const followedClub =
+                    !isClub && row.clubId && selectedIds.includes(row.clubId)
+                      ? getClub(row.clubId)
+                      : null;
                   return (
                     <div
                       key={row.teamName}
@@ -536,13 +545,22 @@ export default function ClubDetailClient({ id }: { id: string }) {
                               backgroundColor: `${club.primaryColor}12`,
                               border: `1px solid ${club.primaryColor}33`,
                             }
+                          : followedClub
+                          ? {
+                              backgroundColor: `${followedClub.primaryColor}0A`,
+                              border: `1px solid ${followedClub.primaryColor}30`,
+                            }
                           : undefined
                       }
                     >
                       <div
                         className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-black text-white"
                         style={{
-                          backgroundColor: isClub ? club.primaryColor : "#D4D4D8",
+                          backgroundColor: isClub
+                            ? club.primaryColor
+                            : followedClub
+                            ? followedClub.primaryColor
+                            : "#D4D4D8",
                         }}
                       >
                         {row.position}
@@ -566,6 +584,8 @@ export default function ClubDetailClient({ id }: { id: string }) {
                         className={`min-w-0 flex-1 truncate text-[12px] ${
                           isClub
                             ? "font-black text-[#111318] dark:text-white"
+                            : followedClub
+                            ? "font-bold text-[#111318] dark:text-white"
                             : "font-semibold text-zinc-600 dark:text-zinc-300"
                         }`}
                       >
