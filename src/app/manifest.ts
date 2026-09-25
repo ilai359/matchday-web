@@ -7,11 +7,16 @@ import type { MetadataRoute } from "next";
 // browser tab with the address bar showing.
 export default function manifest(): MetadataRoute.Manifest {
   return {
+    id: "/",
     name: "Clubside",
     short_name: "Clubside",
     description: "Never miss what matters.",
     start_url: "/",
     display: "standalone",
+    // The app is designed for portrait phone use only - no landscape
+    // layouts exist for any page, so tell the OS not to offer landscape.
+    orientation: "portrait-primary",
+    categories: ["sports", "news"],
     // Matches the dark background used everywhere else in the app
     // (headers, nav bar in dark mode, the new Match Details panel).
     background_color: "#0B0D12",
