@@ -37,15 +37,28 @@ export default function Updates() {
   const [liveLoading, setLiveLoading] = useState(true);
 
   const followedClubNames = selectedIds.map((id) => getClubName(id));
+  // Also search each followed club's own league (e.g. "Premier League"),
+  // deduped - widens the pool of articles /api/news pulls in beyond just
+  // club-name searches, so there's more genuinely-relevant news to show
+  // once it's filtered back down to the clubs actually followed. See the
+  // comment on fetchLiveUpdates for why this can't loosen relevance.
+  const followedLeagues = Array.from(
+    new Set(
+      selectedIds
+        .map((id) => getClub(id)?.league)
+        .filter((league): league is string => Boolean(league))
+    )
+  );
   const clubsKey = followedClubNames.join(",");
+  const leaguesKey = followedLeagues.join(",");
 
   useEffect(() => {
-    fetchLiveUpdates(followedClubNames)
+    fetchLiveUpdates(followedClubNames, followedLeagues)
       .then(setLiveUpdates)
       .catch(() => {})
       .finally(() => setLiveLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clubsKey]);
+  }, [clubsKey, leaguesKey]);
   const [activeCategory, setActiveCategory] = useState(
     "All" as UpdateCategory | "All"
   );

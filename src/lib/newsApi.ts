@@ -548,11 +548,22 @@ function buildFromRelevance(
 }
 
 export async function fetchLiveUpdates(
-  clubNames: string[]
+  clubNames: string[],
+  // Extra search terms (e.g. the leagues those clubs play in) fetched
+  // alongside the club names, purely to widen the raw pool of articles
+  // /api/news pulls in - each search term is its own request there,
+  // capped at 10 results, so more terms means more candidate articles
+  // to filter down from. Relevance below is still judged only against
+  // the real `clubNames`, so a league-wide article still has to
+  // actually be about a followed club to make it into the results -
+  // this only ever adds more candidates, never loosens what counts as
+  // relevant.
+  extraQueries: string[] = []
 ): Promise<NewsUpdate[]> {
+  const searchTerms = Array.from(new Set([...clubNames, ...extraQueries]));
   const query =
-    clubNames.length > 0
-      ? `?clubs=${encodeURIComponent(clubNames.join(","))}`
+    searchTerms.length > 0
+      ? `?clubs=${encodeURIComponent(searchTerms.join(","))}`
       : "";
   const response = await fetch(`/api/news${query}`);
   if (!response.ok) {

@@ -120,6 +120,18 @@ export default function ClubDetailClient({ id }: { id: string }) {
   const followedClubNames = selectedIds
     .map((cid) => getClub(cid)?.name)
     .filter((name): name is string => Boolean(name));
+  // Extra search terms for fetchLiveUpdates below - every followed club's
+  // league, plus this page's own club's league - purely to widen the raw
+  // pool of news articles searched. See the comment on fetchLiveUpdates
+  // for why this can't loosen which articles count as relevant.
+  const followedLeagues = Array.from(
+    new Set(
+      selectedIds
+        .map((cid) => getClub(cid)?.league)
+        .filter((league): league is string => Boolean(league))
+        .concat(club?.league ? [club.league] : [])
+    )
+  );
 
   const [standings, setStandings] = useState<StandingsRow[]>([]);
   const [scorers, setScorers] = useState<Scorer[]>([]);
@@ -158,7 +170,7 @@ export default function ClubDetailClient({ id }: { id: string }) {
         ? fetchFinishedMatches(code, currentSeasonYear).catch(() => [])
         : Promise.resolve([]),
       fetchLiveMatches().catch(() => []),
-      fetchLiveUpdates(newsQueryNames).catch(() => []),
+      fetchLiveUpdates(newsQueryNames, followedLeagues).catch(() => []),
     ])
       .then(([standingsRes, scorersRes, finishedRes, liveRes, newsRes]) => {
         if (cancelled) return;
