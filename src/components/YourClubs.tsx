@@ -179,7 +179,7 @@ function topWithClubGuaranteed(
 
 function rankBadgeClass(i: number): string {
   const base =
-    "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-black";
+    "flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[9px] font-black";
   if (i === 0)
     return `${base} text-white bg-gradient-to-br from-amber-400 to-amber-600 shadow-sm shadow-amber-500/30`;
   if (i === 1)
@@ -236,12 +236,12 @@ function StatList({
           {title}
         </span>
       </div>
-      <ul className="flex flex-col gap-2.5">
+      <ul className="flex flex-col gap-2">
         {items.map((item, i) => {
           const isClub = item.clubId === club.id;
           const value = item[statKey] ?? 0;
           return (
-            <li key={`${item.playerName}-${i}`} className="flex items-center gap-2.5">
+            <li key={`${item.playerName}-${i}`} className="flex items-center gap-2">
               <div className={rankBadgeClass(i)}>{i + 1}</div>
               <div className="min-w-0 flex-1">
                 <div

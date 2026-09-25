@@ -762,12 +762,12 @@ function PlayerStatList({
           {title}
         </span>
       </div>
-      <ul className="flex flex-col gap-2.5">
+      <ul className="flex flex-col gap-2">
         {items.map((item, i) => {
           const value = item[statKey] ?? 0;
           return (
-            <li key={`${item.playerName}-${i}`} className="flex items-center gap-2.5">
-              <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-[10px] font-black text-zinc-400 dark:bg-white/10 dark:text-zinc-400">
+            <li key={`${item.playerName}-${i}`} className="flex items-center gap-2">
+              <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-[9px] font-black text-zinc-400 dark:bg-white/10 dark:text-zinc-400">
                 {i + 1}
               </div>
               <div className="min-w-0 flex-1">
