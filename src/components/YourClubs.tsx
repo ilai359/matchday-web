@@ -170,8 +170,12 @@ function topWithClubGuaranteed(
   const alreadyIncluded = top.some((s) => s.clubId === clubId);
   if (!alreadyIncluded) {
     const clubBest = sorted.find((s) => s.clubId === clubId);
+    // Swap into the last slot rather than appending a 6th row - this list
+    // sits next to the other stat's list (scorers next to assists) and
+    // both need to stay exactly `limit` rows long, or the taller one
+    // makes the two columns visibly uneven.
     if (clubBest) {
-      return [...top, clubBest];
+      return [...top.slice(0, limit - 1), clubBest];
     }
   }
   return top;
