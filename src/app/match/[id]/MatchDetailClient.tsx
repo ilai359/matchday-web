@@ -755,8 +755,8 @@ export default function MatchDetailClient({ id }: { id: string }) {
               </div>
             </div>
 
-            <div className="mt-6 border-t border-zinc-100 pt-5 dark:border-white/10">
-              <div className="mb-3 text-xs font-black uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
+            <div className="mt-5 border-t border-zinc-100 pt-4 dark:border-white/10">
+              <div className="mb-2.5 text-xs font-black uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
                 Match details
               </div>
 
@@ -769,7 +769,7 @@ export default function MatchDetailClient({ id }: { id: string }) {
                   regardless of light/dark mode on purpose - the point was
                   to look and feel distinct, not like a themed variant of
                   the same card pattern used everywhere else. */}
-              <div className="relative overflow-hidden rounded-[28px] bg-[#0B0E16] p-5 text-white shadow-[0_16px_40px_rgba(0,0,0,0.25)]">
+              <div className="relative overflow-hidden rounded-[28px] bg-[#0B0E16] p-4 text-white shadow-[0_16px_40px_rgba(0,0,0,0.25)]">
                 {/* These used to be small circles with a `blur-3xl` filter,
                     which is what was making the top-left and bottom-right
                     corners of this card look cut off instead of rounded on
@@ -800,15 +800,15 @@ export default function MatchDetailClient({ id }: { id: string }) {
                 />
 
                 <div className="relative">
-                  <div className="mb-4 inline-flex items-center rounded-full bg-white/10 px-3 py-1 text-[10px] font-black uppercase tracking-wide text-white/80">
+                  <div className="mb-3 inline-flex items-center rounded-full bg-white/10 px-3 py-1 text-[10px] font-black uppercase tracking-wide text-white/80">
                     {displayMatch.competition}
                   </div>
 
                   <div
                     className={
                       effectiveVenue || displayMatch.city
-                        ? "grid grid-cols-1 gap-4 sm:grid-cols-3"
-                        : "grid grid-cols-1 gap-4 sm:grid-cols-2"
+                        ? "grid grid-cols-1 gap-3 sm:grid-cols-3"
+                        : "grid grid-cols-1 gap-3 sm:grid-cols-2"
                     }
                   >
                     <div>
@@ -820,7 +820,7 @@ export default function MatchDetailClient({ id }: { id: string }) {
                       </div>
                     </div>
 
-                    <div className="border-t border-white/10 pt-4 sm:border-l sm:border-t-0 sm:pl-4 sm:pt-0">
+                    <div className="border-t border-white/10 pt-3 sm:border-l sm:border-t-0 sm:pl-3 sm:pt-0">
                       <div className="text-[10px] font-black uppercase tracking-widest text-white/45">
                         🕐 Kickoff
                       </div>
@@ -830,7 +830,7 @@ export default function MatchDetailClient({ id }: { id: string }) {
                     </div>
 
                     {(effectiveVenue || displayMatch.city) && (
-                      <div className="border-t border-white/10 pt-4 sm:border-l sm:border-t-0 sm:pl-4 sm:pt-0">
+                      <div className="border-t border-white/10 pt-3 sm:border-l sm:border-t-0 sm:pl-3 sm:pt-0">
                         <div className="text-[10px] font-black uppercase tracking-widest text-white/45">
                           📍 Venue
                         </div>
@@ -846,7 +846,7 @@ export default function MatchDetailClient({ id }: { id: string }) {
 
             {leagueCode && (
               <div
-                className="mt-6 overflow-hidden rounded-[26px] p-4"
+                className="mt-5 overflow-hidden rounded-[26px] p-3.5"
                 style={{
                   background: `linear-gradient(135deg, ${withAlpha(
                     displayMatch.homeColor,
@@ -854,7 +854,7 @@ export default function MatchDetailClient({ id }: { id: string }) {
                   )}, ${withAlpha(displayMatch.awayColor, "40")})`,
                 }}
               >
-                <div className="mb-3 flex items-center justify-center gap-2">
+                <div className="mb-2.5 flex items-center justify-center gap-2">
                   <span
                     className="h-2.5 w-2.5 rounded-full"
                     style={{ backgroundColor: displayMatch.homeColor }}

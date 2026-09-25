@@ -200,12 +200,12 @@ function StatPill({
 }) {
   return (
     <div
-      className={`rounded-xl border border-white/10 px-2 py-2 text-center backdrop-blur-md ${
+      className={`rounded-xl border border-white/10 px-1.5 py-1.5 text-center backdrop-blur-md ${
         highlight ? "bg-white/20" : "bg-white/5"
       }`}
     >
       <div className="text-sm font-black leading-none text-white">{value}</div>
-      <div className="mt-1 text-[8px] font-bold uppercase tracking-wider text-white/60">
+      <div className="mt-0.5 text-[8px] font-bold uppercase tracking-wider text-white/60">
         {label}
       </div>
     </div>
@@ -312,7 +312,7 @@ function ClubStatsCard({
         href={`/clubs/${club.id}`}
         onMouseEnter={() => prefetchClubPage(club.id)}
         onTouchStart={() => prefetchClubPage(club.id)}
-        className="relative block overflow-hidden p-4 text-white transition hover:brightness-[1.08] active:brightness-95"
+        className="relative block overflow-hidden p-3.5 text-white transition hover:brightness-[1.08] active:brightness-95"
         style={{
           background: `linear-gradient(135deg, ${club.primaryColor} 0%, #0B0F1A 130%)`,
         }}
@@ -321,8 +321,8 @@ function ClubStatsCard({
           <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-white/15 blur-[60px]" />
           <div className="absolute -bottom-24 -left-10 h-48 w-48 rounded-full bg-black/30 blur-[60px]" />
         </div>
-        <div className="relative z-10 flex items-center gap-4">
-          <div className="shrink-0 rounded-2xl bg-white p-1.5 shadow-lg">
+        <div className="relative z-10 flex items-center gap-3">
+          <div className="shrink-0 rounded-2xl bg-white p-1 shadow-lg">
             <ClubBadge
               name={club.name}
               crest={club.crest}
@@ -331,7 +331,7 @@ function ClubStatsCard({
             />
           </div>
           <div className="min-w-0 flex-1">
-            <div className="mb-1.5 inline-flex items-center rounded-full bg-white/15 px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-white/80 backdrop-blur-md">
+            <div className="mb-1 inline-flex items-center rounded-full bg-white/15 px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-white/80 backdrop-blur-md">
               {club.league}
             </div>
             <div className="truncate text-lg font-black leading-tight">
@@ -339,25 +339,25 @@ function ClubStatsCard({
             </div>
           </div>
           {clubRow && (
-            <div className="shrink-0 rounded-2xl border border-white/15 bg-white/10 px-3 py-2 text-center backdrop-blur-md">
+            <div className="shrink-0 rounded-2xl border border-white/15 bg-white/10 px-2.5 py-1.5 text-center backdrop-blur-md">
               <div className="text-xl font-black leading-none">
                 #{clubRow.position}
               </div>
-              <div className="mt-1 text-[8px] font-black uppercase tracking-wider text-white/60">
+              <div className="mt-0.5 text-[8px] font-black uppercase tracking-wider text-white/60">
                 Place
               </div>
             </div>
           )}
         </div>
         {clubRow && (
-          <div className="relative z-10 mt-4 grid grid-cols-4 gap-2">
+          <div className="relative z-10 mt-3 grid grid-cols-4 gap-1.5">
             <StatPill label="P" value={clubRow.playedGames} />
             <StatPill label="W" value={clubRow.won} />
             <StatPill label="D" value={clubRow.draw} />
             <StatPill label="Pts" value={clubRow.points} highlight />
           </div>
         )}
-        <div className="relative z-10 mt-3 flex items-center justify-center gap-1 text-[10px] font-bold text-white/50">
+        <div className="relative z-10 mt-2 flex items-center justify-center gap-1 text-[10px] font-bold text-white/50">
           View club →
         </div>
       </Link>
@@ -385,7 +385,7 @@ function ClubStatsCard({
       )}
 
       {!loading && visibleRows.length > 0 && (
-        <div className="p-4 pt-4">
+        <div className="p-3.5 pt-3.5">
           <div className="mb-1.5 flex items-center gap-1.5">
             <span className="text-sm">📊</span>
             <span className="text-[10px] font-black uppercase tracking-[0.16em] text-zinc-400 dark:text-zinc-500">
@@ -462,7 +462,7 @@ function ClubStatsCard({
       )}
 
       {!loading && (topScorers.length > 0 || topAssists.length > 0) && (
-        <div className="grid grid-cols-1 gap-4 p-4 pt-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 p-3.5 pt-3.5 sm:grid-cols-2">
           <StatList
             title="Top scorers (League)"
             icon="⚽"
