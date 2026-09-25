@@ -18,7 +18,7 @@ export async function GET(request: Request) {
 
   try {
     const response = await fetchWithRetry(
-      `https://api.football-data.org/v4/competitions/${competition}/scorers?limit=50`,
+      `https://api.football-data.org/v4/competitions/${competition}/scorers?limit=100`,
       {
         headers: { "X-Auth-Token": apiKey },
         next: { revalidate: 3600 },
