@@ -215,13 +215,13 @@ export default function Matches() {
           <div className="absolute -left-24 -top-28 h-72 w-72 rounded-full bg-blue-600/25 blur-[90px]" />
           <div className="absolute -right-24 -top-10 h-72 w-72 rounded-full bg-violet-600/20 blur-[90px]" />
         </div>
-        <div className="relative z-10 mx-auto w-full max-w-2xl px-5 pb-6 pt-8">
+        <div className="relative z-10 mx-auto w-full max-w-2xl px-5 pb-5 pt-6">
           <div className="flex items-start justify-between gap-4">
             <div>
               <div className="mb-1.5 text-[10px] font-black uppercase tracking-[0.28em] text-blue-300/70">
                 Your fixtures
               </div>
-              <h1 className="text-[36px] font-black leading-none tracking-[-0.05em]">
+              <h1 className="text-[30px] font-black leading-none tracking-[-0.045em]">
                 Matches
               </h1>
               <p className="mt-3 text-sm text-white/45">
@@ -234,9 +234,9 @@ export default function Matches() {
           </div>
         </div>
       </header>
-      <div className="mx-auto w-full max-w-2xl px-5 pt-5">
-        <section className="mb-6">
-          <div className="mb-3 flex items-end justify-between px-1">
+      <div className="mx-auto w-full max-w-2xl px-5 pt-4">
+        <section className="mb-5">
+          <div className="mb-2.5 flex items-end justify-between px-1">
             <div>
               <h2 className="text-lg font-black text-[#111318] dark:text-white">
                 Filter by club
@@ -296,8 +296,8 @@ export default function Matches() {
           </div>
         </section>
         {!liveLoading && !liveError && myLiveMatches.length > 0 && (
-          <section className="mb-7">
-            <div className="flex flex-col gap-4">
+          <section className="mb-6">
+            <div className="flex flex-col gap-3">
               {myLiveMatches.map((match) => {
                 const isHomeFollowed = selectedIds.includes(match.homeClubId);
                 const isAwayFollowed = selectedIds.includes(match.awayClubId);
@@ -329,8 +329,8 @@ export default function Matches() {
                         background: `linear-gradient(90deg, ${homeColor}, ${awayColor})`,
                       }}
                     />
-                    <div className="p-5">
-                      <div className="mb-4 flex items-center justify-start gap-2">
+                    <div className="p-4">
+                      <div className="mb-3 flex items-center justify-start gap-2">
                         <div className="shrink-0 rounded-full bg-[#F2F4F7] px-3 py-1.5 text-[11px] font-bold text-zinc-500 dark:bg-white/10 dark:text-zinc-300">
                           {formatCompetition(match.competition)}
                         </div>
@@ -414,7 +414,7 @@ export default function Matches() {
                           </div>
                         </div>
                       </div>
-                      <div className="mt-4 flex items-center justify-between gap-3 border-t border-zinc-100 pt-3 dark:border-white/10">
+                      <div className="mt-3 flex items-center justify-between gap-3 border-t border-zinc-100 pt-2.5 dark:border-white/10">
                         <div className="min-w-0">
                           <div className="text-xs font-bold text-zinc-600 dark:text-zinc-300">
                             {formatDate(match.kickoff)}
@@ -441,12 +441,12 @@ export default function Matches() {
           </section>
         )}
         {liveError && (
-          <div className="mb-5 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 dark:bg-red-500/10 dark:border-red-500/30 dark:text-red-400">
+          <div className="mb-4 rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 dark:bg-red-500/10 dark:border-red-500/30 dark:text-red-400">
             Couldn&apos;t load live match data. Showing saved matches below.
           </div>
         )}
         {myMatches.length === 0 && (
-          <section className="py-8">
+          <section className="py-6">
             <div className="rounded-[28px] border border-black/[0.04] bg-white px-6 py-8 text-center shadow-sm dark:border-white/[0.06] dark:bg-[#14171F] dark:shadow-none">
               <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#F1F3F7] text-2xl dark:bg-white/10">
                 📅
@@ -462,7 +462,7 @@ export default function Matches() {
         )}
         {myMatches.length > 0 && (
           <section>
-            <div className="mb-4">
+            <div className="mb-3">
               <h2 className="text-[22px] font-black tracking-tight text-[#111318] dark:text-white">
                 Upcoming (saved)
               </h2>
@@ -470,7 +470,7 @@ export default function Matches() {
                 Your next fixtures
               </p>
             </div>
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-3">
               {myMatches.map((match, index) => {
                 const homeClub = getClub(match.homeClubId);
                 const awayClub = getClub(match.awayClubId);
@@ -492,8 +492,8 @@ export default function Matches() {
                         background: `linear-gradient(90deg, ${homeColor}, ${awayColor})`,
                       }}
                     />
-                    <div className="p-5">
-                      <div className="mb-4 flex items-center justify-between gap-3">
+                    <div className="p-4">
+                      <div className="mb-3 flex items-center justify-between gap-3">
                         <div className="min-w-0">
                           {isNextMatch && (
                             <div className="mb-1 text-[9px] font-black uppercase tracking-[0.2em] text-blue-500 dark:text-blue-400">
@@ -553,7 +553,7 @@ export default function Matches() {
                           </div>
                         </div>
                       </div>
-                      <div className="mt-4 flex items-center justify-between gap-3 border-t border-zinc-100 pt-3 dark:border-white/10">
+                      <div className="mt-3 flex items-center justify-between gap-3 border-t border-zinc-100 pt-2.5 dark:border-white/10">
                         <div className="min-w-0">
                           <div className="truncate text-xs font-bold text-zinc-600 dark:text-zinc-300">
                             {match.venue}

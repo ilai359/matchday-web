@@ -141,17 +141,17 @@ export default function Home() {
           <div className="absolute -left-24 -top-28 h-72 w-72 rounded-full bg-blue-600/25 blur-[90px]" />
           <div className="absolute -right-24 -top-10 h-72 w-72 rounded-full bg-violet-600/20 blur-[90px]" />
         </div>
-        <div className="relative z-10 mx-auto w-full max-w-2xl px-5 pb-8 pt-8">
+        <div className="relative z-10 mx-auto w-full max-w-2xl px-5 pb-6 pt-6">
           <div className="flex min-w-0 items-start justify-between gap-5">
             <div className="min-w-0 flex-1">
               <div className="mb-1.5 text-[10px] font-black uppercase tracking-[0.28em] text-blue-300/70">
                 Your football
               </div>
-              <h1 className="text-[38px] font-black leading-none tracking-[-0.055em]">
+              <h1 className="text-[32px] font-black leading-none tracking-[-0.05em]">
                 Club
                 <span className="text-blue-400">side</span>
               </h1>
-              <p className="mt-3 max-w-xs text-sm leading-5 text-white/45">
+              <p className="mt-2 max-w-xs text-sm leading-5 text-white/45">
                 Everything important from the clubs you follow.
               </p>
             </div>
@@ -167,9 +167,9 @@ export default function Home() {
           </div>
         </div>
       </header>
-      <div className="mx-auto w-full max-w-2xl px-5 pt-5">
+      <div className="mx-auto w-full max-w-2xl px-5 pt-4">
         {!liveLoading && myLiveMatches.length > 0 && (
-          <div className="mb-3 flex items-center gap-2 px-1">
+          <div className="mb-2 flex items-center gap-2 px-1">
             <span className="relative flex h-2 w-2">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
@@ -180,8 +180,8 @@ export default function Home() {
           </div>
         )}
         {nextMatch && (
-          <section className="mb-7">
-            <div className="mb-3 px-1">
+          <section className="mb-6">
+            <div className="mb-2 px-1">
               <div className="text-[10px] font-black uppercase tracking-[0.22em] text-zinc-400 dark:text-zinc-500">
                 Next match
               </div>
@@ -199,8 +199,8 @@ export default function Home() {
                 <div className="absolute -right-24 -top-28 h-72 w-72 rounded-full bg-white/15 blur-[80px]" />
                 <div className="absolute -bottom-32 -left-24 h-72 w-72 rounded-full bg-black/30 blur-[80px]" />
               </div>
-              <div className="relative z-10 p-5">
-                <div className="mb-5 flex items-center justify-between gap-3">
+              <div className="relative z-10 p-4">
+                <div className="mb-4 flex items-center justify-between gap-3">
                   <div className="min-w-0 rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-white/80 backdrop-blur-xl">
                     <span className="block truncate">
                       {formatCompetition(nextMatch.competition)}
@@ -212,7 +212,7 @@ export default function Home() {
                 </div>
                 <div className="grid grid-cols-[1fr_70px_1fr] items-start gap-3">
                   <div className="min-w-0">
-                    <div className="mb-3">
+                    <div className="mb-2">
                       <ClubBadge
                         name={nextMatch.homeTeamName}
                         crest={homeClub?.crest ?? nextMatch.homeCrest ?? undefined}
@@ -236,7 +236,7 @@ export default function Home() {
                     </div>
                   </div>
                   <div className="flex min-w-0 flex-col items-end text-right">
-                    <div className="mb-3">
+                    <div className="mb-2">
                       <ClubBadge
                         name={nextMatch.awayTeamName}
                         crest={awayClub?.crest ?? nextMatch.awayCrest ?? undefined}
@@ -252,7 +252,7 @@ export default function Home() {
                     </div>
                   </div>
                 </div>
-                <div className="mt-5 flex items-center justify-between gap-3 border-t border-white/10 pt-4">
+                <div className="mt-4 flex items-center justify-between gap-3 border-t border-white/10 pt-3">
                   <div className="min-w-0 text-xs font-medium text-white/60">
                     <span className="mr-1.5">⌖</span>
                     <span className="break-words">
@@ -271,8 +271,8 @@ export default function Home() {
           </section>
         )}
         {upcomingMatches.length > 0 && (
-          <section className="mb-7">
-            <div className="mb-4 flex items-end justify-between">
+          <section className="mb-6">
+            <div className="mb-3 flex items-end justify-between">
               <div>
                 <h2 className="text-[22px] font-black tracking-tight text-[#111318] dark:text-white">
                   Up next
@@ -285,7 +285,7 @@ export default function Home() {
                 {upcomingMatches.length}
               </span>
             </div>
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-2.5">
               {upcomingMatches.map((match) => {
                 const matchHomeClub = getClub(match.homeClubId);
                 const isHomeFollowed = selectedIds.includes(match.homeClubId);
@@ -294,7 +294,7 @@ export default function Home() {
                   <Link
                     key={match.id}
                     href={`/match/${match.id}`}
-                    className="relative block overflow-hidden rounded-[22px] border border-black/[0.045] bg-white p-4 shadow-[0_5px_20px_rgba(0,0,0,0.035)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_30px_rgba(0,0,0,0.07)] dark:border-white/[0.06] dark:bg-[#14171F] dark:shadow-none"
+                    className="relative block overflow-hidden rounded-[22px] border border-black/[0.045] bg-white p-3.5 shadow-[0_5px_20px_rgba(0,0,0,0.035)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_30px_rgba(0,0,0,0.07)] dark:border-white/[0.06] dark:bg-[#14171F] dark:shadow-none"
                   >
                     <div
                       className="absolute bottom-0 left-0 top-0 w-1"
@@ -305,7 +305,7 @@ export default function Home() {
                     />
                     <div className="flex items-center gap-4 pl-1">
                       <div className="min-w-0 flex-1">
-                        <div className="mb-2 flex items-center gap-2">
+                        <div className="mb-1.5 flex items-center gap-2">
                           <span className="truncate text-[10px] font-black uppercase tracking-[0.16em] text-zinc-400 dark:text-zinc-500">
                             {formatCompetition(match.competition)}
                           </span>
@@ -333,7 +333,7 @@ export default function Home() {
                             {displayName(match.awayTeamName, match.awayClubId)}
                           </span>
                         </div>
-                        <div className="mt-2 truncate text-xs font-medium text-zinc-400 dark:text-zinc-500">
+                        <div className="mt-1.5 truncate text-xs font-medium text-zinc-400 dark:text-zinc-500">
                           {formatDate(match.kickoff)}
                           {venueFor(match) ? ` · ${venueFor(match)}` : ""}
                         </div>
@@ -351,8 +351,8 @@ export default function Home() {
           </section>
         )}
         {!nextMatch && (
-          <section className="py-8">
-            <div className="rounded-[28px] border border-black/[0.04] bg-white px-6 py-10 text-center shadow-sm dark:border-white/[0.06] dark:bg-[#14171F] dark:shadow-none">
+          <section className="py-6">
+            <div className="rounded-[28px] border border-black/[0.04] bg-white px-6 py-8 text-center shadow-sm dark:border-white/[0.06] dark:bg-[#14171F] dark:shadow-none">
               <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#F1F3F7] text-2xl dark:bg-white/10">
                 ⚽
               </div>
