@@ -90,7 +90,7 @@ export default function YourClubs() {
 
   return (
     <section className="mb-10">
-      <div className="mb-4 flex items-end justify-between">
+      <div className="mb-3 flex items-end justify-between">
         <div>
           <h2 className="text-[22px] font-black tracking-tight text-[#111318] dark:text-white">
             Your Clubs
@@ -103,7 +103,7 @@ export default function YourClubs() {
           🏆
         </div>
       </div>
-      <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-4">
         {followedClubs.map((club) => {
           const code = LEAGUE_TO_CODE[club.league];
           if (!code) {
@@ -312,7 +312,7 @@ function ClubStatsCard({
         href={`/clubs/${club.id}`}
         onMouseEnter={() => prefetchClubPage(club.id)}
         onTouchStart={() => prefetchClubPage(club.id)}
-        className="relative block overflow-hidden p-5 text-white transition hover:brightness-[1.08] active:brightness-95"
+        className="relative block overflow-hidden p-4 text-white transition hover:brightness-[1.08] active:brightness-95"
         style={{
           background: `linear-gradient(135deg, ${club.primaryColor} 0%, #0B0F1A 130%)`,
         }}
@@ -462,7 +462,7 @@ function ClubStatsCard({
       )}
 
       {!loading && (topScorers.length > 0 || topAssists.length > 0) && (
-        <div className="grid grid-cols-1 gap-5 p-4 pt-5 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 p-4 pt-4 sm:grid-cols-2">
           <StatList
             title="Top scorers (League)"
             icon="⚽"

@@ -141,7 +141,7 @@ export default function Home() {
           <div className="absolute -left-24 -top-28 h-72 w-72 rounded-full bg-blue-600/25 blur-[90px]" />
           <div className="absolute -right-24 -top-10 h-72 w-72 rounded-full bg-violet-600/20 blur-[90px]" />
         </div>
-        <div className="relative z-10 mx-auto w-full max-w-2xl px-5 pb-10 pt-10">
+        <div className="relative z-10 mx-auto w-full max-w-2xl px-5 pb-8 pt-8">
           <div className="flex min-w-0 items-start justify-between gap-5">
             <div className="min-w-0 flex-1">
               <div className="mb-1.5 text-[10px] font-black uppercase tracking-[0.28em] text-blue-300/70">
@@ -167,7 +167,7 @@ export default function Home() {
           </div>
         </div>
       </header>
-      <div className="mx-auto w-full max-w-2xl px-5 pt-6">
+      <div className="mx-auto w-full max-w-2xl px-5 pt-5">
         {!liveLoading && myLiveMatches.length > 0 && (
           <div className="mb-3 flex items-center gap-2 px-1">
             <span className="relative flex h-2 w-2">
@@ -180,7 +180,7 @@ export default function Home() {
           </div>
         )}
         {nextMatch && (
-          <section className="mb-9">
+          <section className="mb-7">
             <div className="mb-3 px-1">
               <div className="text-[10px] font-black uppercase tracking-[0.22em] text-zinc-400 dark:text-zinc-500">
                 Next match
@@ -199,8 +199,8 @@ export default function Home() {
                 <div className="absolute -right-24 -top-28 h-72 w-72 rounded-full bg-white/15 blur-[80px]" />
                 <div className="absolute -bottom-32 -left-24 h-72 w-72 rounded-full bg-black/30 blur-[80px]" />
               </div>
-              <div className="relative z-10 p-6">
-                <div className="mb-7 flex items-center justify-between gap-3">
+              <div className="relative z-10 p-5">
+                <div className="mb-5 flex items-center justify-between gap-3">
                   <div className="min-w-0 rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-white/80 backdrop-blur-xl">
                     <span className="block truncate">
                       {formatCompetition(nextMatch.competition)}
@@ -252,7 +252,7 @@ export default function Home() {
                     </div>
                   </div>
                 </div>
-                <div className="mt-7 flex items-center justify-between gap-3 border-t border-white/10 pt-4">
+                <div className="mt-5 flex items-center justify-between gap-3 border-t border-white/10 pt-4">
                   <div className="min-w-0 text-xs font-medium text-white/60">
                     <span className="mr-1.5">⌖</span>
                     <span className="break-words">
@@ -271,7 +271,7 @@ export default function Home() {
           </section>
         )}
         {upcomingMatches.length > 0 && (
-          <section className="mb-10">
+          <section className="mb-7">
             <div className="mb-4 flex items-end justify-between">
               <div>
                 <h2 className="text-[22px] font-black tracking-tight text-[#111318] dark:text-white">
@@ -351,7 +351,7 @@ export default function Home() {
           </section>
         )}
         {!nextMatch && (
-          <section className="py-12">
+          <section className="py-8">
             <div className="rounded-[28px] border border-black/[0.04] bg-white px-6 py-10 text-center shadow-sm dark:border-white/[0.06] dark:bg-[#14171F] dark:shadow-none">
               <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#F1F3F7] text-2xl dark:bg-white/10">
                 ⚽

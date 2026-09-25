@@ -280,8 +280,8 @@ export default function ClubDetailClient({ id }: { id: string }) {
           <div className="absolute -right-16 -top-16 h-64 w-64 rounded-full bg-white/15 blur-[80px]" />
           <div className="absolute -bottom-28 -left-16 h-64 w-64 rounded-full bg-black/30 blur-[80px]" />
         </div>
-        <div className="relative z-10 mx-auto w-full max-w-2xl px-5 pb-7 pt-8">
-          <div className="mb-5 flex items-center justify-between gap-3">
+        <div className="relative z-10 mx-auto w-full max-w-2xl px-5 pb-6 pt-6">
+          <div className="mb-4 flex items-center justify-between gap-3">
             <button
               type="button"
               onClick={goBack}
@@ -334,7 +334,7 @@ export default function ClubDetailClient({ id }: { id: string }) {
             )}
           </div>
           {clubRow && (
-            <div className="mt-5 grid grid-cols-5 gap-2">
+            <div className="mt-4 grid grid-cols-5 gap-2">
               <HeaderStat label="P" value={clubRow.playedGames} />
               <HeaderStat label="W" value={clubRow.won} />
               <HeaderStat label="D" value={clubRow.draw} />
@@ -345,7 +345,7 @@ export default function ClubDetailClient({ id }: { id: string }) {
         </div>
       </header>
 
-      <div className="mx-auto w-full max-w-2xl px-5 pt-6">
+      <div className="mx-auto w-full max-w-2xl px-5 pt-5">
         {loading && (
           <div className="animate-pulse" aria-hidden="true">
             <div className="mb-6">
@@ -411,7 +411,7 @@ export default function ClubDetailClient({ id }: { id: string }) {
 
         {/* AI SPOTLIGHT */}
         {!loading && spotlight && (
-          <section className="mb-6">
+          <section className="mb-5">
             <div className="overflow-hidden rounded-[24px] border border-blue-100 bg-gradient-to-br from-blue-50 to-violet-50 p-5 dark:border-blue-500/20 dark:from-blue-500/[0.06] dark:to-violet-500/[0.06]">
               <div className="mb-2 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-blue-500 dark:text-blue-400">
                 ✨ AI Summary · written {formatDate(spotlight.writtenAt)}
@@ -428,7 +428,7 @@ export default function ClubDetailClient({ id }: { id: string }) {
 
         {/* RECENT FORM + RESULTS */}
         {!loading && clubResults.length > 0 && (
-          <section className="mb-6">
+          <section className="mb-5">
             <SectionHeading icon="📈" title="Recent form" />
             <div className="mb-3 flex gap-1.5">
               {formResults.map((m) => {
@@ -487,7 +487,7 @@ export default function ClubDetailClient({ id }: { id: string }) {
 
         {/* UPCOMING FIXTURES */}
         {!loading && clubUpcoming.length > 0 && (
-          <section className="mb-6">
+          <section className="mb-5">
             <SectionHeading icon="📅" title="Upcoming fixtures" />
             <div className="flex flex-col gap-2">
               {clubUpcoming.map((m) => {
@@ -520,7 +520,7 @@ export default function ClubDetailClient({ id }: { id: string }) {
 
         {/* LEAGUE TABLE */}
         {!loading && standings.length > 0 && (
-          <section className="mb-6">
+          <section className="mb-5">
             <SectionHeading icon="📊" title="League table" />
             <div className="overflow-hidden rounded-[24px] border border-black/[0.045] bg-white p-3 shadow-sm dark:border-white/[0.06] dark:bg-[#14171F] dark:shadow-none">
               <div className="flex flex-col gap-0.5">
@@ -624,7 +624,7 @@ export default function ClubDetailClient({ id }: { id: string }) {
 
         {/* TOP SCORERS / ASSISTS */}
         {!loading && (clubScorers.length > 0 || clubAssists.length > 0) && (
-          <section className="mb-6">
+          <section className="mb-5">
             <SectionHeading icon="⚽" title="Club stats (League)" />
             <div className="grid grid-cols-1 gap-5 rounded-[24px] border border-black/[0.045] bg-white p-4 shadow-sm dark:border-white/[0.06] dark:bg-[#14171F] dark:shadow-none sm:grid-cols-2">
               <PlayerStatList title="Top scorers" icon="⚽" items={clubScorers} statKey="goals" club={club} />
@@ -635,7 +635,7 @@ export default function ClubDetailClient({ id }: { id: string }) {
 
         {/* NEWS */}
         {!loading && news.length > 0 && (
-          <section className="mb-6">
+          <section className="mb-5">
             <SectionHeading icon="⚡" title="Latest news" />
             <div className="flex flex-col gap-3">
               {news.slice(0, 4).map((update) => {
