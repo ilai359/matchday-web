@@ -13,7 +13,6 @@ import {
 } from "../../../lib/dateHelpers";
 import { formatCompetition } from "../../../lib/competitionNames";
 import {
-  fetchLiveMatches,
   fetchFinishedMatches,
   fetchLiveMatchStatus,
   fetchTeamInfo,
@@ -299,18 +298,15 @@ export default function MatchDetailClient({ id }: { id: string }) {
 
   useEffect(() => {
     if (mockMatch) return;
-    fetchLiveMatches()
-      .then((live) => {
-        const found = live.find((m) => m.id === id) ?? null;
-        if (found) return found;
-        // Not upcoming or live - but that doesn't mean it isn't a real
-        // match. fetchLiveMatches deliberately only covers what's
-        // happening now or coming up soon, so a match that's already
-        // finished (e.g. someone tapping a result from a club's "Recent
-        // form" list) would otherwise come up empty here even though it
-        // really happened. Look it up directly by id before giving up.
-        return fetchMatchById(id);
-      })
+    // Straight to the single-match lookup rather than the batch
+    // fetchLiveMatches list: that list is now scoped to specific
+    // leagues (see /api/matches), and this page doesn't know ahead of
+    // time which league an arbitrary match id belongs to. fetchMatchById
+    // works for any match regardless of league or status - upcoming,
+    // live, or already finished (e.g. someone tapping a result from a
+    // club's "Recent form" list) - so it's both simpler and correct on
+    // its own, with no batch step needed first.
+    fetchMatchById(id)
       .then((found) => setLiveMatch(found))
       .catch(() => setLiveMatch(null))
       .finally(() => setLiveLoading(false));
@@ -489,6 +485,22 @@ export default function MatchDetailClient({ id }: { id: string }) {
     } else {
       router.push("/matches");
     }
+  }
+
+  // A match not being found yet and a match genuinely not existing look
+  // identical here (displayMatch is null either way) unless loading is
+  // checked too - without this, "Match not found" would flash on screen
+  // for every real, valid match while its data was still on the way,
+  // before correcting itself a moment later. Shown here only once
+  // liveLoading has actually finished and there's still nothing to show.
+  if (!displayMatch && liveLoading) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#F5F6F8] dark:bg-[#0B0D12]">
+        <h1 className="animate-pulse text-[28px] font-black leading-none tracking-[-0.05em] text-[#111318] dark:text-white">
+          Club<span className="text-blue-400">side</span>
+        </h1>
+      </main>
+    );
   }
 
   if (!displayMatch) {

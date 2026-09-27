@@ -325,8 +325,8 @@ function ClubStatsCard({
       ? rankedStandings.slice(Math.max(0, clubIndex - 2), clubIndex + 3)
       : rankedStandings.slice(0, 5);
 
-  const topScorers = topWithClubGuaranteed(scorers, club.id, "goals", 8);
-  const topAssists = topWithClubGuaranteed(scorers, club.id, "assists", 8);
+  const topScorers = topWithClubGuaranteed(scorers, club.id, "goals", 5);
+  const topAssists = topWithClubGuaranteed(scorers, club.id, "assists", 5);
 
   const hasStats =
     !loading &&

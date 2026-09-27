@@ -292,11 +292,11 @@ export default function ClubDetailClient({ id }: { id: string }) {
   const clubScorers = scorers
     .filter((s) => s.clubId === club.id)
     .sort((a, b) => b.goals - a.goals)
-    .slice(0, 8);
+    .slice(0, 5);
   const clubAssists = scorers
     .filter((s) => s.clubId === club.id && (s.assists ?? 0) > 0)
     .sort((a, b) => (b.assists ?? 0) - (a.assists ?? 0))
-    .slice(0, 8);
+    .slice(0, 5);
 
   const spotlight = clubSpotlights.find((s) => s.clubId === club.id);
 
