@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useClubs } from "../context/ClubsContext";
 import { getClub } from "../lib/clubHelpers";
+import { readPersisted, writePersisted } from "../lib/persistentCache";
 import {
   fetchStandings,
   fetchScorers,
@@ -24,8 +25,6 @@ type LeagueData = {
 
 export default function YourClubs() {
   const { selectedIds } = useClubs();
-  const [leagueData, setLeagueData] = useState<Record<string, LeagueData>>({});
-  const [loading, setLoading] = useState(true);
 
   const followedClubs = selectedIds
     .map((id) => getClub(id))
@@ -39,17 +38,39 @@ export default function YourClubs() {
     )
   );
   const leaguesKey = supportedLeagues.join(",");
+  const cacheKey = `your-clubs:${leaguesKey}`;
+
+  // Seeded straight from whatever was saved on the device last time this
+  // exact set of leagues was fetched, so a returning visitor sees real
+  // tables and scorers immediately instead of empty cards while the
+  // network catches up - see src/lib/persistentCache.ts for why this is
+  // safe for confirmed football data.
+  const [leagueData, setLeagueData] = useState<Record<string, LeagueData>>(
+    () => readPersisted<Record<string, LeagueData>>(cacheKey) ?? {}
+  );
+  const [loading, setLoading] = useState(
+    () => readPersisted<Record<string, LeagueData>>(cacheKey) === null
+  );
 
   useEffect(() => {
     if (supportedLeagues.length === 0) {
       return;
     }
     let cancelled = false;
-    // Standard "start loading, then resolve" data-fetching pattern - see
-    // the identical, more detailed note on this same pattern in
-    // ClubDetailClient.tsx.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLoading(true);
+    // If we've saved this exact set of leagues before, show it right
+    // away and drop out of the loading state immediately - the fetch
+    // below still runs regardless, to quietly bring it up to date.
+    const cached = readPersisted<Record<string, LeagueData>>(cacheKey);
+    if (cached) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setLeagueData(cached);
+      setLoading(false);
+    } else {
+      // Standard "start loading, then resolve" data-fetching pattern -
+      // see the identical, more detailed note on this same pattern in
+      // ClubDetailClient.tsx.
+      setLoading(true);
+    }
     Promise.all(
       supportedLeagues.map(async (league) => {
         const code = LEAGUE_TO_CODE[league];
@@ -67,6 +88,7 @@ export default function YourClubs() {
           next[league] = data;
         }
         setLeagueData(next);
+        writePersisted(cacheKey, next);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -75,7 +97,7 @@ export default function YourClubs() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [leaguesKey]);
+  }, [leaguesKey, cacheKey]);
 
   if (followedClubs.length === 0) {
     return null;

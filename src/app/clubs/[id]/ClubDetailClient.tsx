@@ -23,6 +23,15 @@ import {
   LiveMatch,
 } from "../../../lib/footballApi";
 import ClubBadge from "../../../components/ClubBadge";
+import { readPersisted, writePersisted } from "../../../lib/persistentCache";
+
+type ClubDetailBundle = {
+  standings: StandingsRow[];
+  scorers: Scorer[];
+  recentMatches: FinishedMatch[];
+  upcomingMatches: LiveMatch[];
+  news: NewsUpdate[];
+};
 
 // Same rule as the match detail page: European club seasons run roughly
 // July-June, so from July onward the season "starts" this calendar year.
@@ -133,12 +142,28 @@ export default function ClubDetailClient({ id }: { id: string }) {
     )
   );
 
-  const [standings, setStandings] = useState<StandingsRow[]>([]);
-  const [scorers, setScorers] = useState<Scorer[]>([]);
-  const [recentMatches, setRecentMatches] = useState<FinishedMatch[]>([]);
-  const [upcomingMatches, setUpcomingMatches] = useState<LiveMatch[]>([]);
-  const [news, setNews] = useState<NewsUpdate[]>([]);
-  const [loading, setLoading] = useState(true);
+  const cacheKey = `club-detail:${id}`;
+  const cachedBundle = readPersisted<ClubDetailBundle>(cacheKey);
+
+  // Seeded from whatever this club's page last saved on the device, so
+  // reopening it shows real tables, scorers and fixtures immediately
+  // instead of empty sections while the network catches up - see
+  // src/lib/persistentCache.ts for why this is safe for confirmed
+  // football data.
+  const [standings, setStandings] = useState<StandingsRow[]>(
+    () => cachedBundle?.standings ?? []
+  );
+  const [scorers, setScorers] = useState<Scorer[]>(
+    () => cachedBundle?.scorers ?? []
+  );
+  const [recentMatches, setRecentMatches] = useState<FinishedMatch[]>(
+    () => cachedBundle?.recentMatches ?? []
+  );
+  const [upcomingMatches, setUpcomingMatches] = useState<LiveMatch[]>(
+    () => cachedBundle?.upcomingMatches ?? []
+  );
+  const [news, setNews] = useState<NewsUpdate[]>(() => cachedBundle?.news ?? []);
+  const [loading, setLoading] = useState(() => cachedBundle === null);
   const [tableExpanded, setTableExpanded] = useState(false);
 
   useEffect(() => {
@@ -149,16 +174,29 @@ export default function ClubDetailClient({ id }: { id: string }) {
       return;
     }
     let cancelled = false;
-    // This is the standard "start loading, then resolve" data-fetching
-    // pattern: mark loading true right as the fetch kicks off, then false
-    // in .finally() below once it settles. The linter would rather this
-    // happen outside the effect entirely, but there's no real downside to
-    // the extra render here, and restructuring this well-understood, safe
-    // pattern just to satisfy it would only make the code harder to
-    // follow (same reasoning as the identical case in
+    // If this club's page has been fetched before, show that saved
+    // version right away and drop out of the loading state immediately -
+    // the fetch below still runs regardless, to quietly bring it up to
+    // date. Otherwise this is the standard "start loading, then resolve"
+    // data-fetching pattern: mark loading true right as the fetch kicks
+    // off, then false in .finally() below once it settles. The linter
+    // would rather this happen outside the effect entirely, but there's
+    // no real downside to the extra render here, and restructuring this
+    // well-understood, safe pattern just to satisfy it would only make
+    // the code harder to follow (same reasoning as the identical case in
     // MatchDetailClient.tsx).
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLoading(true);
+    const cached = readPersisted<ClubDetailBundle>(cacheKey);
+    if (cached) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setStandings(cached.standings);
+      setScorers(cached.scorers);
+      setRecentMatches(cached.recentMatches);
+      setUpcomingMatches(cached.upcomingMatches);
+      setNews(cached.news);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
     const currentSeasonYear = String(getSeasonStartYear(new Date()));
     const newsQueryNames = Array.from(
       new Set([...followedClubNames, club.name])
@@ -182,7 +220,15 @@ export default function ClubDetailClient({ id }: { id: string }) {
         // club(s) it's genuinely about (that's how the Updates page shows
         // each article under the right club) - so getting this club's news
         // is just keeping the ones tagged for this club, not a new lookup.
-        setNews(newsRes.filter((update) => update.clubId === club.id));
+        const clubNews = newsRes.filter((update) => update.clubId === club.id);
+        setNews(clubNews);
+        writePersisted<ClubDetailBundle>(cacheKey, {
+          standings: standingsRes,
+          scorers: scorersRes,
+          recentMatches: finishedRes,
+          upcomingMatches: liveRes,
+          news: clubNews,
+        });
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -196,7 +242,7 @@ export default function ClubDetailClient({ id }: { id: string }) {
     // when this page's own data actually needs to change; the follow list
     // is read fresh at the moment this effect runs regardless.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [club?.id, club?.name, code]);
+  }, [club?.id, club?.name, code, cacheKey]);
 
   function goBack() {
     if (typeof window !== "undefined" && window.history.length > 1) {

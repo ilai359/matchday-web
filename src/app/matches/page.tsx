@@ -14,7 +14,9 @@ import {
   LiveMatch,
 } from "../../lib/footballApi";
 import ClubBadge from "../../components/ClubBadge";
+import { readPersisted, writePersisted } from "../../lib/persistentCache";
 
+const LIVE_MATCHES_CACHE_KEY = "live-matches";
 const MATCHES_SCROLL_KEY = "matchday:matches-scroll";
 const MATCHES_FILTER_KEY = "matchday:matches-filter";
 
@@ -56,12 +58,30 @@ export default function Matches() {
       // the filter just doesn't persist, nothing else breaks.
     }
   }, [activeFilter]);
-  const [liveMatches, setLiveMatches] = useState<LiveMatch[]>([]);
-  const [liveLoading, setLiveLoading] = useState(true);
+  // Seeded from whatever was last saved on the device, so reopening this
+  // tab shows real matches immediately instead of an empty list while the
+  // network catches up - see src/lib/persistentCache.ts. Shares its cache
+  // key with the home page's live-matches fetch, so whichever tab was
+  // opened first also gives the other one a head start.
+  const [liveMatches, setLiveMatches] = useState<LiveMatch[]>(
+    () => readPersisted<LiveMatch[]>(LIVE_MATCHES_CACHE_KEY) ?? []
+  );
+  const [liveLoading, setLiveLoading] = useState(
+    () => readPersisted<LiveMatch[]>(LIVE_MATCHES_CACHE_KEY) === null
+  );
   const [liveError, setLiveError] = useState(false);
   useEffect(() => {
+    const cached = readPersisted<LiveMatch[]>(LIVE_MATCHES_CACHE_KEY);
+    if (cached) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setLiveMatches(cached);
+      setLiveLoading(false);
+    }
     fetchLiveMatches()
-      .then(setLiveMatches)
+      .then((fresh) => {
+        setLiveMatches(fresh);
+        writePersisted(LIVE_MATCHES_CACHE_KEY, fresh);
+      })
       .catch(() => setLiveError(true))
       .finally(() => setLiveLoading(false));
   }, []);
@@ -84,7 +104,10 @@ export default function Matches() {
     if (!hasMatchWorthPolling) return;
     const interval = setInterval(() => {
       fetchLiveMatches()
-        .then(setLiveMatches)
+        .then((fresh) => {
+          setLiveMatches(fresh);
+          writePersisted(LIVE_MATCHES_CACHE_KEY, fresh);
+        })
         .catch(() => {});
     }, 45000);
     return () => clearInterval(interval);

@@ -16,16 +16,37 @@ import {
 } from "../lib/footballApi";
 import ClubBadge from "../components/ClubBadge";
 import YourClubs from "../components/YourClubs";
+import { readPersisted, writePersisted } from "../lib/persistentCache";
+
+const LIVE_MATCHES_CACHE_KEY = "live-matches";
 
 export default function Home() {
   const { selectedIds, loaded } = useClubs();
   const router = useRouter();
-  const [liveMatches, setLiveMatches] = useState<LiveMatch[]>([]);
-  const [liveLoading, setLiveLoading] = useState(true);
+  // Seeded from whatever the app last saved on the device, so a
+  // returning visitor sees real fixtures immediately instead of an empty
+  // "You're all caught up" while the network catches up - see
+  // src/lib/persistentCache.ts for why this is safe for confirmed
+  // football data.
+  const [liveMatches, setLiveMatches] = useState<LiveMatch[]>(
+    () => readPersisted<LiveMatch[]>(LIVE_MATCHES_CACHE_KEY) ?? []
+  );
+  const [liveLoading, setLiveLoading] = useState(
+    () => readPersisted<LiveMatch[]>(LIVE_MATCHES_CACHE_KEY) === null
+  );
 
   useEffect(() => {
+    const cached = readPersisted<LiveMatch[]>(LIVE_MATCHES_CACHE_KEY);
+    if (cached) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setLiveMatches(cached);
+      setLiveLoading(false);
+    }
     fetchLiveMatches()
-      .then(setLiveMatches)
+      .then((fresh) => {
+        setLiveMatches(fresh);
+        writePersisted(LIVE_MATCHES_CACHE_KEY, fresh);
+      })
       .catch(() => {})
       .finally(() => setLiveLoading(false));
   }, []);
