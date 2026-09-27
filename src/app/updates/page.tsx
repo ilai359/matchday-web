@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { updates as mockUpdates, UpdateCategory } from "../../data/updates";
+import { UpdateCategory } from "../../data/updates";
 import { clubSpotlights } from "../../data/clubSpotlights";
 import { useClubs } from "../../context/ClubsContext";
 import { getClub, getClubName } from "../../lib/clubHelpers";
@@ -73,10 +73,7 @@ export default function Updates() {
     });
   };
 
-  const baseUpdates: DisplayUpdate[] =
-    liveUpdates.length > 0
-      ? liveUpdates.map((u) => ({ ...u }))
-      : mockUpdates.map((u) => ({ ...u, link: undefined }));
+  const baseUpdates: DisplayUpdate[] = liveUpdates.map((u) => ({ ...u }));
 
   const spotlightUpdates: DisplayUpdate[] = clubSpotlights
     .filter((spotlight) => selectedIds.includes(spotlight.clubId))
@@ -257,7 +254,25 @@ export default function Updates() {
           </div>
         </section>
 
-        {myUpdates.length === 0 && (
+        {liveLoading && myUpdates.length === 0 && (
+          <section className="py-10">
+            <div className="rounded-[28px] border border-black/[0.04] bg-white px-6 py-10 text-center shadow-sm dark:border-white/[0.06] dark:bg-[#14171F] dark:shadow-none">
+              <div className="mx-auto mb-4 flex h-14 w-14 animate-pulse items-center justify-center rounded-2xl bg-[#F1F3F7] text-2xl dark:bg-white/10">
+                🔎
+              </div>
+
+              <h2 className="mb-2 text-lg font-black text-[#111318] dark:text-white">
+                Looking for updates…
+              </h2>
+
+              <p className="mx-auto max-w-xs text-sm leading-6 text-zinc-500 dark:text-zinc-400">
+                Checking the latest news from your clubs.
+              </p>
+            </div>
+          </section>
+        )}
+
+        {!liveLoading && myUpdates.length === 0 && (
           <section className="py-10">
             <div className="rounded-[28px] border border-black/[0.04] bg-white px-6 py-10 text-center shadow-sm dark:border-white/[0.06] dark:bg-[#14171F] dark:shadow-none">
               <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#F1F3F7] text-2xl dark:bg-white/10">
