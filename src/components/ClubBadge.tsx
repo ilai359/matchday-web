@@ -12,7 +12,7 @@ export default function ClubBadge({ name, crest, color, size = 48 }: ClubBadgePr
   if (crest) {
     return (
       <div
-        className="flex shrink-0 items-center justify-center rounded-2xl bg-white shadow-sm p-2"
+        className="flex shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-white shadow-sm p-2"
         style={{ width: size, height: size }}
       >
         <Image
@@ -20,7 +20,7 @@ export default function ClubBadge({ name, crest, color, size = 48 }: ClubBadgePr
           alt={name}
           width={size - 16}
           height={size - 16}
-          className="object-contain"
+          className="h-full w-full object-contain"
         />
       </div>
     );

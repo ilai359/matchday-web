@@ -325,8 +325,8 @@ function ClubStatsCard({
       ? rankedStandings.slice(Math.max(0, clubIndex - 2), clubIndex + 3)
       : rankedStandings.slice(0, 5);
 
-  const topScorers = topWithClubGuaranteed(scorers, club.id, "goals", 5);
-  const topAssists = topWithClubGuaranteed(scorers, club.id, "assists", 5);
+  const topScorers = topWithClubGuaranteed(scorers, club.id, "goals", 8);
+  const topAssists = topWithClubGuaranteed(scorers, club.id, "assists", 8);
 
   const hasStats =
     !loading &&
@@ -490,14 +490,14 @@ function ClubStatsCard({
       {!loading && (topScorers.length > 0 || topAssists.length > 0) && (
         <div className="grid grid-cols-2 gap-2.5 p-3.5 pt-3.5">
           <StatList
-            title="Top scorers (League)"
+            title="Top scorers"
             icon="⚽"
             items={topScorers}
             statKey="goals"
             club={club}
           />
           <StatList
-            title="Top assists (League)"
+            title="Top assists"
             icon="🎯"
             items={topAssists}
             statKey="assists"
