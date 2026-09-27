@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { fetchWithRetry } from "@/lib/fetchWithRetry";
+import { getOrSet } from "@/lib/cache";
 
 export async function GET(request: Request) {
   const apiKey = process.env.FOOTBALL_DATA_API_KEY;
@@ -12,28 +13,22 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Missing match id" }, { status: 400 });
   }
   try {
-    // A short shared cache rather than no-store: this route is now used
-    // for two different things - polling a live match's score (where the
-    // client itself only checks every 45s anyway, so a few seconds of
-    // extra staleness here is invisible) and looking up any match by id
-    // at all, including ones that finished long ago and will never
-    // change again (reached e.g. from a club's "Recent form" list).
-    // Sharing this across every visitor for a short window costs
-    // football-data.org's 10-requests/minute limit far less than an
-    // uncached call every single time, with no real freshness downside.
-    const response = await fetchWithRetry(
-      `https://api.football-data.org/v4/matches/${id}`,
-      { headers: { "X-Auth-Token": apiKey }, next: { revalidate: 30 } }
-    );
-    if (!response.ok) {
-      return NextResponse.json(
-        { error: "Failed to fetch live match" },
-        { status: response.status }
+    // Same reasoning as standings/route.ts: getOrSet falls back to the
+    // last known-good match data instead of showing nothing when a live
+    // request lands during football-data.org's shared rate limit.
+    const data = await getOrSet(`match-live:${id}`, 30 * 1000, async () => {
+      const response = await fetchWithRetry(
+        `https://api.football-data.org/v4/matches/${id}`,
+        { headers: { "X-Auth-Token": apiKey }, cache: "no-store" }
       );
-    }
-    const data = await response.json();
+      if (!response.ok) {
+        throw new Error(`football-data.org returned ${response.status}`);
+      }
+      return response.json();
+    });
     return NextResponse.json(data);
   } catch (error) {
+    console.error(`match-live failed for id=${id}`, error);
     return NextResponse.json(
       { error: "Something went wrong", details: String(error) },
       { status: 500 }

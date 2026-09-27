@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { fetchWithRetry } from "@/lib/fetchWithRetry";
+import { getOrSet } from "@/lib/cache";
 import { COMPETITIONS } from "@/lib/competitions";
 
 // football-data.org's docs only ever show a single status value in their
@@ -21,27 +22,34 @@ export async function GET() {
   }
 
   try {
+    // Each competition+status combo is its own getOrSet entry so one
+    // rate-limited request doesn't take the rest down with it, and each
+    // one falls back to its own last known-good list instead of an empty
+    // one - this is what used to make only *some* leagues' matches show
+    // up on a given page load.
     const requests = COMPETITIONS.flatMap((code) =>
       STATUSES.map((status) =>
-        fetchWithRetry(
-          `https://api.football-data.org/v4/competitions/${code}/matches?status=${status}`,
-          {
-            headers: { "X-Auth-Token": apiKey },
-            // Short cache: this list now feeds the Matches page's live-score
-            // polling (every 45s), so a full hour of staleness (the old
-            // value) would mean scores basically never update. 60s keeps it
-            // fresh for that without hammering football-data.org's
-            // 10-requests/minute limit - the cache is shared across every
-            // visitor, so it's still at most one real request per URL per
-            // minute, not one per visitor.
-            next: { revalidate: 60 },
+        getOrSet(
+          `matches:${code}:${status}`,
+          60 * 1000,
+          async () => {
+            const response = await fetchWithRetry(
+              `https://api.football-data.org/v4/competitions/${code}/matches?status=${status}`,
+              { headers: { "X-Auth-Token": apiKey }, cache: "no-store" }
+            );
+            if (!response.ok) {
+              throw new Error(`football-data.org returned ${response.status}`);
+            }
+            return response.json();
           }
-        ).then((res) => (res.ok ? res.json() : { matches: [] }))
+        ).catch(() => ({ matches: [] }))
       )
     );
 
     const results = await Promise.all(requests);
-    const allMatches = results.flatMap((result) => result.matches ?? []);
+    const allMatches = results.flatMap(
+      (result) => (result as { matches?: unknown[] }).matches ?? []
+    );
 
     return NextResponse.json({ matches: allMatches });
   } catch (error) {
