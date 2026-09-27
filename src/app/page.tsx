@@ -12,44 +12,67 @@ import {
   fetchLiveMatches,
   fetchVenueFallbacks,
   extractTeamId,
+  leaguesToCodes,
   LiveMatch,
 } from "../lib/footballApi";
 import ClubBadge from "../components/ClubBadge";
 import YourClubs from "../components/YourClubs";
 import { readPersisted, writePersisted } from "../lib/persistentCache";
 
-const LIVE_MATCHES_CACHE_KEY = "live-matches";
+function liveMatchesCacheKey(leaguesKey: string): string {
+  return `live-matches:${leaguesKey}`;
+}
 
 export default function Home() {
   const { selectedIds, loaded } = useClubs();
   const router = useRouter();
+
+  // Only ask for the leagues these followed clubs are actually in,
+  // instead of every league this app knows about - see the comment on
+  // /api/matches for why. Empty until the saved club list has loaded.
+  const followedLeagueCodes = leaguesToCodes(
+    selectedIds
+      .map((id) => getClub(id)?.league)
+      .filter((league): league is string => Boolean(league))
+  );
+  const leaguesKey = followedLeagueCodes.slice().sort().join(",");
+  const cacheKey = liveMatchesCacheKey(leaguesKey);
+
   // Seeded from whatever the app last saved on the device, so a
   // returning visitor sees real fixtures immediately instead of an empty
   // "You're all caught up" while the network catches up - see
   // src/lib/persistentCache.ts for why this is safe for confirmed
   // football data.
   const [liveMatches, setLiveMatches] = useState<LiveMatch[]>(
-    () => readPersisted<LiveMatch[]>(LIVE_MATCHES_CACHE_KEY) ?? []
+    () => readPersisted<LiveMatch[]>(cacheKey) ?? []
   );
   const [liveLoading, setLiveLoading] = useState(
-    () => readPersisted<LiveMatch[]>(LIVE_MATCHES_CACHE_KEY) === null
+    () => readPersisted<LiveMatch[]>(cacheKey) === null
   );
 
   useEffect(() => {
-    const cached = readPersisted<LiveMatch[]>(LIVE_MATCHES_CACHE_KEY);
+    // Wait for the real saved club list before fetching - selectedIds
+    // briefly looks empty for every returning visitor too, for the
+    // instant before it loads in from the browser, and we don't want to
+    // fetch (and cache) an empty-leagues result for that instant.
+    if (!loaded) return;
+    const cached = readPersisted<LiveMatch[]>(cacheKey);
     if (cached) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setLiveMatches(cached);
       setLiveLoading(false);
+    } else {
+      setLiveLoading(true);
     }
-    fetchLiveMatches()
+    fetchLiveMatches(followedLeagueCodes)
       .then((fresh) => {
         setLiveMatches(fresh);
-        writePersisted(LIVE_MATCHES_CACHE_KEY, fresh);
+        writePersisted(cacheKey, fresh);
       })
       .catch(() => {})
       .finally(() => setLiveLoading(false));
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded, leaguesKey]);
 
   // Onboarding is the one, real "welcome" screen now - a brand-new visitor
   // (nothing followed yet) is sent straight there instead of this page

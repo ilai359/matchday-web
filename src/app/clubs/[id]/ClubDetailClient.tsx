@@ -207,7 +207,11 @@ export default function ClubDetailClient({ id }: { id: string }) {
       code
         ? fetchFinishedMatches(code, currentSeasonYear).catch(() => [])
         : Promise.resolve([]),
-      fetchLiveMatches().catch(() => []),
+      // This club's own league only - upcomingMatches is filtered down
+      // to just this club's fixtures below, so there's no reason to ask
+      // for every league this app knows about (see the comment on
+      // /api/matches for why that matters).
+      fetchLiveMatches(code ? [code] : []).catch(() => []),
       fetchLiveUpdates(newsQueryNames, followedLeagues).catch(() => []),
     ])
       .then(([standingsRes, scorersRes, finishedRes, liveRes, newsRes]) => {

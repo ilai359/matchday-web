@@ -328,21 +328,50 @@ export async function fetchMatchById(matchId: string): Promise<LiveMatch | null>
   }
 }
 
-export async function fetchLiveMatches(): Promise<LiveMatch[]> {
+// Converts a list of league names (as stored on a Club, e.g. "Premier
+// League") into the competition codes football-data.org actually uses
+// (e.g. "PL") - deduped, and silently dropping any league this app
+// doesn't have a code for.
+export function leaguesToCodes(leagueNames: string[]): string[] {
+  return Array.from(
+    new Set(
+      leagueNames
+        .map((name) => LEAGUE_TO_CODE[name])
+        .filter((code): code is string => Boolean(code))
+    )
+  );
+}
+
+// leagueCodes scopes which competitions /api/matches actually asks
+// football-data.org for - pass the codes for whichever leagues you
+// actually care about (see leaguesToCodes above). An empty array asks
+// for nothing, which is correct when there's genuinely nothing to ask
+// about yet (e.g. no clubs followed).
+export async function fetchLiveMatches(
+  leagueCodes: string[] = []
+): Promise<LiveMatch[]> {
+  const sortedCodes = [...leagueCodes].sort();
   // Short cache (30s) - long enough to make a quick back-and-forth
   // between pages feel instant, short enough that live scores still
-  // update at essentially the same pace as before.
-  return cachedFetch("client:live-matches", 30 * 1000, async () => {
-    const response = await fetch("/api/matches");
-    if (!response.ok) {
-      throw new Error("Failed to fetch live matches");
+  // update at essentially the same pace as before. Keyed by which
+  // leagues were asked for, so a home page scoped to 3 leagues doesn't
+  // get mixed up with a club page scoped to just 1.
+  return cachedFetch(
+    `client:live-matches:${sortedCodes.join(",")}`,
+    30 * 1000,
+    async () => {
+      const query = `?leagues=${encodeURIComponent(sortedCodes.join(","))}`;
+      const response = await fetch(`/api/matches${query}`);
+      if (!response.ok) {
+        throw new Error("Failed to fetch live matches");
+      }
+      const data = await response.json();
+      const rawMatches: RawApiMatch[] = data.matches ?? [];
+      return rawMatches
+        .map(mapRawMatch)
+        .filter((match) => VISIBLE_STATUSES.has(match.status));
     }
-    const data = await response.json();
-    const rawMatches: RawApiMatch[] = data.matches ?? [];
-    return rawMatches
-      .map(mapRawMatch)
-      .filter((match) => VISIBLE_STATUSES.has(match.status));
-  });
+  );
 }
 
 // Every upcoming or in-progress match for one club, across every

@@ -11,12 +11,16 @@ import {
   fetchLiveMatches,
   fetchVenueFallbacks,
   extractTeamId,
+  leaguesToCodes,
   LiveMatch,
 } from "../../lib/footballApi";
 import ClubBadge from "../../components/ClubBadge";
 import { readPersisted, writePersisted } from "../../lib/persistentCache";
 
-const LIVE_MATCHES_CACHE_KEY = "live-matches";
+function liveMatchesCacheKey(leaguesKey: string): string {
+  return `live-matches:${leaguesKey}`;
+}
+
 const MATCHES_SCROLL_KEY = "matchday:matches-scroll";
 const MATCHES_FILTER_KEY = "matchday:matches-filter";
 
@@ -45,7 +49,7 @@ function saveScrollPosition() {
 }
 
 export default function Matches() {
-  const { selectedIds } = useClubs();
+  const { selectedIds, loaded } = useClubs();
   const [activeFilter, setActiveFilter] = useState<string>(readSavedFilter);
   // Keep the saved filter in sync with whatever's currently selected, so
   // it's there to restore next time this page is remounted (e.g. after
@@ -58,33 +62,51 @@ export default function Matches() {
       // the filter just doesn't persist, nothing else breaks.
     }
   }, [activeFilter]);
+
+  // Only ask for the leagues these followed clubs are actually in,
+  // instead of every league this app knows about - see the comment on
+  // /api/matches for why. Empty until the saved club list has loaded.
+  const followedLeagueCodes = leaguesToCodes(
+    selectedIds
+      .map((id) => getClub(id)?.league)
+      .filter((league): league is string => Boolean(league))
+  );
+  const leaguesKey = followedLeagueCodes.slice().sort().join(",");
+  const cacheKey = liveMatchesCacheKey(leaguesKey);
+
   // Seeded from whatever was last saved on the device, so reopening this
   // tab shows real matches immediately instead of an empty list while the
   // network catches up - see src/lib/persistentCache.ts. Shares its cache
   // key with the home page's live-matches fetch, so whichever tab was
   // opened first also gives the other one a head start.
   const [liveMatches, setLiveMatches] = useState<LiveMatch[]>(
-    () => readPersisted<LiveMatch[]>(LIVE_MATCHES_CACHE_KEY) ?? []
+    () => readPersisted<LiveMatch[]>(cacheKey) ?? []
   );
   const [liveLoading, setLiveLoading] = useState(
-    () => readPersisted<LiveMatch[]>(LIVE_MATCHES_CACHE_KEY) === null
+    () => readPersisted<LiveMatch[]>(cacheKey) === null
   );
   const [liveError, setLiveError] = useState(false);
   useEffect(() => {
-    const cached = readPersisted<LiveMatch[]>(LIVE_MATCHES_CACHE_KEY);
+    // Wait for the real saved club list before fetching - see the
+    // identical note on this pattern on the home page.
+    if (!loaded) return;
+    const cached = readPersisted<LiveMatch[]>(cacheKey);
     if (cached) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setLiveMatches(cached);
       setLiveLoading(false);
+    } else {
+      setLiveLoading(true);
     }
-    fetchLiveMatches()
+    fetchLiveMatches(followedLeagueCodes)
       .then((fresh) => {
         setLiveMatches(fresh);
-        writePersisted(LIVE_MATCHES_CACHE_KEY, fresh);
+        writePersisted(cacheKey, fresh);
       })
       .catch(() => setLiveError(true))
       .finally(() => setLiveLoading(false));
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded, leaguesKey]);
 
   // Keeps scores current for whatever's actually in progress, without
   // polling forever for no reason: only bothers re-fetching while at
@@ -103,14 +125,19 @@ export default function Matches() {
     });
     if (!hasMatchWorthPolling) return;
     const interval = setInterval(() => {
-      fetchLiveMatches()
+      fetchLiveMatches(followedLeagueCodes)
         .then((fresh) => {
           setLiveMatches(fresh);
-          writePersisted(LIVE_MATCHES_CACHE_KEY, fresh);
+          writePersisted(cacheKey, fresh);
         })
         .catch(() => {});
     }, 45000);
     return () => clearInterval(interval);
+    // followedLeagueCodes/cacheKey intentionally excluded: both are
+    // derived fresh from selectedIds every render, and including them
+    // would restart this poll on every render instead of only when
+    // liveMatches itself changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [liveMatches]);
 
   // Last-resort venue lookup for whichever of your followed clubs' matches

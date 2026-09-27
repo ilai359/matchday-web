@@ -14,12 +14,34 @@ import { COMPETITIONS } from "@/lib/competitions";
 // SCHEDULED alone excludes them).
 const STATUSES = ["SCHEDULED", "LIVE"];
 
-export async function GET() {
+export async function GET(request: Request) {
   const apiKey = process.env.FOOTBALL_DATA_API_KEY;
 
   if (!apiKey) {
     return NextResponse.json({ error: "Missing API key" }, { status: 500 });
   }
+
+  // Only ask football-data.org for the leagues someone's actually
+  // watching (their followed clubs' leagues), instead of always asking
+  // for all 8. This route used to fire 16 requests (8 competitions x 2
+  // statuses) on every refresh no matter who was looking - by far the
+  // single biggest source of hitting football-data.org's shared
+  // 10-requests/minute limit. Most people only follow clubs in 2-4
+  // leagues, so this typically cuts that in half or more.
+  //
+  // "leagues" present but empty means the caller genuinely has nothing
+  // to ask for yet (e.g. no clubs followed) - fetch nothing. "leagues"
+  // missing entirely (an older cached page that doesn't send it yet, or
+  // a direct call) falls back to the full list, so nothing breaks.
+  const { searchParams } = new URL(request.url);
+  const leaguesParam = searchParams.get("leagues");
+  const requestedCompetitions =
+    leaguesParam === null
+      ? COMPETITIONS
+      : leaguesParam
+          .split(",")
+          .map((code) => code.trim())
+          .filter((code) => COMPETITIONS.includes(code));
 
   try {
     // Each competition+status combo is its own getOrSet entry so one
@@ -27,7 +49,7 @@ export async function GET() {
     // one falls back to its own last known-good list instead of an empty
     // one - this is what used to make only *some* leagues' matches show
     // up on a given page load.
-    const requests = COMPETITIONS.flatMap((code) =>
+    const requests = requestedCompetitions.flatMap((code) =>
       STATUSES.map((status) =>
         getOrSet(
           `matches:${code}:${status}`,
