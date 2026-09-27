@@ -122,16 +122,19 @@ export default function Home() {
   const nextMatch = futureMatches[0];
   const upcomingMatches = futureMatches.slice(1, 5);
 
-  // Either we don't know yet whether this person has followed clubs
-  // (still reading the saved list), or they haven't and are about to be
-  // sent to /onboarding (effect above) - either way, this is only ever on
-  // screen for an instant (reading the saved list is near-instant; this
-  // is really just covering the moment the app's JS is still starting
-  // up). A plain empty screen made that instant look like the app had
-  // stalled, so this shows the same wordmark as the real header instead -
-  // recognizably "Clubside is opening", not a blank flash - without
-  // showing any actual data that's about to be replaced.
-  if (!loaded || selectedIds.length === 0) {
+  // Three reasons to still be showing the splash instead of the real
+  // page: we don't know yet whether this person has followed clubs
+  // (still reading the saved list), they haven't and are about to be
+  // sent to /onboarding (effect above), or their live match data hasn't
+  // come back yet. That last one matters a lot: without it, the moment
+  // the saved club list is read (near-instant) but before live matches
+  // have loaded, "Next match"/"Up next" had nothing to show yet and fell
+  // back to "You're all caught up" - a real, final-looking message -
+  // even though the actual answer just hadn't arrived. Waiting for
+  // liveLoading here means that message only ever appears once we
+  // genuinely know there's nothing upcoming, not as a placeholder while
+  // still finding out.
+  if (!loaded || selectedIds.length === 0 || liveLoading) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#070A12]">
         <h1 className="animate-pulse text-[32px] font-black leading-none tracking-[-0.05em] text-white">
