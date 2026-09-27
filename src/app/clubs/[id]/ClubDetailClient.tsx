@@ -365,7 +365,7 @@ export default function ClubDetailClient({ id }: { id: string }) {
             </button>
           </div>
           <div className="flex items-center gap-4">
-            <div className="shrink-0 rounded-2xl bg-white p-2 shadow-lg">
+            <div className="shrink-0 overflow-hidden rounded-2xl bg-white p-2 shadow-lg">
               <ClubBadge
                 name={club.name}
                 crest={club.crest}

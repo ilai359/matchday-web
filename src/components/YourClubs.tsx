@@ -348,7 +348,7 @@ function ClubStatsCard({
           <div className="absolute -bottom-24 -left-10 h-48 w-48 rounded-full bg-black/30 blur-[60px]" />
         </div>
         <div className="relative z-10 flex items-center gap-3">
-          <div className="shrink-0 rounded-2xl bg-white p-1 shadow-lg">
+          <div className="shrink-0 overflow-hidden rounded-2xl bg-white p-1 shadow-lg">
             <ClubBadge
               name={club.name}
               crest={club.crest}
