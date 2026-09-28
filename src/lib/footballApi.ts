@@ -318,14 +318,31 @@ const VISIBLE_STATUSES = new Set(["TIMED", "SCHEDULED", "IN_PLAY", "PAUSED"]);
 // null if the id isn't a real football-data.org match (e.g. a Europa/
 // Conference League match, which uses API-Football's own ids instead).
 export async function fetchMatchById(matchId: string): Promise<LiveMatch | null> {
-  try {
-    const response = await fetch(`/api/match-live?id=${matchId}`);
-    if (!response.ok) return null;
-    const data: RawApiMatch = await response.json();
-    return mapRawMatch(data);
-  } catch {
-    return null;
+  // A match that's never been fetched before (most commonly: right after
+  // following a new club, or the first click into a match this session)
+  // has no "last known good" value to fall back on yet - see getOrSet in
+  // cache.ts. So a single transient failure, most commonly
+  // football-data.org's shared rate limit being hit by a burst of other
+  // requests happening at the same time, would otherwise show "Match not
+  // found" for a perfectly real match. Retry a couple of times with a
+  // short pause before actually giving up, so a real match only shows as
+  // missing if it's still failing after several seconds.
+  const attempts = 3;
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      const response = await fetch(`/api/match-live?id=${matchId}`);
+      if (response.ok) {
+        const data: RawApiMatch = await response.json();
+        return mapRawMatch(data);
+      }
+    } catch {
+      // fall through to retry below
+    }
+    if (attempt < attempts) {
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+    }
   }
+  return null;
 }
 
 // Converts a list of league names (as stored on a Club, e.g. "Premier
@@ -333,13 +350,24 @@ export async function fetchMatchById(matchId: string): Promise<LiveMatch | null>
 // (e.g. "PL") - deduped, and silently dropping any league this app
 // doesn't have a code for.
 export function leaguesToCodes(leagueNames: string[]): string[] {
-  return Array.from(
-    new Set(
-      leagueNames
-        .map((name) => LEAGUE_TO_CODE[name])
-        .filter((code): code is string => Boolean(code))
-    )
+  const codes = new Set(
+    leagueNames
+      .map((name) => LEAGUE_TO_CODE[name])
+      .filter((code): code is string => Boolean(code))
   );
+  // A club's `league` field is always its domestic league (e.g. "Premier
+  // League") - never "UEFA Champions League" - so CL would otherwise
+  // never make it into this list no matter which clubs are followed,
+  // silently dropping every Champions League fixture from the home page
+  // and Matches tab. Add it alongside whatever domestic leagues are
+  // followed, since it's a competition most fans want to see regardless
+  // of which specific club they follow. Only added once at least one
+  // league is actually followed - an empty list (nothing followed yet)
+  // still means "ask for nothing".
+  if (codes.size > 0) {
+    codes.add("CL");
+  }
+  return Array.from(codes);
 }
 
 // leagueCodes scopes which competitions /api/matches actually asks
