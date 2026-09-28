@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { rememberArticles } from "@/lib/newsArchive";
 
 const LEAGUE_QUERIES = [
   "Premier League",
@@ -71,16 +72,23 @@ export async function GET(request: Request) {
   const queries = clubNames.length > 0 ? clubNames : LEAGUE_QUERIES;
 
   try {
-    const requests = queries.map((query) =>
-      fetchNewsWithRetry(
+    const requests = queries.map(async (query) => {
+      const result = await fetchNewsWithRetry(
         `https://newsdata.io/api/1/latest?apikey=${apiKey}&q=${encodeURIComponent(
           buildQuery(query)
         )}&language=en&category=sports&size=10`
-      )
-    );
+      );
+      const fresh = (result.results ?? []) as { link?: string; pubDate?: string }[];
+      // NewsData's "latest" endpoint only ever covers the last 48 hours
+      // (a hard limit of the service, not something we can ask around) -
+      // merge in whatever we've remembered from earlier fetches so the
+      // app's effective news window reaches back further than that, at
+      // no extra API cost. See newsArchive.ts for the full reasoning.
+      return rememberArticles(query, fresh);
+    });
 
     const results = await Promise.all(requests);
-    const allArticles = results.flatMap((result) => result.results ?? []);
+    const allArticles = results.flat();
 
     return NextResponse.json({ articles: allArticles });
   } catch (error) {
