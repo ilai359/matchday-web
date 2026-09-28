@@ -10,7 +10,17 @@
 // to never cache, so a stale or missing league table (the bug fixed
 // earlier this project) can't happen again because of this.
 
-const CACHE_NAME = "clubside-static-v1";
+// Bump this string (v1 -> v2 -> ...) any time you need to force every
+// phone/browser to drop its cached static files and pick up a fresh
+// copy of everything - normally not needed (content-hashed filenames
+// already handle that on their own), but this is the escape hatch for
+// when a device is stuck showing an old build for some other reason
+// (e.g. an installed/"Add to Home Screen" app not noticing an update
+// promptly). Bumped once already: club crest corners were fixed in the
+// code (twice, confirmed correct and deployed) but kept showing square
+// on a phone that had the app added to its home screen - the strongest
+// remaining explanation is a stuck old cache there, not the code.
+const CACHE_NAME = "clubside-static-v2";
 
 // Only ever cache same-origin GET requests for the app's own built
 // assets and icons - never API calls, never other origins.
