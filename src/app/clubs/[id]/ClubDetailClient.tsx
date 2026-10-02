@@ -473,23 +473,6 @@ export default function ClubDetailClient({ id }: { id: string }) {
           </div>
         )}
 
-        {/* AI SPOTLIGHT */}
-        {!loading && spotlight && (
-          <section className="mb-4">
-            <div className="overflow-hidden rounded-[24px] border border-blue-100 bg-gradient-to-br from-blue-50 to-violet-50 p-4 dark:border-blue-500/20 dark:from-blue-500/[0.06] dark:to-violet-500/[0.06]">
-              <div className="mb-2 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-blue-500 dark:text-blue-400">
-                ✨ AI Summary · written {formatDate(spotlight.writtenAt)}
-              </div>
-              <h3 className="mb-1.5 text-base font-black text-[#111318] dark:text-white">
-                {spotlight.title}
-              </h3>
-              <p className="text-[13px] leading-[1.7] text-zinc-600 dark:text-zinc-300">
-                {spotlight.summary}
-              </p>
-            </div>
-          </section>
-        )}
-
         {/* RECENT FORM + RESULTS */}
         {!loading && clubResults.length > 0 && (
           <section className="mb-4">
@@ -698,7 +681,7 @@ export default function ClubDetailClient({ id }: { id: string }) {
         )}
 
         {/* NEWS */}
-        {!loading && news.length > 0 && (
+        {!loading && (news.length > 0 || spotlight) && (
           <section className="mb-4">
             <SectionHeading icon="⚡" title="Latest news" />
             <div className="flex flex-col gap-2.5">
@@ -729,6 +712,33 @@ export default function ClubDetailClient({ id }: { id: string }) {
                   </a>
                 );
               })}
+              {spotlight && (
+                // Our own written update for clubs that don't get much
+                // regular news coverage (see data/clubSpotlights.ts) -
+                // used to get a special highlighted callout at the top
+                // of the page; now it's just one more card in this list,
+                // same styling as everything else here, same as Ilai
+                // asked for.
+                <div className="block rounded-[22px] border border-black/[0.045] bg-white p-3.5 shadow-sm dark:border-white/[0.06] dark:bg-[#14171F] dark:shadow-none">
+                  <div className="mb-1.5 flex items-center gap-1.5">
+                    <span
+                      className="flex h-5 w-5 items-center justify-center rounded-full text-[11px]"
+                      style={{
+                        backgroundColor: categoryStyles.Club.background,
+                        color: categoryStyles.Club.color,
+                      }}
+                    >
+                      {categoryStyles.Club.icon}
+                    </span>
+                    <span className="text-[9px] font-black uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+                      Club
+                    </span>
+                  </div>
+                  <div className="text-[13px] font-black leading-snug text-[#111318] dark:text-white">
+                    {spotlight.title}
+                  </div>
+                </div>
+              )}
             </div>
             <Link
               href="/updates"
