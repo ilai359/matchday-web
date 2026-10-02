@@ -188,10 +188,18 @@ export type TeamInfo = { venue?: string };
 // this existed.
 export async function fetchTeamInfo(teamId: string): Promise<TeamInfo | null> {
   try {
-    const response = await fetch(`/api/team-info?id=${teamId}`);
-    if (!response.ok) return null;
-    const data = await response.json();
-    return { venue: data.venue ?? undefined };
+    // A club's stadium essentially never changes, so this is cached far
+    // longer than anything else in this file (an hour) - this was the
+    // one real gap in an otherwise well-cached set of pages: every
+    // single visit to Home or Matches was re-asking for the exact same
+    // handful of stadium names from scratch, for every club in the list
+    // that isn't one of the 132 this app already knows about.
+    return await cachedFetch(`client:team-info:${teamId}`, 60 * 60 * 1000, async () => {
+      const response = await fetch(`/api/team-info?id=${teamId}`);
+      if (!response.ok) throw new Error("Failed to fetch team info");
+      const data = await response.json();
+      return { venue: data.venue ?? undefined };
+    });
   } catch {
     return null;
   }

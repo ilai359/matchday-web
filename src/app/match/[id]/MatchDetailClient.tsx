@@ -834,9 +834,32 @@ export default function MatchDetailClient({ id }: { id: string }) {
               type="button"
               onClick={handleShareMatch}
               disabled={sharing}
-              className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-[#F2F4F7] py-2.5 text-xs font-black text-zinc-600 transition hover:bg-[#E8EBF0] disabled:opacity-60 dark:bg-white/10 dark:text-zinc-300 dark:hover:bg-white/15"
+              className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl py-3 text-xs font-black uppercase tracking-wide text-white shadow-[0_10px_24px_rgba(0,0,0,0.16)] transition hover:-translate-y-0.5 active:scale-[0.98] disabled:opacity-60 disabled:hover:translate-y-0"
+              style={{
+                background: `linear-gradient(135deg, ${displayMatch.homeColor}, ${displayMatch.awayColor})`,
+              }}
             >
-              {sharing ? "Preparing image…" : "📤 Share this match"}
+              {sharing ? (
+                "Preparing image…"
+              ) : (
+                <>
+                  <svg
+                    width="15"
+                    height="15"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.4"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M12 16V4" />
+                    <path d="M7 9l5-5 5 5" />
+                    <path d="M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4" />
+                  </svg>
+                  Share this match
+                </>
+              )}
             </button>
 
             <div className="mt-5 border-t border-zinc-100 pt-4 dark:border-white/10">

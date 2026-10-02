@@ -441,9 +441,32 @@ export default function ClubDetailClient({ id }: { id: string }) {
             type="button"
             onClick={handleShareClub}
             disabled={sharing}
-            className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/10 py-2.5 text-xs font-black text-white backdrop-blur-md transition hover:bg-white/20 disabled:opacity-60"
+            className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-white/15 py-3 text-xs font-black uppercase tracking-wide text-white shadow-[0_10px_24px_rgba(0,0,0,0.2)] backdrop-blur-md transition hover:-translate-y-0.5 active:scale-[0.98] disabled:opacity-60 disabled:hover:translate-y-0"
+            style={{
+              background: `linear-gradient(135deg, ${club.primaryColor}, #111827 85%)`,
+            }}
           >
-            {sharing ? "Preparing image…" : "📤 Share club stats"}
+            {sharing ? (
+              "Preparing image…"
+            ) : (
+              <>
+                <svg
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M12 16V4" />
+                  <path d="M7 9l5-5 5 5" />
+                  <path d="M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4" />
+                </svg>
+                Share club stats
+              </>
+            )}
           </button>
         </div>
       </header>
