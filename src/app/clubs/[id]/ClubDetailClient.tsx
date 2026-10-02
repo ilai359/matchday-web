@@ -333,6 +333,7 @@ export default function ClubDetailClient({ id }: { id: string }) {
         league: club.league,
         country: club.country,
         color: club.primaryColor,
+        crest: club.crest,
         position: clubRow?.position ?? null,
         played: clubRow?.playedGames ?? null,
         won: clubRow?.won ?? null,

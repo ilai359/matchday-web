@@ -580,6 +580,8 @@ export default function MatchDetailClient({ id }: { id: string }) {
     if (!displayMatch) return;
     setSharing(true);
     try {
+      const homeClubId = displayMatch.homeClubId ?? null;
+      const awayClubId = displayMatch.awayClubId ?? null;
       const blob = await createMatchShareImage({
         competition: displayMatch.competition,
         homeName: displayMatch.homeName,
@@ -590,6 +592,23 @@ export default function MatchDetailClient({ id }: { id: string }) {
         awayScore: liveStatus?.awayScore ?? displayMatch.awayScore,
         statusLabel: statusPillLabel,
         dateLabel: formatFullDateWithYear(displayMatch.kickoff),
+        homeCrest: displayMatch.homeCrest,
+        awayCrest: displayMatch.awayCrest,
+        homeForm: homeForm
+          .map((m) => (homeClubId ? resultFor(m, homeClubId) : null))
+          .filter((r): r is "W" | "D" | "L" => r !== null),
+        awayForm: awayForm
+          .map((m) => (awayClubId ? resultFor(m, awayClubId) : null))
+          .filter((r): r is "W" | "D" | "L" => r !== null),
+        headToHead: headToHeadMatches.map((m) => ({
+          dateLabel: formatFullDateWithYear(m.kickoff),
+          homeName: shortName(m.homeClubId, m.homeTeamName),
+          awayName: shortName(m.awayClubId, m.awayTeamName),
+          homeScore: m.homeScore ?? 0,
+          awayScore: m.awayScore ?? 0,
+          homeCrest: crestFor(m.homeClubId, m.homeCrest),
+          awayCrest: crestFor(m.awayClubId, m.awayCrest),
+        })),
       });
       if (blob) {
         await shareOrDownloadImage(
