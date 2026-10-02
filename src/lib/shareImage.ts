@@ -151,6 +151,84 @@ export async function createMatchShareImage(match: ShareMatchInput): Promise<Blo
   });
 }
 
+export type ShareClubInput = {
+  name: string;
+  league: string;
+  country: string;
+  color: string;
+  position: number | null;
+  played: number | null;
+  won: number | null;
+  draw: number | null;
+  lost: number | null;
+  points: number | null;
+};
+
+/** Draws a square (1080x1080) club-stats card and returns it as a PNG blob. */
+export async function createClubShareImage(club: ShareClubInput): Promise<Blob | null> {
+  if (typeof document === "undefined") return null;
+  const size = 1080;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+
+  const bg = ctx.createLinearGradient(0, 0, size, size);
+  bg.addColorStop(0, "#0B0D12");
+  bg.addColorStop(1, "#080B13");
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, size, size);
+
+  glow(ctx, size / 2, size * 0.32, size * 0.48, club.color);
+
+  ctx.textAlign = "center";
+  ctx.fillStyle = "rgba(255,255,255,0.55)";
+  ctx.font = `800 26px ${FONT}`;
+  ctx.fillText(`${club.league.toUpperCase()} · ${club.country.toUpperCase()}`, size / 2, 120);
+
+  drawBadge(ctx, size / 2, 320, 130, club.color, initials(club.name));
+
+  ctx.fillStyle = "#FFFFFF";
+  ctx.font = `800 54px ${FONT}`;
+  wrapLines(ctx, club.name, 820).forEach((line, i) => {
+    ctx.fillText(line, size / 2, 540 + i * 62);
+  });
+
+  if (club.position !== null) {
+    ctx.font = `900 44px ${FONT}`;
+    ctx.fillStyle = club.color;
+    ctx.fillText(`#${club.position} in table`, size / 2, 660);
+  }
+
+  const stats: Array<[string, number | null]> = [
+    ["P", club.played],
+    ["W", club.won],
+    ["D", club.draw],
+    ["L", club.lost],
+    ["PTS", club.points],
+  ];
+  const cellWidth = size / stats.length;
+  const statsY = 800;
+  stats.forEach(([label, value], i) => {
+    const x = cellWidth * i + cellWidth / 2;
+    ctx.font = `900 46px ${FONT}`;
+    ctx.fillStyle = label === "PTS" ? club.color : "#FFFFFF";
+    ctx.fillText(value === null ? "–" : String(value), x, statsY);
+    ctx.font = `700 20px ${FONT}`;
+    ctx.fillStyle = "rgba(255,255,255,0.5)";
+    ctx.fillText(label, x, statsY + 36);
+  });
+
+  ctx.font = `900 36px ${FONT}`;
+  ctx.fillStyle = "#FFFFFF";
+  ctx.fillText("Clubside", size / 2, size - 64);
+
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => resolve(blob), "image/png");
+  });
+}
+
 /**
  * Opens the device's native share sheet with the given image (so it can
  * go straight to Messages, WhatsApp, Instagram Stories, etc.) when the

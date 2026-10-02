@@ -24,6 +24,7 @@ import {
 } from "../../../lib/footballApi";
 import ClubBadge from "../../../components/ClubBadge";
 import { readPersisted, writePersisted } from "../../../lib/persistentCache";
+import { createClubShareImage, shareOrDownloadImage } from "../../../lib/shareImage";
 
 type ClubDetailBundle = {
   standings: StandingsRow[];
@@ -165,6 +166,7 @@ export default function ClubDetailClient({ id }: { id: string }) {
   const [news, setNews] = useState<NewsUpdate[]>(() => cachedBundle?.news ?? []);
   const [loading, setLoading] = useState(() => cachedBundle === null);
   const [tableExpanded, setTableExpanded] = useState(false);
+  const [sharing, setSharing] = useState(false);
 
   useEffect(() => {
     // No `loading` to reset here if there's no club: the component
@@ -322,6 +324,34 @@ export default function ClubDetailClient({ id }: { id: string }) {
     ? standings
     : centeredTableRows(standings, COLLAPSED_TABLE_ROWS);
 
+  async function handleShareClub() {
+    if (!club) return;
+    setSharing(true);
+    try {
+      const blob = await createClubShareImage({
+        name: club.name,
+        league: club.league,
+        country: club.country,
+        color: club.primaryColor,
+        position: clubRow?.position ?? null,
+        played: clubRow?.playedGames ?? null,
+        won: clubRow?.won ?? null,
+        draw: clubRow?.draw ?? null,
+        lost: clubRow?.lost ?? null,
+        points: clubRow?.points ?? null,
+      });
+      if (blob) {
+        await shareOrDownloadImage(
+          blob,
+          `clubside-${club.name}-stats.png`.replace(/\s+/g, "-"),
+          `${club.name} - via Clubside`
+        );
+      }
+    } finally {
+      setSharing(false);
+    }
+  }
+
   const hasAnyData =
     !loading &&
     (clubRow ||
@@ -406,6 +436,14 @@ export default function ClubDetailClient({ id }: { id: string }) {
               <HeaderStat label="Pts" value={clubRow.points} highlight />
             </div>
           )}
+          <button
+            type="button"
+            onClick={handleShareClub}
+            disabled={sharing}
+            className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/10 py-2.5 text-xs font-black text-white backdrop-blur-md transition hover:bg-white/20 disabled:opacity-60"
+          >
+            {sharing ? "Preparing image…" : "📤 Share club stats"}
+          </button>
         </div>
       </header>
 
