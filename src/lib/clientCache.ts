@@ -53,3 +53,23 @@ export async function cachedFetch<T>(
   inFlight.set(key, promise);
   return promise;
 }
+
+// A small companion to the cache above, just for matches: whenever any
+// list of matches gets fetched anywhere in the app (the home page, the
+// Matches tab, a club's own upcoming/recent matches), every match in it
+// gets remembered here by id. A match detail page can then check here
+// first and show real data immediately - no network wait, no "Match not
+// found" flash while a fresh fetch is still on its way - instead of
+// always starting from nothing and waiting on a brand-new request for a
+// match the user most likely just tapped straight out of a list.
+const matchesById = new Map<string, unknown>();
+
+export function rememberMatches<T extends { id: string }>(matches: T[]): void {
+  for (const match of matches) {
+    matchesById.set(match.id, match);
+  }
+}
+
+export function getRememberedMatch<T>(id: string): T | undefined {
+  return matchesById.get(id) as T | undefined;
+}

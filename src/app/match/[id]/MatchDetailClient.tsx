@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { matches } from "../../../data/matches";
 import { useClubs } from "../../../context/ClubsContext";
 import { getClub, getClubName } from "../../../lib/clubHelpers";
+import { getRememberedMatch } from "../../../lib/clientCache";
 import {
   formatFullDate,
   formatFullDateWithYear,
@@ -293,8 +294,16 @@ export default function MatchDetailClient({ id }: { id: string }) {
   const mockMatch = matches.find((m) => m.id === id);
   const router = useRouter();
 
-  const [liveMatch, setLiveMatch] = useState<LiveMatch | null>(null);
-  const [liveLoading, setLiveLoading] = useState(!mockMatch);
+  // A match the user just tapped into almost always just came from a
+  // list this app already fetched (the home page, Matches tab, or a
+  // club's own matches) - rememberMatches (called from fetchLiveMatches)
+  // keeps every match from those lists around by id for exactly this
+  // moment, so there's real data to show immediately instead of a blank
+  // loading screen, and no "Match not found" flash if the fresh fetch
+  // below happens to hit a rate limit.
+  const remembered = mockMatch ? null : getRememberedMatch<LiveMatch>(id);
+  const [liveMatch, setLiveMatch] = useState<LiveMatch | null>(remembered ?? null);
+  const [liveLoading, setLiveLoading] = useState(!mockMatch && !remembered);
 
   useEffect(() => {
     if (mockMatch) return;
@@ -307,8 +316,14 @@ export default function MatchDetailClient({ id }: { id: string }) {
     // club's "Recent form" list) - so it's both simpler and correct on
     // its own, with no batch step needed first.
     fetchMatchById(id)
-      .then((found) => setLiveMatch(found))
-      .catch(() => setLiveMatch(null))
+      .then((found) => {
+        // Only overwrite what's on screen with a real result - a failed
+        // fetch (found === null, usually a transient rate limit) should
+        // never erase an already-remembered match and flip a working
+        // page over to "not found".
+        if (found) setLiveMatch(found);
+      })
+      .catch(() => {})
       .finally(() => setLiveLoading(false));
   }, [id, mockMatch]);
 

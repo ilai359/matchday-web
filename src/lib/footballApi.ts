@@ -1,6 +1,6 @@
 import { clubs } from "../data/clubs";
 import { STADIUMS } from "../data/stadiums";
-import { cachedFetch } from "./clientCache";
+import { cachedFetch, rememberMatches } from "./clientCache";
 export type LiveMatch = {
   id: string;
   competition: string;
@@ -395,9 +395,14 @@ export async function fetchLiveMatches(
       }
       const data = await response.json();
       const rawMatches: RawApiMatch[] = data.matches ?? [];
-      return rawMatches
+      const mapped = rawMatches
         .map(mapRawMatch)
         .filter((match) => VISIBLE_STATUSES.has(match.status));
+      // Remember every match this list just fetched, so tapping straight
+      // into one of them from here shows up instantly instead of waiting
+      // on a brand-new network request - see rememberMatches for why.
+      rememberMatches(mapped);
+      return mapped;
     }
   );
 }
@@ -696,5 +701,11 @@ export function prefetchClubPage(clubId: string): void {
     );
     fetchFinishedMatches(code, currentSeasonYear).catch(() => {});
   }
-  fetchLiveMatches().catch(() => {});
+  // Scoped to this one club's own league, matching exactly what the club
+  // detail page itself asks for when it actually mounts (see
+  // ClubDetailClient.tsx) - this used to call fetchLiveMatches() with no
+  // league codes at all, which (now that fetchLiveMatches is scoped)
+  // warmed a cache key for "no leagues" that the real page never reads
+  // from, making this part of the prefetch a no-op.
+  fetchLiveMatches(code ? [code] : []).catch(() => {});
 }

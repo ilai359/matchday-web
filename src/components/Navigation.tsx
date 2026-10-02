@@ -1,6 +1,9 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useClubs } from "../context/ClubsContext";
+import { getClub } from "../lib/clubHelpers";
+import { fetchLiveMatches, leaguesToCodes } from "../lib/footballApi";
 
 const tabs = [
   { href: "/", label: "Home" },
@@ -8,6 +11,21 @@ const tabs = [
   { href: "/updates", label: "Updates" },
   { href: "/clubs", label: "Clubs" },
 ];
+
+// Home and the Matches tab both show the exact same live-matches list
+// (same fetchLiveMatches call, same client-side cache key - see
+// footballApi.ts), so warming it a moment before either tab is actually
+// opened makes whichever one gets tapped feel instant instead of
+// re-starting the fetch from nothing. Triggered on hover/touch, the same
+// "give it a head start, not a guarantee" pattern already used for club
+// pages (see prefetchClubPage) - cheap and safe to call repeatedly since
+// it's just re-reading an already-warm cache once the real fetch has
+// happened. Deliberately NOT done for the Updates tab: its news fetch
+// isn't cached the same way, and prefetching it on every hover would
+// mean paying for the AI relevance check twice for no reason.
+function prefetchMatches(leagueCodes: string[]): void {
+  fetchLiveMatches(leagueCodes).catch(() => {});
+}
 
 function ProfileIcon() {
   return (
@@ -30,6 +48,12 @@ function ProfileIcon() {
 export default function Navigation() {
   const pathname = usePathname();
   const isProfileActive = pathname === "/settings";
+  const { selectedIds } = useClubs();
+  const followedLeagueCodes = leaguesToCodes(
+    selectedIds
+      .map((id) => getClub(id)?.league)
+      .filter((league): league is string => Boolean(league))
+  );
 
   return (
     <>
@@ -73,6 +97,16 @@ export default function Navigation() {
             <Link
               key={tab.href}
               href={tab.href}
+              onMouseEnter={
+                tab.href === "/" || tab.href === "/matches"
+                  ? () => prefetchMatches(followedLeagueCodes)
+                  : undefined
+              }
+              onTouchStart={
+                tab.href === "/" || tab.href === "/matches"
+                  ? () => prefetchMatches(followedLeagueCodes)
+                  : undefined
+              }
               // Extra vertical padding here (not just on <nav>) so each
               // tab's own tap target is taller, not only the bar around
               // it - the text itself was the entire clickable area before.
