@@ -880,11 +880,34 @@ notification can actually be sent.**
 ### What this is
 
 A toggle in Settings ("Goal alerts") that, once turned on, sends the
-user a push notification whenever a club they follow scores in a live
-match - works even if the app/tab isn't open, the same way any phone
-app's notifications do, via a real OS-level push notification (the Web
-Push standard, using a service worker - the file this app already had
-at `public/sw.js` for caching static assets, now also handling push).
+user a push notification when a match involving a club they follow
+kicks off, and another when that match ends with the final score -
+works even if the app/tab isn't open, the same way any phone app's
+notifications do, via a real OS-level push notification (the Web Push
+standard, using a service worker - the file this app already had at
+`public/sw.js` for caching static assets, now also handling push).
+
+**Deliberately kickoff + full-time only, not goal-by-goal.** The first
+version of this feature tried to alert on every individual goal during
+play, by re-checking the live score every few minutes. That's a bad
+idea on the free football-data.org plan this app uses: live scores on
+that plan are delayed on purpose (football-data.org's own pricing page
+says so), so a "goal" alert could land minutes after the goal actually
+happened - confusing rather than useful. Kickoff and full-time don't
+have that problem: "has this match started" and "has this match
+finished" are reliable right away, only the score shown *during* play
+is delayed. See `src/lib/goalWatch.ts` and
+`src/app/api/cron/check-goals/route.ts` for how this is tracked (the
+route's name still says "check-goals" rather than something like
+"check-matches" just to avoid re-doing the Vercel/GitHub setup below
+for a rename - the behavior inside it is what matters).
+
+**If accurate live, in-play scores are wanted later**, the fix isn't
+more code - it's football-data.org's own "Free w/ Livescores" plan,
+currently €12/month, which removes exactly this delay (and doubles the
+rate limit from 10 to 20 requests/minute). Worth it only if live,
+during-the-match detail actually matters; kickoff + full-time doesn't
+need it.
 
 ### Why this took more than just writing the feature
 
@@ -892,9 +915,10 @@ Vercel's free Hobby plan only runs background/cron jobs once a day (see
 the warm-finished-matches job above) - far too slow for a goal alert to
 mean anything. The fix: a GitHub Actions scheduled workflow
 (`.github/workflows/check-goals.yml`), which is free and can run every 5
-minutes, pings a new API route (`/api/cron/check-goals`) that checks for
-score changes and sends notifications. This is the same free-tier
-workaround discussed and chosen over paying for Vercel Pro.
+minutes, pings a new API route (`/api/cron/check-goals`) that checks
+which matches have just kicked off or just finished and sends
+notifications for those. This is the same free-tier workaround
+discussed and chosen over paying for Vercel Pro.
 
 GitHub's own docs note scheduled workflows are "best effort" (can run a
 few minutes late during busy periods) and get automatically paused if
