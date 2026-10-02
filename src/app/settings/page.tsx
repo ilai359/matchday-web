@@ -26,6 +26,12 @@ export default function Settings() {
   const { theme, setTheme } = useTheme();
   const { selectedIds, resetClubs } = useClubs();
 
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true);
+  }, []);
+
   const [pushMounted, setPushMounted] = useState(false);
   const [pushSupported, setPushSupported] = useState(true);
   const [pushPermissionDenied, setPushPermissionDenied] = useState(false);
@@ -409,7 +415,7 @@ export default function Settings() {
                   </div>
                 </div>
               </div>
-              {theme === "light" ? (
+              {mounted && theme === "light" ? (
                 <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[#111318] dark:bg-white">
                   <div className="h-2 w-2 rounded-full bg-white dark:bg-[#0B0D12]" />
                 </div>
@@ -436,7 +442,7 @@ export default function Settings() {
                   </div>
                 </div>
               </div>
-              {theme === "dark" ? (
+              {mounted && theme === "dark" ? (
                 <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[#111318] dark:bg-white">
                   <div className="h-2 w-2 rounded-full bg-white dark:bg-[#0B0D12]" />
                 </div>
