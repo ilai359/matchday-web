@@ -26,6 +26,7 @@ export default function Settings() {
   const { theme, setTheme } = useTheme();
   const { selectedIds, resetClubs } = useClubs();
 
+  const [pushMounted, setPushMounted] = useState(false);
   const [pushSupported, setPushSupported] = useState(true);
   const [pushPermissionDenied, setPushPermissionDenied] = useState(false);
   const [pushEnabled, setPushEnabled] = useState(false);
@@ -33,8 +34,9 @@ export default function Settings() {
   const selectedIdsKey = selectedIds.join(",");
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPushMounted(true);
     if (!isPushSupported()) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setPushSupported(false);
       return;
     }
@@ -451,7 +453,23 @@ export default function Settings() {
           </h2>
 
           <div className="overflow-hidden rounded-[26px] border border-black/[0.045] bg-white shadow-[0_6px_24px_rgba(0,0,0,0.045)] dark:border-white/[0.06] dark:bg-[#14171F] dark:shadow-none">
-            {!pushSupported ? (
+            {!pushMounted ? (
+              // The real state below depends on browser-only APIs
+              // (Notification permission, an existing push subscription)
+              // that the server has no way to know - rendering this
+              // fixed skeleton until just after mount keeps the
+              // server's guess and the browser's first paint
+              // identical, so React never has to reconcile a mismatch.
+              <div className="animate-pulse px-5 py-4" aria-hidden="true">
+                <div className="flex items-center gap-3">
+                  <div className="h-9 w-9 rounded-xl bg-black/[0.06] dark:bg-white/10" />
+                  <div className="flex-1">
+                    <div className="mb-2 h-3 w-24 rounded-full bg-black/[0.06] dark:bg-white/10" />
+                    <div className="h-2.5 w-44 rounded-full bg-black/[0.05] dark:bg-white/[0.08]" />
+                  </div>
+                </div>
+              </div>
+            ) : !pushSupported ? (
               <div className="px-5 py-4 text-[11px] font-medium leading-relaxed text-zinc-400 dark:text-zinc-500">
                 Goal alerts aren&apos;t supported in this browser.
               </div>
