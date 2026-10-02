@@ -7,6 +7,7 @@ import { matches } from "../../../data/matches";
 import { useClubs } from "../../../context/ClubsContext";
 import { getClub, getClubName } from "../../../lib/clubHelpers";
 import { getRememberedMatch } from "../../../lib/clientCache";
+import { createMatchShareImage, shareOrDownloadImage } from "../../../lib/shareImage";
 import {
   formatFullDate,
   formatFullDateWithYear,
@@ -427,6 +428,7 @@ export default function MatchDetailClient({ id }: { id: string }) {
   // in progress, or just finished (15 min before kickoff to 3 hours after).
   // Stops polling once the match is confirmed finished.
   const [liveStatus, setLiveStatus] = useState<LiveMatchStatus | null>(null);
+  const [sharing, setSharing] = useState(false);
   const kickoffForPolling = displayMatch?.kickoff;
 
   useEffect(() => {
@@ -573,6 +575,33 @@ export default function MatchDetailClient({ id }: { id: string }) {
     : isMatchFinished
     ? "Full-time"
     : displayMatch.statusLabel;
+
+  async function handleShareMatch() {
+    if (!displayMatch) return;
+    setSharing(true);
+    try {
+      const blob = await createMatchShareImage({
+        competition: displayMatch.competition,
+        homeName: displayMatch.homeName,
+        awayName: displayMatch.awayName,
+        homeColor: displayMatch.homeColor,
+        awayColor: displayMatch.awayColor,
+        homeScore: liveStatus?.homeScore ?? displayMatch.homeScore,
+        awayScore: liveStatus?.awayScore ?? displayMatch.awayScore,
+        statusLabel: statusPillLabel,
+        dateLabel: formatFullDateWithYear(displayMatch.kickoff),
+      });
+      if (blob) {
+        await shareOrDownloadImage(
+          blob,
+          `clubside-${displayMatch.homeName}-vs-${displayMatch.awayName}.png`.replace(/\s+/g, "-"),
+          `${displayMatch.homeName} vs ${displayMatch.awayName} - via Clubside`
+        );
+      }
+    } finally {
+      setSharing(false);
+    }
+  }
 
   const headToHeadMatches = [
     ...currentSeasonMatches,
@@ -781,6 +810,15 @@ export default function MatchDetailClient({ id }: { id: string }) {
                 </div>
               </div>
             </div>
+
+            <button
+              type="button"
+              onClick={handleShareMatch}
+              disabled={sharing}
+              className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-[#F2F4F7] py-2.5 text-xs font-black text-zinc-600 transition hover:bg-[#E8EBF0] disabled:opacity-60 dark:bg-white/10 dark:text-zinc-300 dark:hover:bg-white/15"
+            >
+              {sharing ? "Preparing image…" : "📤 Share this match"}
+            </button>
 
             <div className="mt-5 border-t border-zinc-100 pt-4 dark:border-white/10">
               <div className="mb-2.5 text-xs font-black uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
