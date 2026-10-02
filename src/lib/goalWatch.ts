@@ -1,11 +1,14 @@
-// Tracks which live matches the background notification job
-// (src/app/api/cron/check-goals/route.ts) has already sent a "kickoff"
-// alert for, so it can tell apart a match it's seeing live for the
-// first time (send a kickoff notification) from one it's already
-// notified about (don't repeat it), and can notice when a match it was
-// tracking has since disappeared from the live list (that's the signal
-// a match just finished, so it's time to look up the final score and
-// send the full-time notification).
+// Tracks which matches the background notification job
+// (src/app/api/cron/check-goals/route.ts) has already sent a "starting
+// soon", "kickoff", or "full-time" alert for, so none of those three
+// get sent twice:
+// - "started" = seen in the live list at least once (tells a match
+//   being seen live for the first time, worth a kickoff alert, apart
+//   from one already known to be underway - and later, its absence
+//   from the live list is the signal it just finished).
+// - "reminded" = already sent the ~15-minutes-before alert for a
+//   scheduled match, so it doesn't repeat every few minutes while
+//   still inside that window.
 //
 // This deliberately does NOT track in-play scores or try to notify on
 // individual goals anymore - football-data.org's free plan delays live
@@ -27,6 +30,7 @@ const redis =
   redisUrl && redisToken ? new Redis({ url: redisUrl, token: redisToken }) : null;
 
 const memoryStarted = new Set<string>();
+const memoryReminded = new Set<string>();
 
 const STARTED_INDEX_KEY = "goalwatch:started-ids";
 
@@ -68,4 +72,46 @@ export async function clearMatchStarted(matchId: string): Promise<void> {
     }
   }
   memoryStarted.delete(matchId);
+}
+
+const REMINDED_INDEX_KEY = "goalwatch:reminded-ids";
+
+/** Every match id that's already had its "starting soon" reminder sent, so it isn't sent twice. */
+export async function getRemindedMatchIds(): Promise<Set<string>> {
+  if (redis) {
+    try {
+      const ids = await redis.smembers(REMINDED_INDEX_KEY);
+      return new Set(ids);
+    } catch (error) {
+      console.error("getRemindedMatchIds: Redis read failed", error);
+      return new Set();
+    }
+  }
+  return new Set(memoryReminded);
+}
+
+/** Marks a match as having had its "starting soon" reminder sent. */
+export async function markMatchReminded(matchId: string): Promise<void> {
+  if (redis) {
+    try {
+      await redis.sadd(REMINDED_INDEX_KEY, matchId);
+      return;
+    } catch (error) {
+      console.error("markMatchReminded: Redis write failed, using in-memory fallback", error);
+    }
+  }
+  memoryReminded.add(matchId);
+}
+
+/** Clears a match's reminded flag - called once it actually kicks off, just to keep this list from growing forever with matches that have already come and gone. */
+export async function clearMatchReminded(matchId: string): Promise<void> {
+  if (redis) {
+    try {
+      await redis.srem(REMINDED_INDEX_KEY, matchId);
+      return;
+    } catch (error) {
+      console.error("clearMatchReminded: Redis write failed", error);
+    }
+  }
+  memoryReminded.delete(matchId);
 }

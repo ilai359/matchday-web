@@ -880,12 +880,18 @@ notification can actually be sent.**
 ### What this is
 
 A toggle in Settings ("Goal alerts") that, once turned on, sends the
-user a push notification when a match involving a club they follow
-kicks off, and another when that match ends with the final score -
-works even if the app/tab isn't open, the same way any phone app's
-notifications do, via a real OS-level push notification (the Web Push
-standard, using a service worker - the file this app already had at
-`public/sw.js` for caching static assets, now also handling push).
+user a push notification about 15 minutes before a match involving a
+club they follow kicks off, another right when it kicks off, and a
+third when it ends with the final score - works even if the app/tab
+isn't open, the same way any phone app's notifications do, via a real
+OS-level push notification (the Web Push standard, using a service
+worker - the file this app already had at `public/sw.js` for caching
+static assets, now also handling push).
+
+Turning the toggle on is what triggers the browser's own native
+"Allow notifications?" permission prompt, the same one any app or site
+asks before it can send notifications - this app doesn't (and can't)
+skip that; it's the browser's own built-in check.
 
 **Deliberately kickoff + full-time only, not goal-by-goal.** The first
 version of this feature tried to alert on every individual goal during

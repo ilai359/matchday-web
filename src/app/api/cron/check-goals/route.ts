@@ -8,22 +8,26 @@ import {
   getStartedMatchIds,
   markMatchStarted,
   clearMatchStarted,
+  getRemindedMatchIds,
+  markMatchReminded,
+  clearMatchReminded,
 } from "@/lib/goalWatch";
 import { getAllSubscriptions, removeSubscriptionByEndpoint } from "@/lib/pushSubscriptions";
 
 // Runs frequently (every few minutes - see the GitHub Actions workflow
-// at .github/workflows/check-goals.yml) and sends two kinds of alert to
-// anyone following either club in a match: one when the match kicks
-// off, and one when it's over, with the final score.
+// at .github/workflows/check-goals.yml) and sends three kinds of alert
+// to anyone following either club in a match: one about 15 minutes
+// before kickoff, one right when the match kicks off, and one when
+// it's over, with the final score.
 //
 // It deliberately does NOT try to alert on individual goals while a
 // match is still being played. football-data.org's free plan delays
-// live scores during play (see NOTES.md / the pricing note in this
-// repo's notes), so a goal-by-goal alert could lag minutes behind the
-// real thing - worse than no alert at all. Kickoff and full-time are
-// each a single, low-stakes check: "has this match started" and "has
-// this match finished" are reliable even if the score shown mid-match
-// isn't.
+// live scores during play (see NOTES.md), so a goal-by-goal alert could
+// lag minutes behind the real thing - worse than no alert at all. The
+// three alerts this sends instead are all things that are reliable even
+// when the in-play score isn't: "is this match starting soon", "has it
+// started", and "has it finished" (with the real final score, read once
+// it's actually over).
 //
 // This can't be Vercel's own cron (see warm-finished-matches/route.ts
 // for that mechanism) because Vercel's free Hobby plan only allows cron
@@ -33,25 +37,43 @@ import { getAllSubscriptions, removeSubscriptionByEndpoint } from "@/lib/pushSub
 // there, authenticated with its own secret (GOALS_CRON_SECRET) the same
 // way the Vercel cron job authenticates with CRON_SECRET.
 //
-// Deliberately reuses the exact same cache key format
-// (`matches:${code}:LIVE`, 60-second TTL) that /api/matches already uses
-// for real visitors, so this job only spends its own football-data.org
-// request when nobody's looked recently. The one extra request this
-// version adds beyond that - a single-match lookup - only happens once
-// per match, right when it's confirmed finished, not on every tick.
+// Deliberately reuses the exact same cache keys (`matches:${code}:LIVE`
+// and `matches:${code}:SCHEDULED`, both 60-second TTL) that /api/matches
+// already uses for real visitors, so this job only spends its own
+// football-data.org request when nobody's looked recently. The one
+// extra request this adds beyond that - a single-match lookup - only
+// happens once per match, right when it's confirmed finished, not on
+// every tick.
 export const maxDuration = 60;
+
+type RawTeam = { name: string };
 
 type RawLiveMatch = {
   id: number;
   competition: { name: string };
-  homeTeam: { name: string };
-  awayTeam: { name: string };
+  homeTeam: RawTeam;
+  awayTeam: RawTeam;
+};
+
+type RawScheduledMatch = {
+  id: number;
+  competition: { name: string };
+  homeTeam: RawTeam;
+  awayTeam: RawTeam;
+  utcDate: string;
 };
 
 type RawSingleMatch = {
   score?: { fullTime?: { home: number | null; away: number | null } };
   status?: string;
 };
+
+// How long before kickoff the "starting soon" reminder goes out. The
+// job runs roughly every 5 minutes, so a scheduled match's minutes-
+// until-kickoff will land somewhere inside this window at least once
+// before it starts - the alert isn't sent at exactly 15:00 to go, just
+// the first time it's checked and found to be 15 minutes or less away.
+const REMINDER_WINDOW_MINUTES = 15;
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
@@ -76,6 +98,7 @@ export async function GET(request: Request) {
   webpush.setVapidDetails(vapidSubject, vapidPublic, vapidPrivate);
 
   const subscriptions = await getAllSubscriptions();
+  let remindersSent = 0;
   let kickoffsSent = 0;
   let fullTimesSent = 0;
   let notificationsSent = 0;
@@ -83,7 +106,13 @@ export async function GET(request: Request) {
   // Nobody's subscribed yet - nothing to check or send, no point
   // spending football-data.org requests on it.
   if (subscriptions.length === 0) {
-    return NextResponse.json({ kickoffsSent, fullTimesSent, notificationsSent, subscribers: 0 });
+    return NextResponse.json({
+      remindersSent,
+      kickoffsSent,
+      fullTimesSent,
+      notificationsSent,
+      subscribers: 0,
+    });
   }
 
   async function notifySubscribers(clubIds: string[], title: string, body: string, matchId: string) {
@@ -111,13 +140,14 @@ export async function GET(request: Request) {
   }
 
   const previouslyStarted = await getStartedMatchIds();
+  const previouslyReminded = await getRemindedMatchIds();
   const stillLiveIds = new Set<string>();
   const liveMatchesById = new Map<string, RawLiveMatch>();
 
   for (const competition of COMPETITIONS) {
-    let matches: RawLiveMatch[];
+    let liveMatches: RawLiveMatch[];
     try {
-      matches = await getOrSet(`matches:${competition}:LIVE`, 60 * 1000, async () => {
+      liveMatches = await getOrSet(`matches:${competition}:LIVE`, 60 * 1000, async () => {
         const response = await fetchWithRetry(
           `https://api.football-data.org/v4/competitions/${competition}/matches?status=LIVE`,
           { headers: { "X-Auth-Token": apiKey }, cache: "no-store" }
@@ -129,16 +159,16 @@ export async function GET(request: Request) {
         return (data.matches ?? []) as RawLiveMatch[];
       });
     } catch {
-      // This competition's check failed (most likely a rate-limit hit) -
-      // skip it this run rather than fail the whole job; it'll be tried
-      // again on the next scheduled run a few minutes later. Any match
-      // from this competition that was already tracked as started stays
-      // tracked (we just didn't see it this run), so it won't falsely
-      // trigger a full-time alert either.
-      continue;
+      // This competition's live check failed (most likely a rate-limit
+      // hit) - skip it this run rather than fail the whole job; it'll
+      // be tried again on the next scheduled run a few minutes later.
+      // Any match from this competition that was already tracked as
+      // started stays tracked (we just didn't see it this run), so it
+      // won't falsely trigger a full-time alert either.
+      liveMatches = [];
     }
 
-    for (const match of matches) {
+    for (const match of liveMatches) {
       const matchId = String(match.id);
       stillLiveIds.add(matchId);
       liveMatchesById.set(matchId, match);
@@ -148,6 +178,7 @@ export async function GET(request: Request) {
       // First time we've seen this match in the LIVE list - it just
       // kicked off.
       await markMatchStarted(matchId);
+      await clearMatchReminded(matchId);
       kickoffsSent += 1;
 
       const homeClubId = matchClubId(match.homeTeam.name);
@@ -157,6 +188,47 @@ export async function GET(request: Request) {
         clubIds,
         `⚽ Kickoff: ${match.homeTeam.name} vs ${match.awayTeam.name}`,
         `${match.competition.name} is underway`,
+        matchId
+      );
+    }
+
+    let scheduledMatches: RawScheduledMatch[];
+    try {
+      scheduledMatches = await getOrSet(`matches:${competition}:SCHEDULED`, 60 * 1000, async () => {
+        const response = await fetchWithRetry(
+          `https://api.football-data.org/v4/competitions/${competition}/matches?status=SCHEDULED`,
+          { headers: { "X-Auth-Token": apiKey }, cache: "no-store" }
+        );
+        if (!response.ok) {
+          throw new Error(`football-data.org returned ${response.status}`);
+        }
+        const data = await response.json();
+        return (data.matches ?? []) as RawScheduledMatch[];
+      });
+    } catch {
+      scheduledMatches = [];
+    }
+
+    for (const match of scheduledMatches) {
+      const matchId = String(match.id);
+      if (previouslyReminded.has(matchId)) continue;
+
+      const minutesUntilKickoff = (new Date(match.utcDate).getTime() - Date.now()) / 60_000;
+      // Outside the reminder window (too far away, or already started -
+      // negative means it should already be in the LIVE list above) -
+      // nothing to do yet.
+      if (minutesUntilKickoff > REMINDER_WINDOW_MINUTES || minutesUntilKickoff <= 0) continue;
+
+      await markMatchReminded(matchId);
+      remindersSent += 1;
+
+      const homeClubId = matchClubId(match.homeTeam.name);
+      const awayClubId = matchClubId(match.awayTeam.name);
+      const clubIds = [homeClubId, awayClubId].filter((id): id is string => id !== null);
+      await notifySubscribers(
+        clubIds,
+        `⏰ Starting soon: ${match.homeTeam.name} vs ${match.awayTeam.name}`,
+        `${match.competition.name} kicks off shortly`,
         matchId
       );
     }
@@ -217,6 +289,7 @@ export async function GET(request: Request) {
   }
 
   return NextResponse.json({
+    remindersSent,
     kickoffsSent,
     fullTimesSent,
     notificationsSent,
