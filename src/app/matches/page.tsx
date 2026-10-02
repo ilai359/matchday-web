@@ -2,9 +2,8 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { clubs } from "../../data/clubs";
-import { matches } from "../../data/matches";
 import { useClubs } from "../../context/ClubsContext";
-import { getClub, getClubName } from "../../lib/clubHelpers";
+import { getClub } from "../../lib/clubHelpers";
 import { formatDate, formatTime } from "../../lib/dateHelpers";
 import { formatCompetition } from "../../lib/competitionNames";
 import {
@@ -211,26 +210,6 @@ export default function Matches() {
   const myClubs = clubs.filter((club) =>
     selectedIds.includes(club.id)
   );
-  const now = new Date().getTime();
-  const myMatches = matches
-    .filter(
-      (match) =>
-        selectedIds.includes(match.homeClubId) ||
-        selectedIds.includes(match.awayClubId)
-    )
-    .filter((match) => new Date(match.kickoff).getTime() >= now)
-    .filter((match) => {
-      if (activeFilter === "all") return true;
-      return (
-        match.homeClubId === activeFilter ||
-        match.awayClubId === activeFilter
-      );
-    })
-    .sort(
-      (a, b) =>
-        new Date(a.kickoff).getTime() -
-        new Date(b.kickoff).getTime()
-    );
   if (selectedIds.length === 0) {
     return (
       <main className="relative min-h-screen overflow-hidden bg-[#070A12] text-white">
@@ -296,7 +275,7 @@ export default function Matches() {
               </p>
             </div>
             <div className="rounded-full bg-white px-3 py-1.5 text-[11px] font-black text-zinc-500 shadow-sm dark:bg-[#14171F] dark:text-zinc-300 dark:shadow-none">
-              {myLiveMatches.length + myMatches.length} matches
+              {myLiveMatches.length} matches
             </div>
           </div>
           <div className="-mx-5 overflow-x-auto px-5 pb-2">
@@ -495,7 +474,7 @@ export default function Matches() {
             Couldn&apos;t load live match data. Showing saved matches below.
           </div>
         )}
-        {myMatches.length === 0 && (
+        {!liveLoading && !liveError && myLiveMatches.length === 0 && (
           <section className="py-6">
             <div className="rounded-[28px] border border-black/[0.04] bg-white px-6 py-8 text-center shadow-sm dark:border-white/[0.06] dark:bg-[#14171F] dark:shadow-none">
               <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#F1F3F7] text-2xl dark:bg-white/10">
@@ -507,125 +486,6 @@ export default function Matches() {
               <p className="mx-auto max-w-xs text-sm leading-6 text-zinc-500 dark:text-zinc-400">
                 There aren&apos;t any upcoming matches for this filter right now.
               </p>
-            </div>
-          </section>
-        )}
-        {myMatches.length > 0 && (
-          <section>
-            <div className="mb-3">
-              <h2 className="text-[22px] font-black tracking-tight text-[#111318] dark:text-white">
-                Upcoming (saved)
-              </h2>
-              <p className="mt-0.5 text-xs font-medium text-zinc-400 dark:text-zinc-500">
-                Your next fixtures
-              </p>
-            </div>
-            <div className="flex flex-col gap-3">
-              {myMatches.map((match, index) => {
-                const homeClub = getClub(match.homeClubId);
-                const awayClub = getClub(match.awayClubId);
-                const homeColor = homeClub?.primaryColor ?? "#2563EB";
-                const awayColor = awayClub?.primaryColor ?? "#7C3AED";
-                const isNextMatch = index === 0;
-                return (
-                  <article
-                    key={match.id}
-                    className={`relative overflow-hidden rounded-[26px] border bg-white shadow-[0_6px_24px_rgba(0,0,0,0.045)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_34px_rgba(0,0,0,0.08)] dark:bg-[#14171F] dark:shadow-none ${
-                      isNextMatch
-                        ? "border-blue-200/70 dark:border-blue-500/40"
-                        : "border-black/[0.045] dark:border-white/[0.06]"
-                    }`}
-                  >
-                    <div
-                      className="h-1.5 w-full"
-                      style={{
-                        background: `linear-gradient(90deg, ${homeColor}, ${awayColor})`,
-                      }}
-                    />
-                    <div className="p-4">
-                      <div className="mb-3 flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          {isNextMatch && (
-                            <div className="mb-1 text-[9px] font-black uppercase tracking-[0.2em] text-blue-500 dark:text-blue-400">
-                              Next match
-                            </div>
-                          )}
-                          <div className="truncate text-[10px] font-black uppercase tracking-[0.15em] text-zinc-400 dark:text-zinc-500">
-                            {formatCompetition(match.competition)}
-                          </div>
-                        </div>
-                        <div className="shrink-0 rounded-full bg-[#F2F4F7] px-3 py-1.5 text-[11px] font-bold text-zinc-500 dark:bg-white/10 dark:text-zinc-300">
-                          {formatDate(match.kickoff)}
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-[1fr_72px_1fr] items-center gap-3">
-                        <div className="min-w-0">
-                          <div className="mb-3">
-                            <ClubBadge
-                              name={homeClub?.name ?? match.homeClubId}
-                              crest={homeClub?.crest}
-                              color={homeColor}
-                              size={48}
-                            />
-                          </div>
-                          <div className="break-words text-[15px] font-black leading-tight text-[#111318] dark:text-white">
-                            {getClubName(match.homeClubId)}
-                          </div>
-                          <div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
-                            Home
-                          </div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-[9px] font-black uppercase tracking-[0.16em] text-zinc-400 dark:text-zinc-500">
-                            Kickoff
-                          </div>
-                          <div className="mt-1 whitespace-nowrap text-xl font-black tracking-tight text-[#111318] dark:text-white">
-                            {formatTime(match.kickoff)}
-                          </div>
-                          <div className="mx-auto mt-2 w-fit rounded-full bg-[#F2F4F7] px-3 py-1 text-[9px] font-black uppercase tracking-widest text-zinc-400 dark:bg-white/10 dark:text-zinc-400">
-                            VS
-                          </div>
-                        </div>
-                        <div className="flex min-w-0 flex-col items-end text-right">
-                          <div className="mb-3">
-                            <ClubBadge
-                              name={awayClub?.name ?? match.awayClubId}
-                              crest={awayClub?.crest}
-                              color={awayColor}
-                              size={48}
-                            />
-                          </div>
-                          <div className="break-words text-[15px] font-black leading-tight text-[#111318] dark:text-white">
-                            {getClubName(match.awayClubId)}
-                          </div>
-                          <div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
-                            Away
-                          </div>
-                        </div>
-                      </div>
-                      <div className="mt-3 flex items-center justify-between gap-3 border-t border-zinc-100 pt-2.5 dark:border-white/10">
-                        <div className="min-w-0">
-                          <div className="truncate text-xs font-bold text-zinc-600 dark:text-zinc-300">
-                            {match.venue}
-                          </div>
-                          {match.city && (
-                            <div className="mt-0.5 truncate text-[11px] text-zinc-400 dark:text-zinc-500">
-                              {match.city}
-                            </div>
-                          )}
-                        </div>
-                        <Link
-                          href={`/match/${match.id}`}
-                          onClick={saveScrollPosition}
-                          className="shrink-0 rounded-xl bg-[#F2F4F7] px-3 py-2 text-[11px] font-black text-zinc-600 transition hover:bg-[#E8EBF0] dark:bg-white/10 dark:text-zinc-300 dark:hover:bg-white/15"
-                        >
-                          Details →
-                        </Link>
-                      </div>
-                    </div>
-                  </article>
-                );
-              })}
             </div>
           </section>
         )}
