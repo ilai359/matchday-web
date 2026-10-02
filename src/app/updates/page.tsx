@@ -9,6 +9,11 @@ import { formatDate, timeAgo } from "../../lib/dateHelpers";
 import { categories, categoryStyles } from "../../lib/categoryStyles";
 import { fetchLiveUpdates, NewsUpdate } from "../../lib/newsApi";
 import ClubBadge from "../../components/ClubBadge";
+import { readPersisted, writePersisted } from "../../lib/persistentCache";
+
+function updatesCacheKey(clubsKey: string, leaguesKey: string): string {
+  return `updates:${clubsKey}:${leaguesKey}`;
+}
 
 type DisplayUpdate = {
   id: string;
@@ -32,9 +37,7 @@ function getPreview(text: string, limit: number): string {
 }
 
 export default function Updates() {
-   const { selectedIds } = useClubs();
-  const [liveUpdates, setLiveUpdates] = useState<NewsUpdate[]>([]);
-  const [liveLoading, setLiveLoading] = useState(true);
+  const { selectedIds, loaded } = useClubs();
 
   const followedClubNames = selectedIds.map((id) => getClubName(id));
   // Also search each followed club's own league (e.g. "Premier League"),
@@ -51,14 +54,42 @@ export default function Updates() {
   );
   const clubsKey = followedClubNames.join(",");
   const leaguesKey = followedLeagues.join(",");
+  const cacheKey = updatesCacheKey(clubsKey, leaguesKey);
+
+  // Seeded from whatever was last saved on the device, same
+  // show-saved-data-instantly pattern used on the home page, Matches tab
+  // and club pages - see persistentCache.ts. Without this, every single
+  // visit started from zero and showed "Nothing here yet" for as long as
+  // the fetch took, even when there was perfectly good news sitting in
+  // localStorage from the last visit.
+  const [liveUpdates, setLiveUpdates] = useState<NewsUpdate[]>(
+    () => readPersisted<NewsUpdate[]>(cacheKey) ?? []
+  );
+  const [liveLoading, setLiveLoading] = useState(
+    () => readPersisted<NewsUpdate[]>(cacheKey) === null
+  );
+  const [liveError, setLiveError] = useState(false);
 
   useEffect(() => {
+    if (!loaded) return;
+    const cached = readPersisted<NewsUpdate[]>(cacheKey);
+    if (cached) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setLiveUpdates(cached);
+      setLiveLoading(false);
+    } else {
+      setLiveLoading(true);
+    }
+    setLiveError(false);
     fetchLiveUpdates(followedClubNames, followedLeagues)
-      .then(setLiveUpdates)
-      .catch(() => {})
+      .then((fresh) => {
+        setLiveUpdates(fresh);
+        writePersisted(cacheKey, fresh);
+      })
+      .catch(() => setLiveError(true))
       .finally(() => setLiveLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clubsKey, leaguesKey]);
+  }, [loaded, clubsKey, leaguesKey]);
   const [activeCategory, setActiveCategory] = useState(
     "All" as UpdateCategory | "All"
   );
@@ -272,7 +303,15 @@ export default function Updates() {
           </section>
         )}
 
-        {!liveLoading && myUpdates.length === 0 && (
+        {liveError && (
+          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/30 dark:bg-red-500/10 dark:text-red-400">
+            {myUpdates.length > 0
+              ? "Couldn't check for new updates just now. Showing saved updates below."
+              : "Couldn't check for updates just now - try again in a moment."}
+          </div>
+        )}
+
+        {!liveLoading && !liveError && myUpdates.length === 0 && (
           <section className="py-10">
             <div className="rounded-[28px] border border-black/[0.04] bg-white px-6 py-10 text-center shadow-sm dark:border-white/[0.06] dark:bg-[#14171F] dark:shadow-none">
               <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#F1F3F7] text-2xl dark:bg-white/10">
