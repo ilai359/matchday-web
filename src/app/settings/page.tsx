@@ -13,10 +13,65 @@ import {
   LEAGUE_TO_CODE,
   StandingsRow,
 } from "../../lib/footballApi";
+import {
+  isPushSupported,
+  getNotificationPermission,
+  hasActivePushSubscription,
+  subscribeToPush,
+  unsubscribeFromPush,
+  updatePushClubs,
+} from "../../lib/pushClient";
 
 export default function Settings() {
   const { theme, setTheme } = useTheme();
   const { selectedIds, resetClubs } = useClubs();
+
+  const [pushSupported, setPushSupported] = useState(true);
+  const [pushPermissionDenied, setPushPermissionDenied] = useState(false);
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
+  const selectedIdsKey = selectedIds.join(",");
+
+  useEffect(() => {
+    if (!isPushSupported()) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setPushSupported(false);
+      return;
+    }
+    if (getNotificationPermission() === "denied") {
+      setPushPermissionDenied(true);
+    }
+    hasActivePushSubscription().then(setPushEnabled);
+  }, []);
+
+  useEffect(() => {
+    // Keeps an already-subscribed device's "which clubs to notify about"
+    // list in sync whenever the user follows/unfollows a club - without
+    // this, turning alerts on once and then following a new club later
+    // would silently never alert for that new club.
+    if (!pushEnabled) return;
+    updatePushClubs(selectedIds).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pushEnabled, selectedIdsKey]);
+
+  async function handleTogglePush() {
+    if (pushBusy) return;
+    setPushBusy(true);
+    try {
+      if (pushEnabled) {
+        await unsubscribeFromPush();
+        setPushEnabled(false);
+      } else {
+        const ok = await subscribeToPush(selectedIds);
+        setPushEnabled(ok);
+        if (!ok && getNotificationPermission() === "denied") {
+          setPushPermissionDenied(true);
+        }
+      }
+    } finally {
+      setPushBusy(false);
+    }
+  }
 
   const followedClubs = clubs.filter((club) => selectedIds.includes(club.id));
   const followedLeagues = [...new Set(followedClubs.map((club) => club.league))];
@@ -387,6 +442,53 @@ export default function Settings() {
                 <div className="h-5 w-5 rounded-full border-2 border-zinc-200 dark:border-white/15" />
               )}
             </button>
+          </div>
+        </section>
+
+        <section className="mb-6">
+          <h2 className="mb-3 px-1 text-xs font-black uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
+            Notifications
+          </h2>
+
+          <div className="overflow-hidden rounded-[26px] border border-black/[0.045] bg-white shadow-[0_6px_24px_rgba(0,0,0,0.045)] dark:border-white/[0.06] dark:bg-[#14171F] dark:shadow-none">
+            {!pushSupported ? (
+              <div className="px-5 py-4 text-[11px] font-medium leading-relaxed text-zinc-400 dark:text-zinc-500">
+                Goal alerts aren&apos;t supported in this browser.
+              </div>
+            ) : pushPermissionDenied ? (
+              <div className="px-5 py-4 text-[11px] font-medium leading-relaxed text-zinc-400 dark:text-zinc-500">
+                Notifications are blocked for Clubside in your browser or
+                phone settings. Allow them there to turn on goal alerts.
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={handleTogglePush}
+                disabled={pushBusy}
+                className="flex w-full items-center justify-between px-5 py-4 text-left disabled:opacity-60"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#F2F4F7] text-lg dark:bg-white/[0.06]">
+                    🔔
+                  </div>
+                  <div>
+                    <div className="text-sm font-black text-[#111318] dark:text-white">
+                      Goal alerts
+                    </div>
+                    <div className="text-[11px] font-medium text-zinc-400 dark:text-zinc-500">
+                      Get notified when a club you follow scores
+                    </div>
+                  </div>
+                </div>
+                {pushEnabled ? (
+                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[#111318] dark:bg-white">
+                    <div className="h-2 w-2 rounded-full bg-white dark:bg-[#0B0D12]" />
+                  </div>
+                ) : (
+                  <div className="h-5 w-5 rounded-full border-2 border-zinc-200 dark:border-white/15" />
+                )}
+              </button>
+            )}
           </div>
         </section>
 

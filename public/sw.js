@@ -58,6 +58,49 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+// Goal-alert push notifications. The actual decision of "did a followed
+// club just score" happens server-side (see
+// src/app/api/cron/check-goals/route.ts) - this just displays whatever
+// notification that job sends, and opens the right match when tapped.
+self.addEventListener("push", (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    // Not valid JSON for some reason - fall back to a generic notification
+    // below rather than letting the whole push event silently fail.
+  }
+
+  const title = data.title || "Clubside";
+  const options = {
+    body: data.body || "",
+    icon: "/icons/icon-192.png",
+    badge: "/icons/icon-192.png",
+    data: { url: data.url || "/" },
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = event.notification.data?.url || "/";
+
+  event.waitUntil(
+    (async () => {
+      const windows = await self.clients.matchAll({ type: "window" });
+      for (const client of windows) {
+        if (client.url.includes(url) && "focus" in client) {
+          return client.focus();
+        }
+      }
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(url);
+      }
+    })()
+  );
+});
+
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   if (!isCacheable(request)) {

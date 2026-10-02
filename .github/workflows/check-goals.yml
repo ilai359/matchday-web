@@ -1,0 +1,35 @@
+name: Check for goals
+
+# Vercel's free plan only allows background jobs ("cron jobs") to run
+# once a day, which is far too slow for a goal alert to feel like an
+# alert. GitHub Actions' scheduled workflows are free and can run every
+# few minutes instead, so this is what actually triggers the app's
+# goal-check job on a real schedule - see
+# src/app/api/cron/check-goals/route.ts for what that job does.
+#
+# One-time setup this needs (see NOTES.md for the full writeup):
+#   1. A repository secret named GOALS_CRON_SECRET, set to the same
+#      value as the GOALS_CRON_SECRET environment variable in Vercel.
+#   2. The app's own GOALS_CRON_SECRET, VAPID_PUBLIC_KEY,
+#      VAPID_PRIVATE_KEY, VAPID_SUBJECT, and NEXT_PUBLIC_VAPID_PUBLIC_KEY
+#      environment variables set in Vercel.
+#
+# GitHub's own docs note that scheduled workflows run on a "best effort"
+# basis and can be delayed by a few minutes during busy periods, and are
+# automatically disabled if the repository goes 60 days with no commits
+# at all (a manual run, or any new push, re-enables it). Fine for a goal
+# alert - a few minutes' delay is a minor tradeoff for this being free.
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  check-goals:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping the check-goals endpoint
+        run: |
+          curl --fail --silent --show-error \
+            -H "Authorization: Bearer ${{ secrets.GOALS_CRON_SECRET }}" \
+            "https://matchday-web-zeta.vercel.app/api/cron/check-goals"

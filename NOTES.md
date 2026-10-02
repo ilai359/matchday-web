@@ -870,3 +870,77 @@ declaring things fixed after a single successful check. The right way to
 verify caching/rate-limit fixes: test several different matches/leagues,
 more than once each, with a short wait in between - a single success
 proves nothing when the underlying problem is intermittent by nature.
+
+## Push notifications ("goal alerts") - built, needs one-time setup before it actually works
+
+**Status: code written and committed, 2026-10-02. NOT yet working in
+production - needs the manual setup steps below, done once, before any
+notification can actually be sent.**
+
+### What this is
+
+A toggle in Settings ("Goal alerts") that, once turned on, sends the
+user a push notification whenever a club they follow scores in a live
+match - works even if the app/tab isn't open, the same way any phone
+app's notifications do, via a real OS-level push notification (the Web
+Push standard, using a service worker - the file this app already had
+at `public/sw.js` for caching static assets, now also handling push).
+
+### Why this took more than just writing the feature
+
+Vercel's free Hobby plan only runs background/cron jobs once a day (see
+the warm-finished-matches job above) - far too slow for a goal alert to
+mean anything. The fix: a GitHub Actions scheduled workflow
+(`.github/workflows/check-goals.yml`), which is free and can run every 5
+minutes, pings a new API route (`/api/cron/check-goals`) that checks for
+score changes and sends notifications. This is the same free-tier
+workaround discussed and chosen over paying for Vercel Pro.
+
+GitHub's own docs note scheduled workflows are "best effort" (can run a
+few minutes late during busy periods) and get automatically paused if
+the repo goes a full 60 days with no commits - a non-issue for an
+actively-worked-on project, but worth knowing if alerts ever seem to
+stop and nothing else looks wrong (check the Actions tab, or just push
+any commit/run it manually to reactivate).
+
+### One-time setup (has to be done before this works at all)
+
+**1. In Vercel** (Project -> Settings -> Environment Variables), add:
+- `GOALS_CRON_SECRET` = `317daaa68fbfa1f02e0159ee5ae11e5299bd06fd587caf61ca6de22339a3543b`
+- `VAPID_PUBLIC_KEY` = `BHGw0kZXChK3FqvaSu1UnOBKL_eBnJCf7R_XMaUZphXIA0CcBBn6Gxg86E1iTvx8GywHomLjNuitcZTzosRyQwc`
+- `VAPID_PRIVATE_KEY` = `kAmsNy6Ai81CzCOYh6gUYKKArpb8bCoos4DFtjfQGM0`
+- `VAPID_SUBJECT` = `mailto:kugelmann.ilai@gmail.com`
+- `NEXT_PUBLIC_VAPID_PUBLIC_KEY` = same value as `VAPID_PUBLIC_KEY` above
+  (needs the `NEXT_PUBLIC_` name too - that's what makes it reach the
+  browser side of the app, which also needs this key to subscribe a
+  device in the first place)
+
+These are real, already-generated keys (made once, specifically for
+this app) - not placeholders to swap out. After adding them, redeploy
+(any new push to `main` triggers one anyway) so the
+`NEXT_PUBLIC_VAPID_PUBLIC_KEY` value actually gets baked into the app -
+unlike the other, server-only variables, this one has to be present
+*at build time*, not just at runtime.
+
+**2. In GitHub** (the repo -> Settings -> Secrets and variables ->
+Actions -> New repository secret): add a secret named
+`GOALS_CRON_SECRET` with the exact same value used in Vercel above.
+This is what lets the scheduled workflow call the check-goals endpoint
+without anyone else being able to.
+
+**3. Run `npm install` once** (in a real Terminal on your Mac, not
+through this chat) so the new `web-push` package this feature depends
+on is actually downloaded - needed for local testing (`npm run dev`).
+Not needed for the live site: Vercel installs it automatically on its
+own as part of every deploy.
+
+### Still open / known limitations
+
+- Only syncs which clubs to notify about when the Settings page itself
+  is open while already subscribed (see the effect in
+  `src/app/settings/page.tsx`) - following a new club from the Clubs
+  page won't update an already-on subscription until Settings is next
+  visited. Fine for now; a more thorough fix would sync this from
+  wherever clubs are followed/unfollowed, not just Settings.
+- Not yet tested end-to-end with a real deployed app and a real device,
+  since that needs the setup above done first.
