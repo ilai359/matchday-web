@@ -73,7 +73,14 @@ function truncate(text: string, maxChars: number): string {
 // canvas to read, with no CORS question at all. If a crest ever fails
 // to load for any reason, every drawing function below falls back to
 // the colored initials badge instead of failing the whole share.
-const CREST_OPTIMIZE_WIDTH = 300;
+//
+// The width below has to be one of Next's own preconfigured image
+// sizes (see next.config.ts's images.imageSizes/deviceSizes, or just
+// Next's defaults when, like here, that's left unset) - it rejects any
+// other width with a 400, which silently failed every crest load (and
+// fell back to initials every time) until this was caught. 384 is one
+// of Next's built-in default sizes.
+const CREST_OPTIMIZE_WIDTH = 384;
 
 function optimizedCrestUrl(src: string): string {
   return `/_next/image?url=${encodeURIComponent(src)}&w=${CREST_OPTIMIZE_WIDTH}&q=75`;
