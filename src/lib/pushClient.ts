@@ -97,3 +97,36 @@ export async function unsubscribeFromPush(): Promise<void> {
     body: JSON.stringify({ endpoint }),
   });
 }
+
+const AUTO_PROMPT_KEY = "matchday-push-auto-prompted";
+
+/**
+ * Called the moment someone follows their very first club - the
+ * natural first time to ask for notification permission, instead of
+ * only offering it once someone finds the toggle in Settings.
+ *
+ * Only ever tries this once per browser, whatever the outcome (granted,
+ * denied, or dismissed) - tracked in localStorage so it doesn't ask
+ * again on every first-follow (e.g. after resetting followed clubs).
+ * Settings keeps its own "Goal alerts" toggle for turning this on (or
+ * back on) any time after, so nobody's stuck with whatever they chose
+ * in this one moment.
+ */
+export async function maybeAskForNotificationsOnFirstFollow(clubId: string): Promise<void> {
+  if (!isPushSupported()) return;
+
+  try {
+    if (localStorage.getItem(AUTO_PROMPT_KEY)) return;
+    localStorage.setItem(AUTO_PROMPT_KEY, "1");
+  } catch {
+    // localStorage unavailable (private browsing etc.) - skip rather
+    // than risk asking on every single "first" follow.
+    return;
+  }
+
+  // Already answered before (e.g. via Settings, on another visit) -
+  // nothing new to ask.
+  if (Notification.permission !== "default") return;
+
+  await subscribeToPush([clubId]);
+}

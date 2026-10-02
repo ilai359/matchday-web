@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { maybeAskForNotificationsOnFirstFollow } from "../lib/pushClient";
 
 type ClubsContextType = {
   selectedIds: string[];
@@ -39,9 +40,22 @@ export function ClubsProvider({ children }: { children: ReactNode }) {
   }, [selectedIds, loaded]);
 
   function toggleClub(id: string) {
+    const isFirstEverFollow = selectedIds.length === 0 && !selectedIds.includes(id);
+
     setSelectedIds((prev) =>
       prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]
     );
+
+    // The moment someone follows their very first club is the natural
+    // point to ask for notification permission - there's finally
+    // something to notify them about, and it doesn't require them to
+    // separately find the toggle in Settings. This only ever fires
+    // once per browser (see maybeAskForNotificationsOnFirstFollow) -
+    // Settings still has the toggle any time after, including to turn
+    // it on if this moment was missed or dismissed.
+    if (isFirstEverFollow) {
+      maybeAskForNotificationsOnFirstFollow(id);
+    }
   }
 
   function resetClubs() {
