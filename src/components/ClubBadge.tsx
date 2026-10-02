@@ -11,17 +11,28 @@ type ClubBadgeProps = {
 export default function ClubBadge({ name, crest, color, size = 48 }: ClubBadgeProps) {
   if (crest) {
     return (
+      // Two nested boxes on purpose, not one: Safari/WebKit (the browser
+      // behind iOS PWAs) has a known bug where overflow-hidden + rounded
+      // corners fail to actually clip a child if box-shadow lives on
+      // that same element - the shadow's own corner shows through as a
+      // flat edge, exactly the "still square" crest corners reported
+      // after two earlier fixes that both looked correct in the code.
+      // The outer box owns the shadow and the rounded shape; the inner
+      // box (no shadow) owns the clipping, so each one only does the
+      // part Safari can actually combine reliably.
       <div
-        className="flex shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-white shadow-sm p-2"
+        className="shrink-0 rounded-2xl shadow-sm"
         style={{ width: size, height: size }}
       >
-        <Image
-          src={crest}
-          alt={name}
-          width={size - 16}
-          height={size - 16}
-          className="h-full w-full object-contain"
-        />
+        <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-2xl bg-white p-2">
+          <Image
+            src={crest}
+            alt={name}
+            width={size - 16}
+            height={size - 16}
+            className="h-full w-full object-contain"
+          />
+        </div>
       </div>
     );
   }

@@ -365,7 +365,9 @@ export default function ClubDetailClient({ id }: { id: string }) {
             </button>
           </div>
           <div className="flex items-center gap-4">
-            <div className="shrink-0 overflow-hidden rounded-2xl bg-white p-2 shadow-lg">
+            {/* No overflow-hidden here on purpose - see the matching
+                comment in YourClubs.tsx and in ClubBadge.tsx. */}
+            <div className="shrink-0 rounded-2xl bg-white p-2 shadow-lg">
               <ClubBadge
                 name={club.name}
                 crest={club.crest}

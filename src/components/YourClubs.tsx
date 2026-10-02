@@ -348,7 +348,12 @@ function ClubStatsCard({
           <div className="absolute -bottom-24 -left-10 h-48 w-48 rounded-full bg-black/30 blur-[60px]" />
         </div>
         <div className="relative z-10 flex items-center gap-3">
-          <div className="shrink-0 overflow-hidden rounded-2xl bg-white p-1 shadow-lg">
+          {/* No overflow-hidden here on purpose - ClubBadge already clips
+              its own crest correctly, and combining overflow-hidden with
+              shadow-lg on the SAME element is exactly what caused the
+              "square corners in dark mode" bug (a Safari/WebKit quirk -
+              see the comment in ClubBadge.tsx for the full story). */}
+          <div className="shrink-0 rounded-2xl bg-white p-1 shadow-lg">
             <ClubBadge
               name={club.name}
               crest={club.crest}
