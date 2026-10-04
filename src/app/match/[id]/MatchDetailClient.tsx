@@ -679,7 +679,12 @@ export default function MatchDetailClient({ id }: { id: string }) {
             onClick={goBackToMatches}
             className="mb-4 inline-flex items-center gap-1.5 text-xs font-bold text-white/60 transition hover:text-white/90"
           >
-            ← Back to Matches
+            {/* Just "Back", not "Back to Matches" - goBackToMatches
+                actually goes back to wherever this match was opened
+                from (Home, a club's page, etc.), not always the
+                Matches tab, so the old label was already a bit
+                misleading even before this was asked for. */}
+            ← Back
           </button>
           <div className="mb-1.5 text-[10px] font-black uppercase tracking-[0.28em] text-blue-300/70">
             {displayMatch.competition}

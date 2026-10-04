@@ -5,24 +5,6 @@ import { Club, clubs } from "../../data/clubs";
 import { useClubs } from "../../context/ClubsContext";
 import ClubBadge from "../../components/ClubBadge";
 
-// A handful of globally well-known clubs, shown as quick picks above the
-// full alphabetical list - without this, someone who doesn't already know
-// exactly which club they want has to scroll or search through all 132.
-// Real club ids only (checked against src/data/clubs.ts), spanning a mix
-// of leagues rather than just one.
-const POPULAR_CLUB_IDS = [
-  "real-madrid",
-  "barcelona",
-  "manchester-united",
-  "manchester-city",
-  "liverpool",
-  "arsenal",
-  "chelsea",
-  "bayern-munich",
-  "paris-saint-germain",
-  "juventus",
-];
-
 type ClubRowProps = {
   club: Club;
   isSelected: boolean;
@@ -30,10 +12,8 @@ type ClubRowProps = {
   registerRef: (id: string, element: HTMLDivElement | null) => void;
 };
 
-// Pulled out of the main component so the same row (and the same
-// select/deselect visuals) can be reused for both the "Popular clubs"
-// quick-pick section and the full list below, instead of maintaining two
-// near-identical copies of this markup.
+// Pulled out of the main component so every row in the full club list
+// shares the exact same markup and select/deselect visuals.
 function ClubRow({ club, isSelected, onToggle, registerRef }: ClubRowProps) {
   const clubColor = club.primaryColor ?? "#111827";
 
@@ -169,16 +149,8 @@ export default function Clubs() {
 
   const normalizedQuery = query.trim().toLowerCase();
 
-  // Shown as its own "Popular clubs" section above the full list, only
-  // while not searching - once someone's searching they're looking for
-  // something specific, and the full results below already cover it.
-  const popularClubs: Club[] = POPULAR_CLUB_IDS.map((id) =>
-    clubs.find((club) => club.id === id)
-  ).filter((club): club is Club => Boolean(club));
-  const popularClubIdSet = new Set(POPULAR_CLUB_IDS);
-
   const filteredClubs = clubs.filter((club) => {
-    if (!normalizedQuery) return !popularClubIdSet.has(club.id);
+    if (!normalizedQuery) return true;
 
     return (
       club.name.toLowerCase().includes(normalizedQuery) ||
@@ -400,30 +372,6 @@ export default function Clubs() {
             )}
           </div>
 
-          {/* POPULAR CLUBS - quick picks for browsing, hidden while searching */}
-          {!normalizedQuery && popularClubs.length > 0 && (
-            <div className="mb-7">
-              <div className="mb-3 flex items-center gap-1.5 px-1">
-                <span className="text-sm">⭐</span>
-                <span className="text-[11px] font-black uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
-                  Popular clubs
-                </span>
-              </div>
-
-              <div className="flex flex-col gap-3">
-                {popularClubs.map((club) => (
-                  <ClubRow
-                    key={club.id}
-                    club={club}
-                    isSelected={selectedIds.includes(club.id)}
-                    onToggle={handleListToggle}
-                    registerRef={registerClubRef}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* SEARCH RESULT COUNT */}
           {query.trim() && filteredClubs.length > 0 && (
             <div className="mb-3 px-1 text-[11px] font-bold text-zinc-400 dark:text-zinc-500">
@@ -471,11 +419,6 @@ export default function Clubs() {
           )}
 
           {/* CLUB LIST */}
-          {!normalizedQuery && popularClubs.length > 0 && (
-            <div className="mb-3 px-1 text-[11px] font-bold text-zinc-400 dark:text-zinc-500">
-              All clubs
-            </div>
-          )}
           <div className="flex flex-col gap-3">
             {filteredClubs.map((club) => (
               <ClubRow
