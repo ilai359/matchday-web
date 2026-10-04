@@ -203,24 +203,34 @@ export default function ClubDetailClient({ id }: { id: string }) {
     const newsQueryNames = Array.from(
       new Set([...followedClubNames, club.name])
     );
+    // Every club's own league, plus Champions League - a club that's
+    // actually in it should see those fixtures/results on its own page
+    // too (Home and the Matches tab already do this same thing). For a
+    // club NOT in the Champions League this just filters down to nothing
+    // below, which is cheap: this data is shared and cached across every
+    // visitor, not refetched per club, so most of the time this costs
+    // nothing extra at all rather than one wasted request per club.
+    const codesWithChampionsLeague = code
+      ? Array.from(new Set([code, "CL"]))
+      : [];
     Promise.all([
       code ? fetchStandings(code).catch(() => []) : Promise.resolve([]),
       code ? fetchScorers(code).catch(() => []) : Promise.resolve([]),
       code
         ? fetchFinishedMatches(code, currentSeasonYear).catch(() => [])
         : Promise.resolve([]),
-      // This club's own league only - upcomingMatches is filtered down
-      // to just this club's fixtures below, so there's no reason to ask
-      // for every league this app knows about (see the comment on
-      // /api/matches for why that matters).
-      fetchLiveMatches(code ? [code] : []).catch(() => []),
+      code
+        ? fetchFinishedMatches("CL", currentSeasonYear).catch(() => [])
+        : Promise.resolve([]),
+      fetchLiveMatches(codesWithChampionsLeague).catch(() => []),
       fetchLiveUpdates(newsQueryNames, followedLeagues).catch(() => []),
     ])
-      .then(([standingsRes, scorersRes, finishedRes, liveRes, newsRes]) => {
+      .then(([standingsRes, scorersRes, finishedRes, clFinishedRes, liveRes, newsRes]) => {
         if (cancelled) return;
+        const combinedFinished = [...finishedRes, ...clFinishedRes];
         setStandings(standingsRes);
         setScorers(scorersRes);
-        setRecentMatches(finishedRes);
+        setRecentMatches(combinedFinished);
         setUpcomingMatches(liveRes);
         // fetchLiveUpdates already tags every article with the specific
         // club(s) it's genuinely about (that's how the Updates page shows
@@ -231,7 +241,7 @@ export default function ClubDetailClient({ id }: { id: string }) {
         writePersisted<ClubDetailBundle>(cacheKey, {
           standings: standingsRes,
           scorers: scorersRes,
-          recentMatches: finishedRes,
+          recentMatches: combinedFinished,
           upcomingMatches: liveRes,
           news: clubNews,
         });
