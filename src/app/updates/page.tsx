@@ -6,7 +6,8 @@ import { clubSpotlights } from "../../data/clubSpotlights";
 import { useClubs } from "../../context/ClubsContext";
 import { getClub, getClubName } from "../../lib/clubHelpers";
 import { formatDate, timeAgo } from "../../lib/dateHelpers";
-import { categories, categoryStyles } from "../../lib/categoryStyles";
+import { categoryStyles } from "../../lib/categoryStyles";
+import { clubs } from "../../data/clubs";
 import { fetchLiveUpdates, NewsUpdate } from "../../lib/newsApi";
 import ClubBadge from "../../components/ClubBadge";
 import { readPersisted, writePersisted } from "../../lib/persistentCache";
@@ -90,9 +91,7 @@ export default function Updates() {
       .finally(() => setLiveLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loaded, clubsKey, leaguesKey]);
-  const [activeCategory, setActiveCategory] = useState(
-    "All" as UpdateCategory | "All"
-  );
+  const [activeClub, setActiveClub] = useState<string>("all");
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
   const toggleExpanded = (id: string) => {
@@ -122,12 +121,14 @@ export default function Updates() {
 
   const combinedUpdates: DisplayUpdate[] = [...baseUpdates, ...spotlightUpdates];
 
+  // Same club list + same "All clubs" pattern as the Matches tab, so
+  // filtering works the same way in both places instead of two different
+  // interactions to learn.
+  const myClubs = clubs.filter((club) => selectedIds.includes(club.id));
+
   const myUpdates = combinedUpdates
     .filter((update) => selectedIds.includes(update.clubId))
-    .filter(
-      (update) =>
-        activeCategory === "All" || update.category === activeCategory
-    )
+    .filter((update) => activeClub === "all" || update.clubId === activeClub)
     .sort(
       (a, b) =>
         new Date(b.publishedAt).getTime() -
@@ -218,11 +219,11 @@ export default function Updates() {
           <div className="mb-3 flex items-end justify-between px-1">
             <div>
               <h2 className="text-lg font-black text-[#111318] dark:text-white">
-                Filter updates
+                Filter by club
               </h2>
 
               <p className="mt-0.5 text-xs font-medium text-zinc-400 dark:text-zinc-500">
-                Choose what you want to see
+                Show updates from one club
               </p>
             </div>
 
@@ -233,17 +234,24 @@ export default function Updates() {
 
           <div className="-mx-5 overflow-x-auto px-5 pb-2">
             <div className="flex w-max gap-2">
-              {categories.map((category) => {
-                const isActive = activeCategory === category;
+              <button
+                onClick={() => setActiveClub("all")}
+                className={`whitespace-nowrap rounded-full px-4 py-2.5 text-sm font-bold transition-all ${
+                  activeClub === "all"
+                    ? "bg-[#111318] text-white shadow-lg shadow-black/10 dark:bg-white dark:text-[#111318] dark:shadow-none"
+                    : "border border-black/[0.05] bg-white text-zinc-600 shadow-sm dark:border-white/10 dark:bg-[#14171F] dark:text-zinc-300 dark:shadow-none"
+                }`}
+              >
+                All clubs
+              </button>
 
-                const style =
-                  category === "All" ? undefined : categoryStyles[category];
-
+              {myClubs.map((club) => {
+                const isActive = activeClub === club.id;
                 return (
                   <button
-                    key={category}
-                    onClick={() => setActiveCategory(category)}
-                    className={`flex items-center gap-2 whitespace-nowrap rounded-full px-4 py-2.5 text-sm font-bold transition-all ${
+                    key={club.id}
+                    onClick={() => setActiveClub(club.id)}
+                    className={`flex items-center gap-2 whitespace-nowrap rounded-full px-3.5 py-2 text-sm font-bold transition-all ${
                       isActive
                         ? "text-white shadow-lg"
                         : "border border-black/[0.05] bg-white text-zinc-600 shadow-sm dark:border-white/10 dark:bg-[#14171F] dark:text-zinc-300 dark:shadow-none"
@@ -251,33 +259,20 @@ export default function Updates() {
                     style={
                       isActive
                         ? {
-                            background:
-                              category === "All"
-                                ? "linear-gradient(135deg, #111827, #020617)"
-                                : style?.gradient,
+                            background: `linear-gradient(135deg, ${
+                              club.primaryColor ?? "#2563EB"
+                            }, #111827)`,
                           }
                         : undefined
                     }
                   >
-                    {category !== "All" && (
-                      <span
-                        className={`flex h-6 w-6 items-center justify-center rounded-full text-[12px] ${
-                          isActive ? "bg-white/15" : ""
-                        }`}
-                        style={
-                          !isActive
-                            ? {
-                                backgroundColor: style?.background,
-                                color: style?.color,
-                              }
-                            : undefined
-                        }
-                      >
-                        {style?.icon}
-                      </span>
-                    )}
-
-                    {category}
+                    <ClubBadge
+                      name={club.name}
+                      crest={club.crest}
+                      color={club.primaryColor}
+                      size={24}
+                    />
+                    {club.name}
                   </button>
                 );
               })}
@@ -323,13 +318,14 @@ export default function Updates() {
               </h2>
 
               <p className="mx-auto max-w-xs text-sm leading-6 text-zinc-500 dark:text-zinc-400">
-                There aren&apos;t any {activeCategory.toLowerCase()} updates
-                from your clubs right now.
+                {activeClub === "all"
+                  ? "There aren't any updates from your clubs right now."
+                  : `There aren't any updates from ${getClubName(activeClub)} right now.`}
               </p>
 
-              {activeCategory !== "All" && (
+              {activeClub !== "all" && (
                 <button
-                  onClick={() => setActiveCategory("All")}
+                  onClick={() => setActiveClub("all")}
                   className="mt-5 rounded-xl bg-[#111318] px-5 py-2.5 text-xs font-black text-white dark:bg-white dark:text-[#111318]"
                 >
                   Show all updates
