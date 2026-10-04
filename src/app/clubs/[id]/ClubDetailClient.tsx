@@ -441,7 +441,16 @@ export default function ClubDetailClient({ id }: { id: string }) {
             type="button"
             onClick={handleShareClub}
             disabled={sharing}
-            className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-white/15 py-3 text-xs font-black uppercase tracking-wide text-white shadow-[0_10px_24px_rgba(0,0,0,0.2)] backdrop-blur-md transition hover:-translate-y-0.5 active:scale-[0.98] disabled:opacity-60 disabled:hover:translate-y-0"
+            // No border/backdrop-blur here (unlike this card's other
+            // white/10 buttons) - those made sense on the old
+            // semi-transparent background this button used to have, but
+            // backdrop-blur specifically is a known Safari/WebKit bug
+            // magnet with rounded corners (the same bug family already
+            // fixed once in this app, on ClubBadge's crest corners) -
+            // blurring content behind a now fully-opaque background it
+            // sits in front of was doing nothing useful while still
+            // risking that same rounded-corner glitch on a phone.
+            className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl py-3 text-xs font-black uppercase tracking-wide text-white shadow-[0_10px_24px_rgba(0,0,0,0.2)] transition hover:-translate-y-0.5 active:scale-[0.98] disabled:opacity-60 disabled:hover:translate-y-0"
             style={{
               background: `linear-gradient(135deg, ${club.primaryColor}, #111827 85%)`,
             }}
