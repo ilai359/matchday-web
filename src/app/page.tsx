@@ -217,7 +217,7 @@ export default function Home() {
               onClick={() => {
                 window.location.href = "/clubs";
               }}
-              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.08] text-lg backdrop-blur-md transition hover:bg-white/[0.13] active:scale-95"
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.08] text-lg transition hover:bg-white/[0.13] active:scale-95"
               aria-label="My clubs"
             >
               ⚽
@@ -259,7 +259,7 @@ export default function Home() {
               </div>
               <div className="relative z-10 p-4">
                 <div className="mb-4 flex items-center justify-between gap-3">
-                  <div className="min-w-0 rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-white/80 backdrop-blur-xl">
+                  <div className="min-w-0 rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-white/80">
                     <span className="block truncate">
                       {formatCompetition(nextMatch.competition)}
                     </span>

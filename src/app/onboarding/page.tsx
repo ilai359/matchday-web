@@ -69,7 +69,7 @@ export default function OnboardingWelcome() {
 
       {/* CONTENT */}
       <div className="relative z-10 flex min-h-screen flex-col items-center justify-center px-6 text-center">
-        <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.07] px-4 py-2 backdrop-blur-xl">
+        <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.07] px-4 py-2">
           <span className="h-2 w-2 rounded-full bg-emerald-400" />
           <span className="text-[11px] font-bold tracking-wide text-white/80">
             YOUR FOOTBALL. YOUR FEED.

@@ -218,7 +218,7 @@ export default function Matches() {
           <div className="absolute -right-40 top-24 h-[420px] w-[420px] rounded-full bg-violet-600/20 blur-[100px]" />
         </div>
         <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-2xl flex-col items-center justify-center px-5 text-center">
-          <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-[22px] border border-white/10 bg-white/10 text-3xl backdrop-blur-xl">
+          <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-[22px] border border-white/10 bg-white/10 text-3xl">
             ⚽
           </div>
           <h1 className="mb-2 text-2xl font-black tracking-tight">
@@ -257,7 +257,7 @@ export default function Matches() {
                 Every upcoming game from your clubs.
               </p>
             </div>
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.08] text-xl backdrop-blur-xl">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.08] text-xl">
               ⚽
             </div>
           </div>

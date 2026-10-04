@@ -226,7 +226,7 @@ function StatPill({
 }) {
   return (
     <div
-      className={`rounded-xl border border-white/10 px-1.5 py-1.5 text-center backdrop-blur-md ${
+      className={`rounded-xl border border-white/10 px-1.5 py-1.5 text-center ${
         highlight ? "bg-white/20" : "bg-white/5"
       }`}
     >
@@ -370,7 +370,7 @@ function ClubStatsCard({
             </div>
           </div>
           {clubRow && (
-            <div className="shrink-0 rounded-2xl border border-white/15 bg-white/10 px-2.5 py-1.5 text-center backdrop-blur-md">
+            <div className="shrink-0 rounded-2xl border border-white/15 bg-white/10 px-2.5 py-1.5 text-center">
               <div className="text-xl font-black leading-none">
                 #{clubRow.position}
               </div>

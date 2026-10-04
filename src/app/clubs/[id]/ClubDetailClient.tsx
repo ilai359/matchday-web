@@ -378,7 +378,7 @@ export default function ClubDetailClient({ id }: { id: string }) {
             <button
               type="button"
               onClick={goBack}
-              className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-lg backdrop-blur-md transition hover:bg-white/20 active:scale-95"
+              className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-lg transition hover:bg-white/20 active:scale-95"
               aria-label="Go back"
             >
               ←
@@ -418,7 +418,7 @@ export default function ClubDetailClient({ id }: { id: string }) {
               </div>
             </div>
             {clubRow && (
-              <div className="shrink-0 rounded-2xl border border-white/15 bg-white/10 px-3.5 py-2.5 text-center backdrop-blur-md">
+              <div className="shrink-0 rounded-2xl border border-white/15 bg-white/10 px-3.5 py-2.5 text-center">
                 <div className="text-2xl font-black leading-none">
                   #{clubRow.position}
                 </div>
@@ -846,7 +846,7 @@ function HeaderStat({
 }) {
   return (
     <div
-      className={`rounded-xl border border-white/10 px-2 py-2 text-center backdrop-blur-md ${
+      className={`rounded-xl border border-white/10 px-2 py-2 text-center ${
         highlight ? "bg-white/20" : "bg-white/5"
       }`}
     >
