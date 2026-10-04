@@ -194,6 +194,48 @@ export async function getOrSet<T>(
   return promise;
 }
 
+/**
+ * True if a match in `competition` is currently live (IN_PLAY or PAUSED).
+ *
+ * Reuses the exact cache key /api/matches already keeps fresh
+ * (`matches:{competition}:LIVE`, refreshed every 60s) instead of making
+ * its own request - so checking this never costs an extra call to
+ * football-data.org. If that key isn't populated (nobody's loaded a
+ * matches list recently) this just assumes "not live", which only
+ * matters in the rare case nothing in the app has checked matches for
+ * that competition in the last minute.
+ *
+ * Used by /api/standings so a league table only updates once football-
+ * data.org's match data actually shows no game in progress, rather than
+ * possibly reflecting in-play scores while a match is still being
+ * played.
+ */
+export async function isCompetitionLive(competition: string): Promise<boolean> {
+  if (!redis) return false;
+  try {
+    const cached = await redis.get<{ matches?: unknown[] }>(
+      `matches:${competition}:LIVE`
+    );
+    return Array.isArray(cached?.matches) && cached.matches.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Reads the "last known good" copy of `key` (see getOrSet above) without
+ * triggering a fresh fetch, or null if there isn't one yet.
+ */
+export async function getStaleOnly<T>(key: string): Promise<T | null> {
+  if (!redis) return null;
+  try {
+    const stale = await redis.get<T>(`stale:${key}`);
+    return stale ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /** Exposed for tests / debugging only. Only clears the in-memory fallback. */
 export function _clearCacheForTests() {
   store.clear();

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { fetchWithRetry } from "@/lib/fetchWithRetry";
-import { getOrSet } from "@/lib/cache";
+import { getOrSet, isCompetitionLive, getStaleOnly } from "@/lib/cache";
 
 export async function GET(request: Request) {
   const apiKey = process.env.FOOTBALL_DATA_API_KEY;
@@ -18,6 +18,21 @@ export async function GET(request: Request) {
   }
 
   try {
+    // Hold the table still while a match in this competition is in
+    // progress, and only let it move once nothing's live anymore - so
+    // position/points never shift mid-match, only once a result is
+    // actually final. Cheap to check: it reuses the matches data the app
+    // is already keeping fresh, no extra request to football-data.org.
+    if (await isCompetitionLive(competition)) {
+      const held = await getStaleOnly(`standings:${competition}`);
+      if (held !== null) {
+        return NextResponse.json(held);
+      }
+      // No earlier snapshot to hold onto yet (e.g. first ever request
+      // for this competition happens to land mid-match) - fall through
+      // and fetch once rather than show nothing.
+    }
+
     // Using the shared Redis cache (getOrSet) instead of Next's own fetch
     // cache. This matters here specifically: Next's fetch cache has no
     // fallback if a live request happens to land during football-data.org's
