@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import webpush from "web-push";
 import { fetchWithRetry } from "@/lib/fetchWithRetry";
-import { getOrSet } from "@/lib/cache";
+import { getOrSet, isCompetitionLive } from "@/lib/cache";
 import { COMPETITIONS } from "@/lib/competitions";
 import { matchClubId } from "@/lib/footballApi";
+import { formatCompetition } from "@/lib/competitionNames";
 import {
   getStartedMatchIds,
   markMatchStarted,
@@ -12,22 +13,28 @@ import {
   markMatchReminded,
   clearMatchReminded,
 } from "@/lib/goalWatch";
+import { getKnownPositions, setKnownPositions, PositionMap } from "@/lib/tableWatch";
 import { getAllSubscriptions, removeSubscriptionByEndpoint } from "@/lib/pushSubscriptions";
 
 // Runs frequently (every few minutes - see the GitHub Actions workflow
-// at .github/workflows/check-goals.yml) and sends three kinds of alert
+// at .github/workflows/check-goals.yml) and sends four kinds of alert
 // to anyone following either club in a match: one about 15 minutes
-// before kickoff, one right when the match kicks off, and one when
-// it's over, with the final score.
+// before kickoff, one right when the match kicks off, one when it's
+// over (with the final score), and - once a competition's table is no
+// longer mid-match (see isCompetitionLive in cache.ts, the same freeze
+// /api/standings uses) - one if a followed club's league position
+// actually moved since the last check.
 //
 // It deliberately does NOT try to alert on individual goals while a
 // match is still being played. football-data.org's free plan delays
 // live scores during play (see NOTES.md), so a goal-by-goal alert could
 // lag minutes behind the real thing - worse than no alert at all. The
-// three alerts this sends instead are all things that are reliable even
-// when the in-play score isn't: "is this match starting soon", "has it
-// started", and "has it finished" (with the real final score, read once
-// it's actually over).
+// first three alerts this sends instead are all things that are
+// reliable even when the in-play score isn't: "is this match starting
+// soon", "has it started", and "has it finished" (with the real final
+// score, read once it's actually over). The table-position alert is
+// reliable for the same reason the table-freeze fix is: it only ever
+// looks once nothing in that competition is still being played.
 //
 // This can't be Vercel's own cron (see warm-finished-matches/route.ts
 // for that mechanism) because Vercel's free Hobby plan only allows cron
@@ -66,6 +73,16 @@ type RawScheduledMatch = {
 type RawSingleMatch = {
   score?: { fullTime?: { home: number | null; away: number | null } };
   status?: string;
+};
+
+type RawStandingsRow = {
+  position: number;
+  points: number;
+  team: { name: string };
+};
+
+type RawStandingsResponse = {
+  standings?: { type: string; table: RawStandingsRow[] }[];
 };
 
 // How long before kickoff the "starting soon" reminder goes out. The
@@ -115,9 +132,9 @@ export async function GET(request: Request) {
     });
   }
 
-  async function notifySubscribers(clubIds: string[], title: string, body: string, matchId: string) {
+  async function notifySubscribers(clubIds: string[], title: string, body: string, url: string) {
     if (clubIds.length === 0) return;
-    const payload = JSON.stringify({ title, body, url: `/match/${matchId}` });
+    const payload = JSON.stringify({ title, body, url });
     for (const sub of subscriptions) {
       if (!sub.clubIds.some((id) => clubIds.includes(id))) continue;
       try {
@@ -188,7 +205,7 @@ export async function GET(request: Request) {
         clubIds,
         `⚽ Kickoff: ${match.homeTeam.name} vs ${match.awayTeam.name}`,
         `${match.competition.name} is underway`,
-        matchId
+        `/match/${matchId}`
       );
     }
 
@@ -229,7 +246,7 @@ export async function GET(request: Request) {
         clubIds,
         `⏰ Starting soon: ${match.homeTeam.name} vs ${match.awayTeam.name}`,
         `${match.competition.name} kicks off shortly`,
-        matchId
+        `/match/${matchId}`
       );
     }
 
@@ -275,7 +292,7 @@ export async function GET(request: Request) {
             clubIds,
             `🏁 Full time: ${liveMatch.homeTeam.name} ${homeScore}-${awayScore} ${liveMatch.awayTeam.name}`,
             `${liveMatch.competition.name} · final score`,
-            matchId
+            `/match/${matchId}`
           );
         }
       }
@@ -288,11 +305,95 @@ export async function GET(request: Request) {
     }
   }
 
+  // Table-position alerts: for every competition whose table isn't
+  // currently frozen (see isCompetitionLive - "frozen" means a match in
+  // it is still being played), compare each tracked club's position to
+  // the last time we checked, and tell anyone subscribed to a club that
+  // moved. Checked once per competition per run rather than tied to any
+  // single match, so a Saturday with several kickoff times settles once
+  // the whole round is actually over, instead of firing a notification
+  // after every individual result and possibly flip-flopping mid-round.
+  let positionChangesSent = 0;
+  for (const competition of COMPETITIONS) {
+    if (await isCompetitionLive(competition)) continue;
+
+    let table: RawStandingsRow[];
+    try {
+      // Same cache key /api/standings already keeps fresh (see that
+      // route) - reading it here costs an extra football-data.org
+      // request only when nobody's looked at this competition's table
+      // in the last 5 minutes.
+      table = await getOrSet(`standings:${competition}`, 5 * 60 * 1000, async () => {
+        const response = await fetchWithRetry(
+          `https://api.football-data.org/v4/competitions/${competition}/standings`,
+          { headers: { "X-Auth-Token": apiKey }, cache: "no-store" }
+        );
+        if (!response.ok) {
+          throw new Error(`football-data.org returned ${response.status}`);
+        }
+        const data = (await response.json()) as RawStandingsResponse;
+        return data.standings?.find((s) => s.type === "TOTAL")?.table ?? [];
+      });
+    } catch {
+      // Couldn't get this competition's table this run (most likely a
+      // rate-limit hit) - skip it, try again next run.
+      continue;
+    }
+
+    const knownPositions = await getKnownPositions(competition);
+    const updatedPositions: PositionMap = { ...knownPositions };
+    let anyChange = false;
+
+    for (const row of table) {
+      const clubId = matchClubId(row.team.name);
+      if (!clubId) continue;
+      updatedPositions[clubId] = row.position;
+
+      const previousPosition = knownPositions[clubId];
+      // First time this club's ever been checked (e.g. right after this
+      // feature shipped) - just record where it is, nothing to compare
+      // against yet.
+      if (previousPosition === undefined || previousPosition === row.position) continue;
+
+      anyChange = true;
+      positionChangesSent += 1;
+      const movedUp = row.position < previousPosition;
+      await notifySubscribers(
+        [clubId],
+        `${movedUp ? "⬆️" : "⬇️"} ${row.team.name} ${movedUp ? "moved up to" : "dropped to"} ${ordinal(row.position)} in ${formatCompetition(competition)}`,
+        `Now on ${row.points} points`,
+        `/clubs/${clubId}`
+      );
+    }
+
+    if (anyChange) {
+      await setKnownPositions(competition, updatedPositions);
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 800));
+  }
+
   return NextResponse.json({
     remindersSent,
     kickoffsSent,
     fullTimesSent,
+    positionChangesSent,
     notificationsSent,
     subscribers: subscriptions.length,
   });
+}
+
+function ordinal(n: number): string {
+  const lastTwo = n % 100;
+  if (lastTwo >= 11 && lastTwo <= 13) return `${n}th`;
+  switch (n % 10) {
+    case 1:
+      return `${n}st`;
+    case 2:
+      return `${n}nd`;
+    case 3:
+      return `${n}rd`;
+    default:
+      return `${n}th`;
+  }
 }
