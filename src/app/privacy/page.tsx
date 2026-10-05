@@ -20,7 +20,7 @@ export default function Privacy() {
             Privacy Policy
           </h1>
           <p className="mt-3 max-w-xs text-sm leading-5 text-white/45">
-            Last updated September 24, 2026.
+            Last updated October 5, 2026.
           </p>
         </div>
       </header>
@@ -35,7 +35,8 @@ export default function Privacy() {
               Clubside doesn&apos;t collect any personal data. There are no
               accounts, no tracking, and no analytics. The only things saved
               are your theme and followed clubs, and those stay on your own
-              device.
+              device - unless you turn on notifications, in which case see
+              below for the one thing that involves.
             </p>
           </div>
         </section>
@@ -49,6 +50,22 @@ export default function Privacy() {
               Two things: which clubs you follow, and whether you use light
               or dark mode. Both are saved only in your browser, on your own
               device. They&apos;re never sent to us or anyone else.
+            </p>
+          </div>
+        </section>
+
+        <section className="mb-6">
+          <h2 className="mb-3 px-1 text-xs font-black uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
+            Notifications
+          </h2>
+          <div className="overflow-hidden rounded-[26px] border border-black/[0.045] bg-white p-5 shadow-[0_6px_24px_rgba(0,0,0,0.045)] dark:border-white/[0.06] dark:bg-[#14171F] dark:shadow-none">
+            <p className="text-sm leading-6 text-zinc-600 dark:text-zinc-300">
+              If you turn on goal or kickoff alerts, your device gets a
+              private notification address (not tied to your name, email, or
+              any other identity) along with the list of clubs you asked to
+              be notified about. That&apos;s stored only so we know where to
+              send the alert. Turning notifications off removes it. It&apos;s
+              never used for anything else and never shared.
             </p>
           </div>
         </section>
@@ -76,24 +93,6 @@ export default function Privacy() {
               No analytics, no ads, no third-party trackers, and nothing is
               ever sold or shared. There&apos;s no sign-up, so we don&apos;t
               have your name, email, or any other personal details.
-            </p>
-          </div>
-        </section>
-
-        <section className="mb-6">
-          <h2 className="mb-3 px-1 text-xs font-black uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
-            Questions
-          </h2>
-          <div className="overflow-hidden rounded-[26px] border border-black/[0.045] bg-white p-5 shadow-[0_6px_24px_rgba(0,0,0,0.045)] dark:border-white/[0.06] dark:bg-[#14171F] dark:shadow-none">
-            <p className="text-sm leading-6 text-zinc-600 dark:text-zinc-300">
-              Questions about this policy? Email{" "}
-              <a
-                href="mailto:kugelmann.ilai@gmail.com"
-                className="font-bold text-[#111318] underline dark:text-white"
-              >
-                kugelmann.ilai@gmail.com
-              </a>
-              .
             </p>
           </div>
         </section>
