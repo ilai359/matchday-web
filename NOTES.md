@@ -936,27 +936,38 @@ any commit/run it manually to reactivate).
 ### One-time setup (has to be done before this works at all)
 
 **1. In Vercel** (Project -> Settings -> Environment Variables), add:
-- `GOALS_CRON_SECRET` = `317daaa68fbfa1f02e0159ee5ae11e5299bd06fd587caf61ca6de22339a3543b`
-- `VAPID_PUBLIC_KEY` = `BHGw0kZXChK3FqvaSu1UnOBKL_eBnJCf7R_XMaUZphXIA0CcBBn6Gxg86E1iTvx8GywHomLjNuitcZTzosRyQwc`
-- `VAPID_PRIVATE_KEY` = `kAmsNy6Ai81CzCOYh6gUYKKArpb8bCoos4DFtjfQGM0`
+- `GOALS_CRON_SECRET`
+- `VAPID_PUBLIC_KEY`
+- `VAPID_PRIVATE_KEY`
 - `VAPID_SUBJECT` = `mailto:kugelmann.ilai@gmail.com`
 - `NEXT_PUBLIC_VAPID_PUBLIC_KEY` = same value as `VAPID_PUBLIC_KEY` above
   (needs the `NEXT_PUBLIC_` name too - that's what makes it reach the
   browser side of the app, which also needs this key to subscribe a
   device in the first place)
 
-These are real, already-generated keys (made once, specifically for
-this app) - not placeholders to swap out. After adding them, redeploy
-(any new push to `main` triggers one anyway) so the
-`NEXT_PUBLIC_VAPID_PUBLIC_KEY` value actually gets baked into the app -
-unlike the other, server-only variables, this one has to be present
-*at build time*, not just at runtime.
+**The real values for these live in a password manager / your own
+notes, never in this file.** An earlier version of this file had the
+actual secret values written out here - this repo is public, so that
+meant anyone could read them directly off GitHub. They've since been
+rotated; see "Secret rotation" below if these ever need regenerating
+again. After adding them, redeploy (any new push to `main` triggers
+one anyway) so the `NEXT_PUBLIC_VAPID_PUBLIC_KEY` value actually gets
+baked into the app - unlike the other, server-only variables, this one
+has to be present *at build time*, not just at runtime.
 
 **2. In GitHub** (the repo -> Settings -> Secrets and variables ->
 Actions -> New repository secret): add a secret named
 `GOALS_CRON_SECRET` with the exact same value used in Vercel above.
 This is what lets the scheduled workflow call the check-goals endpoint
 without anyone else being able to.
+
+**Secret rotation:** if `GOALS_CRON_SECRET` or the VAPID keys are ever
+exposed again (committed in plain text, pasted somewhere public,
+etc.), generate new ones and update both Vercel and GitHub together -
+a mismatch between the two makes every check-goals run fail with 401
+until they match again. New VAPID keys: `npx web-push
+generate-vapid-keys`. New cron secret: any random string, e.g.
+`openssl rand -hex 32`.
 
 **3. Run `npm install` once** (in a real Terminal on your Mac, not
 through this chat) so the new `web-push` package this feature depends
