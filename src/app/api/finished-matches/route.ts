@@ -24,7 +24,14 @@ export async function GET(request: Request) {
     const isCurrentSeason = !season || Number(season) === currentSeasonYear;
     // Past seasons never change once they're over, so they're cached much
     // longer than the current season (which still gets new results added).
-    const ttlMs = isCurrentSeason ? 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000;
+    // The current season used to be cached a full hour, which meant a
+    // just-finished result could take up to an hour to show up in a
+    // club's "Recent form" - noticeably stale. 5 minutes matches the
+    // tradeoff already used for the standings cache (fresh enough to
+    // feel current, still far under football-data.org's shared
+    // 10-requests/minute rate limit since this is one shared cache entry
+    // per competition+season, not per visitor).
+    const ttlMs = isCurrentSeason ? 5 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000;
 
     // Cache key includes the competition and season so each combination
     // (e.g. BL1/2025 vs PL/2024) gets its own independent cache entry.
