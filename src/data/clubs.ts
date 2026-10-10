@@ -637,6 +637,7 @@ export const clubs: Club[] = [
     country: "France",
     league: "Ligue 1",
     primaryColor: "#FFD700",
+    crest: "https://crests.football-data.org/535.png",
   },
   {
     id: "lecce",
