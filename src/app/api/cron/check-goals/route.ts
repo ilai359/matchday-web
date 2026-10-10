@@ -112,7 +112,27 @@ export async function GET(request: Request) {
     );
   }
 
-  webpush.setVapidDetails(vapidSubject, vapidPublic, vapidPrivate);
+  // Configuring web-push validates the VAPID keys' format (correct
+  // length, correct encoding) and throws immediately if they're
+  // malformed - which used to crash this entire route with a 500 if
+  // anything about them was ever slightly wrong (e.g. a copy-paste
+  // mistake when rotating them in Vercel). That's a push-notification
+  // problem, not a reason to also stop tracking kickoffs/full-times/
+  // table changes, so it's now caught and only disables sending actual
+  // notifications for this run - everything else still works, and the
+  // route still returns a normal 2xx instead of failing the whole
+  // GitHub Actions job (and emailing a failure notice) over it.
+  let pushConfigured = true;
+  try {
+    webpush.setVapidDetails(vapidSubject, vapidPublic, vapidPrivate);
+  } catch (error) {
+    pushConfigured = false;
+    console.error(
+      "check-goals: webpush.setVapidDetails rejected the configured VAPID keys - " +
+        "notifications are disabled for this run. Check VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY/VAPID_SUBJECT in Vercel.",
+      error
+    );
+  }
 
   const subscriptions = await getAllSubscriptions();
   let remindersSent = 0;
@@ -129,11 +149,13 @@ export async function GET(request: Request) {
       fullTimesSent,
       notificationsSent,
       subscribers: 0,
+      pushConfigured,
     });
   }
 
   async function notifySubscribers(clubIds: string[], title: string, body: string, url: string) {
     if (clubIds.length === 0) return;
+    if (!pushConfigured) return;
     const payload = JSON.stringify({ title, body, url });
     for (const sub of subscriptions) {
       if (!sub.clubIds.some((id) => clubIds.includes(id))) continue;
@@ -380,6 +402,7 @@ export async function GET(request: Request) {
     positionChangesSent,
     notificationsSent,
     subscribers: subscriptions.length,
+    pushConfigured,
   });
 }
 
