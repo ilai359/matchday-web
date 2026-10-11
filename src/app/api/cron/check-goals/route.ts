@@ -400,8 +400,13 @@ async function runCheckGoals(): Promise<NextResponse> {
       // Same cache key /api/standings already keeps fresh (see that
       // route) - reading it here costs an extra football-data.org
       // request only when nobody's looked at this competition's table
-      // in the last 5 minutes.
-      table = await getOrSet(`standings:${competition}`, 5 * 60 * 1000, async () => {
+      // in the last 5 minutes. /api/standings caches the RAW
+      // football-data.org response object under this key (same reason
+      // as the LIVE/SCHEDULED fix above) - matching that shape here,
+      // and extracting the TOTAL table after the cache call instead of
+      // before it, is what keeps this correct regardless of which of
+      // the two routes last wrote this key.
+      const standingsData = await getOrSet(`standings:${competition}`, 5 * 60 * 1000, async () => {
         const response = await fetchWithRetry(
           `https://api.football-data.org/v4/competitions/${competition}/standings`,
           { headers: { "X-Auth-Token": apiKey }, cache: "no-store" }
@@ -409,9 +414,10 @@ async function runCheckGoals(): Promise<NextResponse> {
         if (!response.ok) {
           throw new Error(`football-data.org returned ${response.status}`);
         }
-        const data = (await response.json()) as RawStandingsResponse;
-        return data.standings?.find((s) => s.type === "TOTAL")?.table ?? [];
+        return response.json();
       });
+      table =
+        (standingsData as RawStandingsResponse)?.standings?.find((s) => s.type === "TOTAL")?.table ?? [];
     } catch {
       // Couldn't get this competition's table this run (most likely a
       // rate-limit hit) - skip it, try again next run.
