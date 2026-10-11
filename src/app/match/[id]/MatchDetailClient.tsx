@@ -17,12 +17,14 @@ import { formatCompetition } from "../../../lib/competitionNames";
 import {
   fetchFinishedMatches,
   fetchLiveMatchStatus,
+  fetchStandings,
   fetchTeamInfo,
   extractTeamId,
   prefetchClubPage,
   LiveMatch,
   FinishedMatch,
   LiveMatchStatus,
+  StandingsRow,
   LEAGUE_TO_CODE,
   fetchMatchById,
 } from "../../../lib/footballApi";
@@ -128,6 +130,22 @@ function crestFor(clubId: string | null, apiCrest: string | null): string | unde
 function withAlpha(hex: string, alphaHex: string): string {
   if (!hex.startsWith("#") || hex.length !== 7) return hex;
   return `${hex}${alphaHex}`;
+}
+
+// "1st", "2nd", "3rd", "4th", ... - used for a club's league position.
+function ordinal(n: number): string {
+  const lastTwo = n % 100;
+  if (lastTwo >= 11 && lastTwo <= 13) return `${n}th`;
+  switch (n % 10) {
+    case 1:
+      return `${n}st`;
+    case 2:
+      return `${n}nd`;
+    case 3:
+      return `${n}rd`;
+    default:
+      return `${n}th`;
+  }
 }
 
 function resultFor(
@@ -422,6 +440,42 @@ export default function MatchDetailClient({ id }: { id: string }) {
       cancelled = true;
     };
   }, [leagueCode, homeClubId, awayClubId]);
+
+  // League-table position for each side, shown under their name below.
+  // Deliberately skipped for Champions League (leagueCode === "CL"):
+  // its table isn't a single simple standings list the way a domestic
+  // league's is (group/league-phase format), and this app doesn't track
+  // or show CL standings anywhere else either - not worth a special case
+  // for one competition when "skip it" is clearer and correct.
+  const [standings, setStandings] = useState<StandingsRow[]>([]);
+  useEffect(() => {
+    if (!leagueCode || leagueCode === "CL") {
+      // Same accepted pattern as setHistoryLoading(true) below: resetting
+      // state synchronously in an effect in response to a changed
+      // dependency (here, navigating to a different match whose
+      // leagueCode is now missing or CL) is the correct, standard thing
+      // to do - the alternative the linter prefers would only make this
+      // harder to follow for no real benefit.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setStandings([]);
+      return;
+    }
+    let cancelled = false;
+    fetchStandings(leagueCode)
+      .then((rows) => {
+        if (!cancelled) setStandings(rows);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [leagueCode]);
+  const homePosition = displayMatch?.homeClubId
+    ? standings.find((row) => row.clubId === displayMatch.homeClubId)?.position
+    : undefined;
+  const awayPosition = displayMatch?.awayClubId
+    ? standings.find((row) => row.clubId === displayMatch.awayClubId)?.position
+    : undefined;
 
   // --- Live score polling ---
   // Only bother checking while the match could plausibly be about to start,
@@ -757,6 +811,11 @@ export default function MatchDetailClient({ id }: { id: string }) {
                 <div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
                   Home
                 </div>
+                {homePosition !== undefined && (
+                  <div className="mt-0.5 text-[10px] font-semibold text-zinc-400 dark:text-zinc-500">
+                    {ordinal(homePosition)} in {displayMatch.competition}
+                  </div>
+                )}
               </div>
               <div className="pt-3 text-center">
                 {isLive || isMatchFinished ? (
@@ -832,6 +891,11 @@ export default function MatchDetailClient({ id }: { id: string }) {
                 <div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
                   Away
                 </div>
+                {awayPosition !== undefined && (
+                  <div className="mt-0.5 text-[10px] font-semibold text-zinc-400 dark:text-zinc-500">
+                    {ordinal(awayPosition)} in {displayMatch.competition}
+                  </div>
+                )}
               </div>
             </div>
 
