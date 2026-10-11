@@ -208,9 +208,17 @@ export default function Matches() {
         m.homeClubId === activeFilter ||
         m.awayClubId === activeFilter
     )
-    .sort(
-      (a, b) => new Date(a.kickoff).getTime() - new Date(b.kickoff).getTime()
-    );
+    .sort((a, b) => {
+      // Live matches always float to the top, ahead of everything else -
+      // a match actually in progress is the most time-sensitive thing on
+      // this page, more so than kickoff order alone would put it.
+      // Within each group (live vs. everything else), the existing
+      // kickoff-ascending order is unchanged.
+      const aLive = a.status === "IN_PLAY" || a.status === "PAUSED";
+      const bLive = b.status === "IN_PLAY" || b.status === "PAUSED";
+      if (aLive !== bLive) return aLive ? -1 : 1;
+      return new Date(a.kickoff).getTime() - new Date(b.kickoff).getTime();
+    });
   const myClubs = clubs.filter((club) =>
     selectedIds.includes(club.id)
   );
