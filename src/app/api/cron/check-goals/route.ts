@@ -92,24 +92,48 @@ type RawStandingsResponse = {
 // the first time it's checked and found to be 15 minutes or less away.
 const REMINDER_WINDOW_MINUTES = 15;
 
-export async function GET(request: Request) {
-  const authHeader = request.headers.get("authorization");
-  if (
-    !process.env.GOALS_CRON_SECRET ||
-    authHeader !== `Bearer ${process.env.GOALS_CRON_SECRET}`
-  ) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
+// The real work lives here, called by GET below from inside a
+// catch-everything wrapper. Split out so that genuinely ANY failure in
+// here - a missing env var, a malformed VAPID key, an unexpected bug in
+// code below that nobody's written a try/catch around yet, literally
+// anything - gets turned into a readable JSON response instead of a
+// bare 500.
+//
+// Why this matters beyond just "cleaner code": `curl --fail`, which the
+// GitHub Actions workflow uses to call this route, throws away the
+// response BODY on any non-2xx status - it only ever reports the bare
+// status code. That made every past failure here a dead end: GitHub's
+// log said "500", Vercel's own request logs only keep ~1 hour of
+// history on the free plan, and the actual reason was gone by the time
+// anyone went looking. Returning 200 with the real error inside the
+// JSON body - rather than a non-2xx status - means curl prints it, the
+// GitHub Actions log shows it directly, and the job stops "failing" (so
+// the every-5-minutes failure emails stop) even while something here
+// still needs fixing. A genuinely broken check-goals run is still
+// visible (its JSON says `"ok": false`), just not failing the whole
+// job over it.
+async function runCheckGoals(): Promise<NextResponse> {
   const apiKey = process.env.FOOTBALL_DATA_API_KEY;
   const vapidPublic = process.env.VAPID_PUBLIC_KEY;
   const vapidPrivate = process.env.VAPID_PRIVATE_KEY;
   const vapidSubject = process.env.VAPID_SUBJECT;
-  if (!apiKey || !vapidPublic || !vapidPrivate || !vapidSubject) {
-    return NextResponse.json(
-      { error: "Missing required environment variables" },
-      { status: 500 }
-    );
+
+  const missing = [
+    !apiKey && "FOOTBALL_DATA_API_KEY",
+    !vapidPublic && "VAPID_PUBLIC_KEY",
+    !vapidPrivate && "VAPID_PRIVATE_KEY",
+    !vapidSubject && "VAPID_SUBJECT",
+  ].filter((name): name is string => Boolean(name));
+
+  if (missing.length > 0 || !apiKey || !vapidPublic || !vapidPrivate || !vapidSubject) {
+    // Named explicitly (rather than one generic message) so whichever
+    // one is actually missing/empty in Vercel's env vars is immediately
+    // obvious from the response body, instead of having to guess among
+    // four.
+    return NextResponse.json({
+      ok: false,
+      error: `Missing required environment variable(s): ${missing.join(", ")}`,
+    });
   }
 
   // Configuring web-push validates the VAPID keys' format (correct
@@ -144,6 +168,7 @@ export async function GET(request: Request) {
   // spending football-data.org requests on it.
   if (subscriptions.length === 0) {
     return NextResponse.json({
+      ok: true,
       remindersSent,
       kickoffsSent,
       fullTimesSent,
@@ -396,6 +421,7 @@ export async function GET(request: Request) {
   }
 
   return NextResponse.json({
+    ok: true,
     remindersSent,
     kickoffsSent,
     fullTimesSent,
@@ -404,6 +430,33 @@ export async function GET(request: Request) {
     subscribers: subscriptions.length,
     pushConfigured,
   });
+}
+
+export async function GET(request: Request) {
+  const authHeader = request.headers.get("authorization");
+  if (
+    !process.env.GOALS_CRON_SECRET ||
+    authHeader !== `Bearer ${process.env.GOALS_CRON_SECRET}`
+  ) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  try {
+    return await runCheckGoals();
+  } catch (error) {
+    // The genuinely-unexpected case: something inside runCheckGoals
+    // threw and nothing closer to it caught it. Logged for Vercel's own
+    // logs (useful within their ~1 hour retention), and also returned
+    // directly in the response body so it's visible immediately via
+    // GitHub Actions' log or a plain curl, without needing to catch it
+    // in Vercel's logs in time.
+    console.error("check-goals: unhandled error", error);
+    return NextResponse.json({
+      ok: false,
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+  }
 }
 
 function ordinal(n: number): string {

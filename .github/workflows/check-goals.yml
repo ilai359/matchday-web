@@ -29,7 +29,26 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Ping the check-goals endpoint
+        # The route itself (src/app/api/cron/check-goals/route.ts)
+        # always returns 200 now, even when something inside it goes
+        # wrong - the actual outcome is in the JSON body's "ok" field.
+        # That's deliberate: `curl --fail` throws away the response BODY
+        # on any non-2xx status, which used to mean every failure here
+        # showed up as a bare, unexplained "500" with no way to see why.
+        # This prints the body unconditionally (so a real problem is
+        # still visible in this log), and only fails the step - which
+        # is what triggers GitHub's "workflow failed" email - on an
+        # actual HTTP-level failure (wrong/missing secret -> 401, or
+        # something going wrong before the route's own code even runs).
         run: |
-          curl --fail --silent --show-error \
+          response=$(curl --silent --show-error -w '\nHTTP_STATUS:%{http_code}' \
             -H "Authorization: Bearer ${{ secrets.GOALS_CRON_SECRET }}" \
-            "https://matchday-web-zeta.vercel.app/api/cron/check-goals"
+            "https://matchday-web-zeta.vercel.app/api/cron/check-goals")
+          http_status=$(echo "$response" | tail -n1 | cut -d: -f2)
+          body=$(echo "$response" | sed '$d')
+          echo "$body"
+          echo "HTTP status: $http_status"
+          if [ "$http_status" -ge 400 ]; then
+            echo "::error::Request failed with HTTP $http_status"
+            exit 1
+          fi
