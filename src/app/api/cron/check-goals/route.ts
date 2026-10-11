@@ -227,7 +227,17 @@ async function runCheckGoals(): Promise<NextResponse> {
   for (const competition of COMPETITIONS) {
     let liveMatches: RawLiveMatch[];
     try {
-      liveMatches = await getOrSet(`matches:${competition}:LIVE`, 60 * 1000, async () => {
+      // IMPORTANT: this cache key is shared with src/app/api/matches/
+      // route.ts, which real visitors hit constantly - it caches the
+      // RAW football-data.org response object (`{ matches: [...], ... }`),
+      // not a bare array. Caching just the array here (as this used to
+      // do) meant that whenever /api/matches had refreshed this key more
+      // recently (the overwhelmingly common case), getOrSet's cache hit
+      // would hand back that object where an array was expected, and
+      // `for (const match of liveMatches)` below would throw "is not
+      // iterable". Matching the same shape here is what actually fixes
+      // that, not just masks it.
+      const data = await getOrSet(`matches:${competition}:LIVE`, 60 * 1000, async () => {
         const response = await fetchWithRetry(
           `https://api.football-data.org/v4/competitions/${competition}/matches?status=LIVE`,
           { headers: { "X-Auth-Token": apiKey }, cache: "no-store" }
@@ -235,9 +245,9 @@ async function runCheckGoals(): Promise<NextResponse> {
         if (!response.ok) {
           throw new Error(`football-data.org returned ${response.status}`);
         }
-        const data = await response.json();
-        return (data.matches ?? []) as RawLiveMatch[];
+        return response.json();
       });
+      liveMatches = ((data as { matches?: RawLiveMatch[] })?.matches ?? []) as RawLiveMatch[];
     } catch {
       // This competition's live check failed (most likely a rate-limit
       // hit) - skip it this run rather than fail the whole job; it'll
@@ -274,7 +284,8 @@ async function runCheckGoals(): Promise<NextResponse> {
 
     let scheduledMatches: RawScheduledMatch[];
     try {
-      scheduledMatches = await getOrSet(`matches:${competition}:SCHEDULED`, 60 * 1000, async () => {
+      // Same shared-cache-key reasoning as the LIVE fetch above.
+      const data = await getOrSet(`matches:${competition}:SCHEDULED`, 60 * 1000, async () => {
         const response = await fetchWithRetry(
           `https://api.football-data.org/v4/competitions/${competition}/matches?status=SCHEDULED`,
           { headers: { "X-Auth-Token": apiKey }, cache: "no-store" }
@@ -282,9 +293,9 @@ async function runCheckGoals(): Promise<NextResponse> {
         if (!response.ok) {
           throw new Error(`football-data.org returned ${response.status}`);
         }
-        const data = await response.json();
-        return (data.matches ?? []) as RawScheduledMatch[];
+        return response.json();
       });
+      scheduledMatches = ((data as { matches?: RawScheduledMatch[] })?.matches ?? []) as RawScheduledMatch[];
     } catch {
       scheduledMatches = [];
     }

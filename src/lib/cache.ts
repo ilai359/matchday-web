@@ -213,13 +213,24 @@ export async function getOrSet<T>(
 export async function isCompetitionLive(competition: string): Promise<boolean> {
   if (!redis) return false;
   try {
-    // The value cached under this key (by check-goals/route.ts's LIVE
-    // fetcher) is the raw matches array itself, not an object wrapping
-    // it - matching that shape here, instead of reading a non-existent
-    // `.matches` property off an array, is what makes this function
-    // actually report "true" when a competition has live matches.
+    // This key is shared between src/app/api/matches/route.ts (which
+    // caches the RAW football-data.org response object, i.e.
+    // `{ matches: [...], ... }`) and check-goals/route.ts (which, as of
+    // the fix alongside this one, also caches that same raw object
+    // shape rather than a bare array). Whichever of those two last
+    // refreshed this key is what's actually sitting in Redis, so this
+    // reads both the expected `{ matches: [...] }` shape and, just in
+    // case anything ever caches a bare array here again, a plain array
+    // directly - rather than assuming one specific shape and silently
+    // reporting "not live" (the original bug) whenever the other one
+    // turns out to be what's cached.
     const cached = await redis.get<unknown>(`matches:${competition}:LIVE`);
-    return Array.isArray(cached) && cached.length > 0;
+    const matches = Array.isArray(cached)
+      ? cached
+      : cached && typeof cached === "object" && "matches" in cached
+        ? (cached as { matches?: unknown[] }).matches
+        : undefined;
+    return Array.isArray(matches) && matches.length > 0;
   } catch {
     return false;
   }
