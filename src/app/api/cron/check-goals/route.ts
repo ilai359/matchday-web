@@ -92,6 +92,21 @@ type RawStandingsResponse = {
 // the first time it's checked and found to be 15 minutes or less away.
 const REMINDER_WINDOW_MINUTES = 15;
 
+// Wraps one phase of runCheckGoals so that if something inside it
+// throws, the error message says WHICH phase failed (e.g. "[standings
+// loop] r is not iterable") instead of just the bare error. Minified
+// production stack traces are close to useless for figuring out which
+// of several `for` loops below actually broke - this makes the JSON
+// response itself point at the right one, no source maps needed.
+async function withSection<T>(section: string, fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`[${section}] ${message}`);
+  }
+}
+
 // The real work lives here, called by GET below from inside a
 // catch-everything wrapper. Split out so that genuinely ANY failure in
 // here - a missing env var, a malformed VAPID key, an unexpected bug in
@@ -208,6 +223,7 @@ async function runCheckGoals(): Promise<NextResponse> {
   const stillLiveIds = new Set<string>();
   const liveMatchesById = new Map<string, RawLiveMatch>();
 
+  await withSection("kickoff/reminder loop", async () => {
   for (const competition of COMPETITIONS) {
     let liveMatches: RawLiveMatch[];
     try {
@@ -302,12 +318,14 @@ async function runCheckGoals(): Promise<NextResponse> {
     // other cron job.
     await new Promise((resolve) => setTimeout(resolve, 800));
   }
+  });
 
   // Any match that was tracked as started last run, but isn't in any
   // competition's LIVE list this run, has left play - either finished,
   // or postponed/abandoned. Either way, look up its current state once
   // (not repeatedly) to get the real final score and send the full-time
   // alert, then stop tracking it.
+  await withSection("full-time loop", async () => {
   for (const matchId of previouslyStarted) {
     if (stillLiveIds.has(matchId)) continue;
 
@@ -351,6 +369,7 @@ async function runCheckGoals(): Promise<NextResponse> {
       console.error(`check-goals: couldn't confirm final state for match ${matchId}`, error);
     }
   }
+  });
 
   // Table-position alerts: for every competition whose table isn't
   // currently frozen (see isCompetitionLive - "frozen" means a match in
@@ -361,6 +380,7 @@ async function runCheckGoals(): Promise<NextResponse> {
   // the whole round is actually over, instead of firing a notification
   // after every individual result and possibly flip-flopping mid-round.
   let positionChangesSent = 0;
+  await withSection("standings loop", async () => {
   for (const competition of COMPETITIONS) {
     if (await isCompetitionLive(competition)) continue;
 
@@ -419,6 +439,7 @@ async function runCheckGoals(): Promise<NextResponse> {
 
     await new Promise((resolve) => setTimeout(resolve, 800));
   }
+  });
 
   return NextResponse.json({
     ok: true,
