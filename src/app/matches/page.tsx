@@ -17,7 +17,11 @@ import ClubBadge from "../../components/ClubBadge";
 import { readPersisted, writePersisted } from "../../lib/persistentCache";
 
 function liveMatchesCacheKey(leaguesKey: string): string {
-  return `live-matches:${leaguesKey}`;
+  // Suffixed so this page's persisted cache entry (which includes
+  // recently-finished matches) never collides with the home page's
+  // entry for the same leagues (which deliberately doesn't) - same
+  // reasoning as the client-side cache key in fetchLiveMatches.
+  return `live-matches:${leaguesKey}:with-recent-finished`;
 }
 
 const MATCHES_SCROLL_KEY = "matchday:matches-scroll";
@@ -97,7 +101,7 @@ export default function Matches() {
     } else {
       setLiveLoading(true);
     }
-    fetchLiveMatches(followedLeagueCodes)
+    fetchLiveMatches(followedLeagueCodes, { includeRecentlyFinished: true })
       .then((fresh) => {
         setLiveMatches(fresh);
         writePersisted(cacheKey, fresh);
@@ -124,7 +128,7 @@ export default function Matches() {
     });
     if (!hasMatchWorthPolling) return;
     const interval = setInterval(() => {
-      fetchLiveMatches(followedLeagueCodes)
+      fetchLiveMatches(followedLeagueCodes, { includeRecentlyFinished: true })
         .then((fresh) => {
           setLiveMatches(fresh);
           writePersisted(cacheKey, fresh);
@@ -336,6 +340,7 @@ export default function Matches() {
                 const homeColor = homeClub?.primaryColor ?? "#94A3B8";
                 const awayColor = awayClub?.primaryColor ?? "#94A3B8";
                 const isInPlay = match.status === "IN_PLAY" || match.status === "PAUSED";
+                const isFinished = match.status === "FINISHED";
                 // Our match list isn't checked every minute (some
                 // competitions only every several hours), so a match can
                 // sit labeled "Kickoff [time]" even after that time has
@@ -369,6 +374,11 @@ export default function Matches() {
                             {match.status === "PAUSED" ? "Half-time" : "Live"}
                           </div>
                         )}
+                        {isFinished && (
+                          <div className="flex shrink-0 items-center gap-1.5 rounded-full bg-zinc-500/10 px-3 py-1.5 text-[11px] font-black uppercase tracking-wider text-zinc-500 dark:bg-white/10 dark:text-zinc-400">
+                            Full-time
+                          </div>
+                        )}
                       </div>
                       <div className="grid grid-cols-[1fr_72px_1fr] items-center gap-3">
                         <div className="min-w-0">
@@ -399,6 +409,15 @@ export default function Matches() {
                                   : match.minute
                                   ? `${match.minute}'`
                                   : "Live"}
+                              </div>
+                              <div className="mt-1 whitespace-nowrap text-lg font-black tracking-tight text-[#111318] dark:text-white">
+                                {match.homeScore ?? 0} – {match.awayScore ?? 0}
+                              </div>
+                            </>
+                          ) : isFinished ? (
+                            <>
+                              <div className="text-[9px] font-black uppercase tracking-[0.16em] text-zinc-400 dark:text-zinc-500">
+                                Full-time
                               </div>
                               <div className="mt-1 whitespace-nowrap text-lg font-black tracking-tight text-[#111318] dark:text-white">
                                 {match.homeScore ?? 0} – {match.awayScore ?? 0}

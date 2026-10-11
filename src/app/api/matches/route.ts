@@ -43,14 +43,33 @@ export async function GET(request: Request) {
           .map((code) => code.trim())
           .filter((code) => COMPETITIONS.includes(code));
 
+  // Recently-finished matches (roughly the last 2 calendar days) are
+  // fetched alongside SCHEDULED/LIVE for every competition, same as
+  // those two - but whether a CALLER actually wants them mixed into
+  // what it shows is a client-side decision (see fetchLiveMatches'
+  // includeRecentlyFinished option), not something this route decides.
+  // This just makes the data available; the Matches page is the one
+  // place that currently asks for it, so the home page and club pages
+  // keep behaving exactly as before.
+  //
+  // Scoped with dateFrom/dateTo (not just "?status=FINISHED" with no
+  // range) so this doesn't pull a whole season's worth of results -
+  // football-data.org's own dateFrom/dateTo params work on whole
+  // calendar dates, so this is roughly, not exactly, "the last 24
+  // hours", which is a fine approximation for "recent results".
+  const today = new Date();
+  const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+  const dateFrom = yesterday.toISOString().slice(0, 10);
+  const dateTo = today.toISOString().slice(0, 10);
+
   try {
     // Each competition+status combo is its own getOrSet entry so one
     // rate-limited request doesn't take the rest down with it, and each
     // one falls back to its own last known-good list instead of an empty
     // one - this is what used to make only *some* leagues' matches show
     // up on a given page load.
-    const requests = requestedCompetitions.flatMap((code) =>
-      STATUSES.map((status) =>
+    const requests = requestedCompetitions.flatMap((code) => [
+      ...STATUSES.map((status) =>
         getOrSet(
           `matches:${code}:${status}`,
           60 * 1000,
@@ -65,8 +84,25 @@ export async function GET(request: Request) {
             return response.json();
           }
         ).catch(() => ({ matches: [] }))
-      )
-    );
+      ),
+      // Cached much longer than SCHEDULED/LIVE (15 min, not 60s) - a
+      // finished result doesn't change, so there's no reason to re-ask
+      // football-data.org for it anywhere near as often.
+      getOrSet(
+        `matches:${code}:FINISHED:recent`,
+        15 * 60 * 1000,
+        async () => {
+          const response = await fetchWithRetry(
+            `https://api.football-data.org/v4/competitions/${code}/matches?status=FINISHED&dateFrom=${dateFrom}&dateTo=${dateTo}`,
+            { headers: { "X-Auth-Token": apiKey }, cache: "no-store" }
+          );
+          if (!response.ok) {
+            throw new Error(`football-data.org returned ${response.status}`);
+          }
+          return response.json();
+        }
+      ).catch(() => ({ matches: [] })),
+    ]);
 
     const results = await Promise.all(requests);
     const allMatches = results.flatMap(

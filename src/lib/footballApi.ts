@@ -309,11 +309,20 @@ async function fetchJsonWithRetry<T = unknown>(
   throw lastError;
 }
 
-// Matches worth showing on the Matches page: not yet started (TIMED /
-// SCHEDULED), or currently being played (IN_PLAY / PAUSED at half-time).
-// Finished matches are deliberately left out here - this list is about
-// what's coming up or happening right now, not match history.
+// Matches worth showing by default: not yet started (TIMED / SCHEDULED),
+// or currently being played (IN_PLAY / PAUSED at half-time). A finished
+// match is only included when a caller explicitly opts in (see
+// fetchLiveMatches' includeRecentlyFinished option below) - the home
+// page and a club's own page intentionally keep showing only what's
+// upcoming or live, same as always.
 const VISIBLE_STATUSES = new Set(["TIMED", "SCHEDULED", "IN_PLAY", "PAUSED"]);
+
+// How long after kickoff a FINISHED match still counts as "recent"
+// enough to show on the Matches page - not measured from the actual
+// final whistle (football-data.org doesn't give us that moment
+// precisely), but close enough in practice since a match's own kickoff-
+// to-full-time gap is only a couple of hours out of this 24.
+const RECENTLY_FINISHED_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 // A single match by its own id, regardless of status - unlike
 // fetchLiveMatches (which deliberately only returns what's upcoming or
@@ -384,35 +393,46 @@ export function leaguesToCodes(leagueNames: string[]): string[] {
 // for nothing, which is correct when there's genuinely nothing to ask
 // about yet (e.g. no clubs followed).
 export async function fetchLiveMatches(
-  leagueCodes: string[] = []
+  leagueCodes: string[] = [],
+  options: { includeRecentlyFinished?: boolean } = {}
 ): Promise<LiveMatch[]> {
+  const { includeRecentlyFinished = false } = options;
   const sortedCodes = [...leagueCodes].sort();
   // Short cache (30s) - long enough to make a quick back-and-forth
   // between pages feel instant, short enough that live scores still
   // update at essentially the same pace as before. Keyed by which
-  // leagues were asked for, so a home page scoped to 3 leagues doesn't
-  // get mixed up with a club page scoped to just 1.
-  return cachedFetch(
-    `client:live-matches:${sortedCodes.join(",")}`,
-    30 * 1000,
-    async () => {
-      const query = `?leagues=${encodeURIComponent(sortedCodes.join(","))}`;
-      const response = await fetch(`/api/matches${query}`);
-      if (!response.ok) {
-        throw new Error("Failed to fetch live matches");
-      }
-      const data = await response.json();
-      const rawMatches: RawApiMatch[] = data.matches ?? [];
-      const mapped = rawMatches
-        .map(mapRawMatch)
-        .filter((match) => VISIBLE_STATUSES.has(match.status));
-      // Remember every match this list just fetched, so tapping straight
-      // into one of them from here shows up instantly instead of waiting
-      // on a brand-new network request - see rememberMatches for why.
-      rememberMatches(mapped);
-      return mapped;
+  // leagues were asked for (so a home page scoped to 3 leagues doesn't
+  // get mixed up with a club page scoped to just 1) AND by whether
+  // finished matches were requested - otherwise the Matches page (which
+  // wants them) and the home/club pages (which don't) could each serve
+  // the other's cached, differently-filtered result for the same set of
+  // leagues within the same 30 seconds.
+  const cacheKey = `client:live-matches:${sortedCodes.join(",")}${
+    includeRecentlyFinished ? ":with-recent-finished" : ""
+  }`;
+  return cachedFetch(cacheKey, 30 * 1000, async () => {
+    const query = `?leagues=${encodeURIComponent(sortedCodes.join(","))}`;
+    const response = await fetch(`/api/matches${query}`);
+    if (!response.ok) {
+      throw new Error("Failed to fetch live matches");
     }
-  );
+    const data = await response.json();
+    const rawMatches: RawApiMatch[] = data.matches ?? [];
+    const mapped = rawMatches.map(mapRawMatch).filter((match) => {
+      if (VISIBLE_STATUSES.has(match.status)) return true;
+      if (!includeRecentlyFinished || match.status !== "FINISHED") return false;
+      const kickoffTime = new Date(match.kickoff).getTime();
+      return (
+        !Number.isNaN(kickoffTime) &&
+        Date.now() - kickoffTime <= RECENTLY_FINISHED_WINDOW_MS
+      );
+    });
+    // Remember every match this list just fetched, so tapping straight
+    // into one of them from here shows up instantly instead of waiting
+    // on a brand-new network request - see rememberMatches for why.
+    rememberMatches(mapped);
+    return mapped;
+  });
 }
 
 // Every upcoming or in-progress match for one club, across every
