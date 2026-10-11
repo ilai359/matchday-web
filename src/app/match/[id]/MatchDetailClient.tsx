@@ -781,13 +781,21 @@ export default function MatchDetailClient({ id }: { id: string }) {
                     onTouchStart={() => prefetchClubPage(displayMatch.homeClubId!)}
                     className="block"
                   >
-                    <div className="mb-2 flex justify-center transition hover:-translate-y-0.5">
+                    <div className="relative mb-2 flex justify-center transition hover:-translate-y-0.5">
                       <ClubBadge
                         name={displayMatch.homeName}
                         crest={displayMatch.homeCrest}
                         color={displayMatch.homeColor}
                         size={56}
                       />
+                      {homePosition !== undefined && (
+                        <div
+                          className="absolute -right-1.5 -top-1.5 flex h-6 min-w-[26px] items-center justify-center rounded-full px-1.5 text-[11px] font-black text-white shadow-[0_2px_6px_rgba(0,0,0,0.3)]"
+                          style={{ backgroundColor: displayMatch.homeColor }}
+                        >
+                          {ordinal(homePosition)}
+                        </div>
+                      )}
                     </div>
                     <div className="break-words text-[16px] font-black leading-tight text-[#111318] underline decoration-zinc-300 underline-offset-2 dark:text-white dark:decoration-zinc-600">
                       {displayMatch.homeName}
@@ -795,13 +803,21 @@ export default function MatchDetailClient({ id }: { id: string }) {
                   </Link>
                 ) : (
                   <>
-                    <div className="mb-2 flex justify-center">
+                    <div className="relative mb-2 flex justify-center">
                       <ClubBadge
                         name={displayMatch.homeName}
                         crest={displayMatch.homeCrest}
                         color={displayMatch.homeColor}
                         size={56}
                       />
+                      {homePosition !== undefined && (
+                        <div
+                          className="absolute -right-1.5 -top-1.5 flex h-6 min-w-[26px] items-center justify-center rounded-full px-1.5 text-[11px] font-black text-white shadow-[0_2px_6px_rgba(0,0,0,0.3)]"
+                          style={{ backgroundColor: displayMatch.homeColor }}
+                        >
+                          {ordinal(homePosition)}
+                        </div>
+                      )}
                     </div>
                     <div className="break-words text-[14px] font-medium leading-tight text-zinc-400 dark:text-zinc-500">
                       {displayMatch.homeName}
@@ -811,11 +827,6 @@ export default function MatchDetailClient({ id }: { id: string }) {
                 <div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
                   Home
                 </div>
-                {homePosition !== undefined && (
-                  <div className="mt-0.5 text-[10px] font-semibold text-zinc-400 dark:text-zinc-500">
-                    {ordinal(homePosition)} in {displayMatch.competition}
-                  </div>
-                )}
               </div>
               <div className="pt-3 text-center">
                 {isLive || isMatchFinished ? (
@@ -861,13 +872,21 @@ export default function MatchDetailClient({ id }: { id: string }) {
                     onTouchStart={() => prefetchClubPage(displayMatch.awayClubId!)}
                     className="block"
                   >
-                    <div className="mb-2 flex justify-center transition hover:-translate-y-0.5">
+                    <div className="relative mb-2 flex justify-center transition hover:-translate-y-0.5">
                       <ClubBadge
                         name={displayMatch.awayName}
                         crest={displayMatch.awayCrest}
                         color={displayMatch.awayColor}
                         size={56}
                       />
+                      {awayPosition !== undefined && (
+                        <div
+                          className="absolute -right-1.5 -top-1.5 flex h-6 min-w-[26px] items-center justify-center rounded-full px-1.5 text-[11px] font-black text-white shadow-[0_2px_6px_rgba(0,0,0,0.3)]"
+                          style={{ backgroundColor: displayMatch.awayColor }}
+                        >
+                          {ordinal(awayPosition)}
+                        </div>
+                      )}
                     </div>
                     <div className="break-words text-[16px] font-black leading-tight text-[#111318] underline decoration-zinc-300 underline-offset-2 dark:text-white dark:decoration-zinc-600">
                       {displayMatch.awayName}
@@ -875,13 +894,21 @@ export default function MatchDetailClient({ id }: { id: string }) {
                   </Link>
                 ) : (
                   <>
-                    <div className="mb-2 flex justify-center">
+                    <div className="relative mb-2 flex justify-center">
                       <ClubBadge
                         name={displayMatch.awayName}
                         crest={displayMatch.awayCrest}
                         color={displayMatch.awayColor}
                         size={56}
                       />
+                      {awayPosition !== undefined && (
+                        <div
+                          className="absolute -right-1.5 -top-1.5 flex h-6 min-w-[26px] items-center justify-center rounded-full px-1.5 text-[11px] font-black text-white shadow-[0_2px_6px_rgba(0,0,0,0.3)]"
+                          style={{ backgroundColor: displayMatch.awayColor }}
+                        >
+                          {ordinal(awayPosition)}
+                        </div>
+                      )}
                     </div>
                     <div className="break-words text-[14px] font-medium leading-tight text-zinc-400 dark:text-zinc-500">
                       {displayMatch.awayName}
@@ -891,11 +918,6 @@ export default function MatchDetailClient({ id }: { id: string }) {
                 <div className="mt-1 text-[10px] font-bold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
                   Away
                 </div>
-                {awayPosition !== undefined && (
-                  <div className="mt-0.5 text-[10px] font-semibold text-zinc-400 dark:text-zinc-500">
-                    {ordinal(awayPosition)} in {displayMatch.competition}
-                  </div>
-                )}
               </div>
             </div>
 
