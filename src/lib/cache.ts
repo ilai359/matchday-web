@@ -213,10 +213,13 @@ export async function getOrSet<T>(
 export async function isCompetitionLive(competition: string): Promise<boolean> {
   if (!redis) return false;
   try {
-    const cached = await redis.get<{ matches?: unknown[] }>(
-      `matches:${competition}:LIVE`
-    );
-    return Array.isArray(cached?.matches) && cached.matches.length > 0;
+    // The value cached under this key (by check-goals/route.ts's LIVE
+    // fetcher) is the raw matches array itself, not an object wrapping
+    // it - matching that shape here, instead of reading a non-existent
+    // `.matches` property off an array, is what makes this function
+    // actually report "true" when a competition has live matches.
+    const cached = await redis.get<unknown>(`matches:${competition}:LIVE`);
+    return Array.isArray(cached) && cached.length > 0;
   } catch {
     return false;
   }
