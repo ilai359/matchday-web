@@ -42,9 +42,14 @@ export async function GET(request: Request) {
     // table that's a minute stale beats a blank one), and never caches the
     // failure itself. Same fix already applied to finished-matches and
     // team-info for the same reason.
+    // Used to be 5 minutes. Once a match ends and the freeze above lifts,
+    // this TTL is now the only thing standing between "match just
+    // finished" and "table shows the real result" - 5 minutes made that
+    // feel broken/slow. Matching the ~60s cadence everything else in the
+    // app already updates on instead.
     const data = await getOrSet(
       `standings:${competition}`,
-      5 * 60 * 1000,
+      60 * 1000,
       async () => {
         const response = await fetchWithRetry(
           `https://api.football-data.org/v4/competitions/${competition}/standings`,

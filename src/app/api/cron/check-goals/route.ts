@@ -402,7 +402,9 @@ async function runCheckGoals(): Promise<NextResponse> {
       // and extracting the TOTAL table after the cache call instead of
       // before it, is what keeps this correct regardless of which of
       // the two routes last wrote this key.
-      const standingsData = await getOrSet(`standings:${competition}`, 5 * 60 * 1000, async () => {
+      // Must stay in sync with the TTL /api/standings/route.ts uses for
+      // this same cache key (see that file) - both now 60s.
+      const standingsData = await getOrSet(`standings:${competition}`, 60 * 1000, async () => {
         const response = await fetchWithRetry(
           `https://api.football-data.org/v4/competitions/${competition}/standings`,
           { headers: { "X-Auth-Token": apiKey }, cache: "no-store" }

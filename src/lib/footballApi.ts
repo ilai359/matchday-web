@@ -503,11 +503,12 @@ type RawStandingsResponse = {
 export async function fetchStandings(
   competitionCode: string
 ): Promise<StandingsRow[]> {
-  // Cached in the browser for a few minutes - a league table barely
-  // changes minute to minute, so revisiting the same league within one
-  // browsing session (e.g. checking a few different clubs in the same
-  // league) shouldn't have to wait on the network again each time.
-  return cachedFetch(`client:standings:${competitionCode}`, 3 * 60 * 1000, async () => {
+  // Cached in the browser briefly - long enough that flipping between a
+  // few clubs in the same league in one session doesn't re-ask the
+  // network every time, short enough (60s, matching the server-side
+  // cache this calls into) that a table update after a match ends shows
+  // up without needing a hard refresh.
+  return cachedFetch(`client:standings:${competitionCode}`, 60 * 1000, async () => {
     const response = await fetch(`/api/standings?competition=${competitionCode}`);
     if (!response.ok) {
       throw new Error("Failed to fetch standings");

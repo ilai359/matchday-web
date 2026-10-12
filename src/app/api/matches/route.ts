@@ -85,12 +85,19 @@ export async function GET(request: Request) {
           }
         ).catch(() => ({ matches: [] }))
       ),
-      // Cached much longer than SCHEDULED/LIVE (15 min, not 60s) - a
-      // finished result doesn't change, so there's no reason to re-ask
-      // football-data.org for it anywhere near as often.
+      // Used to be cached 15 minutes ("a finished result doesn't change,
+      // so why ask often") - but that's the TTL for the match's own
+      // score, not for whether it's SHOWN as finished yet at all. A
+      // match that just ended is still sitting in the (separately
+      // cached, 60s) LIVE list until that expires, then needs this cache
+      // to also refresh before the Matches page can show it as
+      // "Full-time" - worst case the two combined used to be a 16-minute
+      // wait. Matching the LIVE/SCHEDULED cadence here instead closes
+      // that gap down to the same ~60s everything else already updates
+      // on.
       getOrSet(
         `matches:${code}:FINISHED:recent`,
-        15 * 60 * 1000,
+        60 * 1000,
         async () => {
           const response = await fetchWithRetry(
             `https://api.football-data.org/v4/competitions/${code}/matches?status=FINISHED&dateFrom=${dateFrom}&dateTo=${dateTo}`,
