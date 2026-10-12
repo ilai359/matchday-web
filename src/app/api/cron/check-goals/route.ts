@@ -17,6 +17,7 @@ import { getKnownPositions, setKnownPositions, PositionMap } from "@/lib/tableWa
 import { getAllSubscriptions, removeSubscriptionByEndpoint } from "@/lib/pushSubscriptions";
 import { getClub, getClubName } from "@/lib/clubHelpers";
 import { fetchLiveUpdates } from "@/lib/newsApi";
+import { refreshScorersAfterMatch } from "@/lib/scorersData";
 
 // Same URL the GitHub Actions workflow itself calls this app at (see
 // .github/workflows/check-goals.yml) - needed here because fetchLiveUpdates
@@ -82,6 +83,9 @@ type RawScheduledMatch = {
 type RawSingleMatch = {
   score?: { fullTime?: { home: number | null; away: number | null } };
   status?: string;
+  homeTeam?: RawTeam;
+  awayTeam?: RawTeam;
+  competition?: { name: string; code?: string };
 };
 
 type RawStandingsRow = {
@@ -364,17 +368,35 @@ async function runCheckGoals(): Promise<NextResponse> {
       if (single.status === "FINISHED") {
         const homeScore = single.score?.fullTime?.home ?? null;
         const awayScore = single.score?.fullTime?.away ?? null;
-        if (homeScore !== null && awayScore !== null && liveMatch) {
+        // Read team names/competition straight off this single-match
+        // lookup (the real API always includes them) rather than
+        // liveMatchesById, which only ever holds matches that are STILL
+        // live as of this run - a match that just finished is, by
+        // definition, never in it. Falling back to `liveMatch` here only
+        // covers the (never expected) case where the API response itself
+        // is missing these fields.
+        const homeTeam = single.homeTeam ?? liveMatch?.homeTeam;
+        const awayTeam = single.awayTeam ?? liveMatch?.awayTeam;
+        const competitionName = single.competition?.name ?? liveMatch?.competition.name;
+        if (homeScore !== null && awayScore !== null && homeTeam && awayTeam && competitionName) {
           fullTimesSent += 1;
-          const homeClubId = matchClubId(liveMatch.homeTeam.name);
-          const awayClubId = matchClubId(liveMatch.awayTeam.name);
+          const homeClubId = matchClubId(homeTeam.name);
+          const awayClubId = matchClubId(awayTeam.name);
           const clubIds = [homeClubId, awayClubId].filter((id): id is string => id !== null);
           await notifySubscribers(
             clubIds,
-            `🏁 Full time: ${liveMatch.homeTeam.name} ${homeScore}-${awayScore} ${liveMatch.awayTeam.name}`,
-            `${liveMatch.competition.name} · final score`,
+            `🏁 Full time: ${homeTeam.name} ${homeScore}-${awayScore} ${awayTeam.name}`,
+            `${competitionName} · final score`,
             `/match/${matchId}`
           );
+        }
+        // Refresh this competition's top-scorers cache right away -
+        // see scorersData.ts. single.competition?.code is football-
+        // data.org's own short code (e.g. "PL"), the same ones used as
+        // cache keys everywhere else in this app, so no lookup/mapping
+        // is needed here.
+        if (single.competition?.code) {
+          await refreshScorersAfterMatch(single.competition.code, apiKey);
         }
       }
       await clearMatchStarted(matchId);

@@ -250,6 +250,31 @@ export async function getStaleOnly<T>(key: string): Promise<T | null> {
   }
 }
 
+/**
+ * Clears a cached key (both the normal TTL'd copy and its "last known
+ * good" stale copy) so the next getOrSet() call for it is forced to
+ * fetch fresh instead of serving whatever's currently cached - even if
+ * that entry hasn't expired yet.
+ *
+ * Used when something more reliable than a timer tells us a cached
+ * value just went stale - e.g. check-goals confirming a match finished,
+ * which is a precise signal that competition's scorers list may have
+ * changed right now, rather than waiting out its normal (long) TTL.
+ * Best-effort like every other Redis call here: a failure just means
+ * the stale value lingers a bit longer, not a broken request.
+ */
+export async function invalidate(key: string): Promise<void> {
+  store.delete(key);
+  lastGood.delete(key);
+  if (!redis) return;
+  try {
+    await redis.del(key);
+    await redis.del(`stale:${key}`);
+  } catch (error) {
+    console.error(`invalidate: Redis DEL failed for key "${key}"`, error);
+  }
+}
+
 /** Exposed for tests / debugging only. Only clears the in-memory fallback. */
 export function _clearCacheForTests() {
   store.clear();
