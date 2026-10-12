@@ -559,14 +559,23 @@ export async function fetchLiveUpdates(
   // actually be about a followed club to make it into the results -
   // this only ever adds more candidates, never loosens what counts as
   // relevant.
-  extraQueries: string[] = []
+  extraQueries: string[] = [],
+  // Both internal fetches below use relative paths ("/api/news", not
+  // "https://..."), which only resolve on their own in the browser
+  // (against the current page's own origin). A relative path can't be
+  // resolved at all from server-side code (e.g. a cron route calling
+  // this to warm the cache ahead of time) - passing the site's own
+  // origin here makes this function work from either place; browser
+  // callers just leave it as "" and keep using relative paths exactly
+  // as before.
+  baseUrl: string = ""
 ): Promise<NewsUpdate[]> {
   const searchTerms = Array.from(new Set([...clubNames, ...extraQueries]));
   const query =
     searchTerms.length > 0
       ? `?clubs=${encodeURIComponent(searchTerms.join(","))}`
       : "";
-  const response = await fetch(`/api/news${query}`);
+  const response = await fetch(`${baseUrl}/api/news${query}`);
   if (!response.ok) {
     throw new Error("Failed to fetch news");
   }
@@ -629,7 +638,7 @@ export async function fetchLiveUpdates(
   }
 
   try {
-    const relevanceResponse = await fetch("/api/news-relevance", {
+    const relevanceResponse = await fetch(`${baseUrl}/api/news-relevance`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

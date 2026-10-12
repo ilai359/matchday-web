@@ -15,6 +15,15 @@ import {
 } from "@/lib/goalWatch";
 import { getKnownPositions, setKnownPositions, PositionMap } from "@/lib/tableWatch";
 import { getAllSubscriptions, removeSubscriptionByEndpoint } from "@/lib/pushSubscriptions";
+import { getClub, getClubName } from "@/lib/clubHelpers";
+import { fetchLiveUpdates } from "@/lib/newsApi";
+
+// Same URL the GitHub Actions workflow itself calls this app at (see
+// .github/workflows/check-goals.yml) - needed here because fetchLiveUpdates
+// normally calls relative paths like "/api/news", which only resolve on
+// their own in the browser. A server-side caller has to hand it a real
+// origin instead.
+const SITE_BASE_URL = "https://matchday-web-zeta.vercel.app";
 
 // Runs frequently (every few minutes - see the GitHub Actions workflow
 // at .github/workflows/check-goals.yml) and sends four kinds of alert
@@ -455,6 +464,40 @@ async function runCheckGoals(): Promise<NextResponse> {
   }));
   });
 
+  // Keep the Updates tab's news cache warm for whoever's actually
+  // subscribed, so opening it doesn't also have to pay for a live
+  // NewsData.io fetch *and* a Claude relevance/dedup call right at that
+  // moment - by far the slowest single thing in the app, since the AI
+  // step alone can take several seconds. This calls the exact same
+  // fetchLiveUpdates pipeline (and cache keys) the Updates page itself
+  // uses, just triggered by this cron's own schedule instead of a real
+  // visit, for the union of every subscriber's actual followed clubs -
+  // not hardcoded to any one person, derived from the same push
+  // subscriptions already read above. Deliberately its own try/catch
+  // (not withSection) - a hiccup here should never turn kickoffs,
+  // reminders, full-times or standings - all of which already
+  // succeeded by this point - into a reported failure.
+  let newsWarmed = false;
+  try {
+    const subscribedClubIds = Array.from(
+      new Set(subscriptions.flatMap((sub) => sub.clubIds))
+    );
+    const clubNames = subscribedClubIds.map((id) => getClubName(id));
+    const leagues = Array.from(
+      new Set(
+        subscribedClubIds
+          .map((id) => getClub(id)?.league)
+          .filter((league): league is string => Boolean(league))
+      )
+    );
+    if (clubNames.length > 0) {
+      await fetchLiveUpdates(clubNames, leagues, SITE_BASE_URL);
+      newsWarmed = true;
+    }
+  } catch (error) {
+    console.error("check-goals: news warm-up failed", error);
+  }
+
   return NextResponse.json({
     ok: true,
     remindersSent,
@@ -464,6 +507,7 @@ async function runCheckGoals(): Promise<NextResponse> {
     notificationsSent,
     subscribers: subscriptions.length,
     pushConfigured,
+    newsWarmed,
   });
 }
 
