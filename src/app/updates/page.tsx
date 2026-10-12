@@ -126,7 +126,19 @@ export default function Updates() {
   // interactions to learn.
   const myClubs = clubs.filter((club) => selectedIds.includes(club.id));
 
-  const myUpdates = combinedUpdates
+  // A big, newsy club (Real Madrid) can easily have 10x the stories of a
+  // quiet one (FC Groningen) - sorted purely by date, that buries the
+  // quiet club's handful of updates under a flood from whichever club
+  // happens to be in the news most this week. Capping each club to its
+  // own most recent MAX_UPDATES_PER_CLUB keeps every followed club
+  // represented in the "All clubs" view instead of one dominating it.
+  // The array below is already sorted newest-first before the cap runs,
+  // so taking the first N updates seen per club is the same as taking
+  // that club's N most recent - and the result stays globally sorted
+  // since it's just a filtered subsequence of an already-sorted array.
+  const MAX_UPDATES_PER_CLUB = 10;
+
+  const sortedUpdates = combinedUpdates
     .filter((update) => selectedIds.includes(update.clubId))
     .filter((update) => activeClub === "all" || update.clubId === activeClub)
     .sort(
@@ -134,6 +146,14 @@ export default function Updates() {
         new Date(b.publishedAt).getTime() -
         new Date(a.publishedAt).getTime()
     );
+
+  const updateCountByClub = new Map<string, number>();
+  const myUpdates = sortedUpdates.filter((update) => {
+    const count = updateCountByClub.get(update.clubId) ?? 0;
+    if (count >= MAX_UPDATES_PER_CLUB) return false;
+    updateCountByClub.set(update.clubId, count + 1);
+    return true;
+  });
 
   if (selectedIds.length === 0) {
     return (
