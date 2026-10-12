@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { fetchWithRetry } from "@/lib/fetchWithRetry";
-import { getOrSet } from "@/lib/cache";
+import { getMatches } from "@/lib/matchesData";
 import { COMPETITIONS } from "@/lib/competitions";
 
 // Runs on Vercel's Edge Runtime instead of the default Node.js serverless
@@ -15,54 +14,6 @@ import { COMPETITIONS } from "@/lib/competitions";
 // runtime.
 export const runtime = "edge";
 
-
-// football-data.org's docs only ever show a single status value in their
-// examples (e.g. "?status=FINISHED"), so combining values in one request
-// (like "SCHEDULED,LIVE") isn't something their docs confirm works. Rather
-// than guess at undocumented syntax, we just ask for each status
-// separately and merge the results - two confirmed-working requests per
-// competition instead of one unconfirmed one. LIVE is their pseudo-status
-// that covers both IN_PLAY and PAUSED, so this is what actually makes live
-// matches show up (they were being silently dropped before, since
-// SCHEDULED alone excludes them).
-const STATUSES = ["SCHEDULED", "LIVE"];
-
-// Each status (SCHEDULED/LIVE/FINISHED:recent) above is its own
-// independently-cached request, refreshed on its own schedule - so right
-// around when a match actually changes status, it's entirely possible
-// for the SAME match to still be sitting in one cache's answer (e.g.
-// LIVE, not yet expired) while it's already showing up in another's
-// (e.g. FINISHED:recent, which just refreshed a moment later). Without
-// deduplicating, that match renders twice on the Matches page - once
-// mid-game, once as a finished result - until both caches happen to
-// catch up with each other, which is exactly the "shows up as 2
-// different matches" symptom Ilai ran into.
-//
-// A match's real status only ever moves forward (scheduled -> live ->
-// finished, never back), so when the same id shows up more than once,
-// keeping whichever copy reports the more advanced status is always the
-// correct answer, not a guess - same idea used for the match detail
-// page's own live-status/displayed-status reconciliation.
-function statusRank(status: unknown): number {
-  if (status === "FINISHED") return 2;
-  if (status === "IN_PLAY" || status === "PAUSED") return 1;
-  return 0;
-}
-
-function dedupeByMostAdvancedStatus(matches: unknown[]): unknown[] {
-  const byId = new Map<string | number, { match: unknown; rank: number }>();
-  for (const match of matches) {
-    const id = (match as { id?: string | number } | null)?.id;
-    if (id === undefined || id === null) continue;
-    const rank = statusRank((match as { status?: unknown } | null)?.status);
-    const existing = byId.get(id);
-    if (!existing || rank >= existing.rank) {
-      byId.set(id, { match, rank });
-    }
-  }
-  return Array.from(byId.values(), (entry) => entry.match);
-}
-
 export async function GET(request: Request) {
   const apiKey = process.env.FOOTBALL_DATA_API_KEY;
 
@@ -72,101 +23,22 @@ export async function GET(request: Request) {
 
   // Only ask football-data.org for the leagues someone's actually
   // watching (their followed clubs' leagues), instead of always asking
-  // for all 8. This route used to fire 16 requests (8 competitions x 2
-  // statuses) on every refresh no matter who was looking - by far the
-  // single biggest source of hitting football-data.org's shared
-  // 10-requests/minute limit. Most people only follow clubs in 2-4
-  // leagues, so this typically cuts that in half or more.
-  //
-  // "leagues" present but empty means the caller genuinely has nothing
-  // to ask for yet (e.g. no clubs followed) - fetch nothing. "leagues"
-  // missing entirely (an older cached page that doesn't send it yet, or
-  // a direct call) falls back to the full list, so nothing breaks.
+  // for all 8. "leagues" present but empty means the caller genuinely
+  // has nothing to ask for yet (e.g. no clubs followed) - fetch nothing.
+  // "leagues" missing entirely (an older cached page that doesn't send
+  // it yet, or a direct call) falls back to the full list.
   const { searchParams } = new URL(request.url);
   const leaguesParam = searchParams.get("leagues");
   const requestedCompetitions =
     leaguesParam === null
       ? COMPETITIONS
-      : leaguesParam
-          .split(",")
-          .map((code) => code.trim())
-          .filter((code) => COMPETITIONS.includes(code));
-
-  // Recently-finished matches (roughly the last 2 calendar days) are
-  // fetched alongside SCHEDULED/LIVE for every competition, same as
-  // those two - but whether a CALLER actually wants them mixed into
-  // what it shows is a client-side decision (see fetchLiveMatches'
-  // includeRecentlyFinished option), not something this route decides.
-  // This just makes the data available; the Matches page is the one
-  // place that currently asks for it, so the home page and club pages
-  // keep behaving exactly as before.
-  //
-  // Scoped with dateFrom/dateTo (not just "?status=FINISHED" with no
-  // range) so this doesn't pull a whole season's worth of results -
-  // football-data.org's own dateFrom/dateTo params work on whole
-  // calendar dates, so this is roughly, not exactly, "the last 24
-  // hours", which is a fine approximation for "recent results".
-  const today = new Date();
-  const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
-  const dateFrom = yesterday.toISOString().slice(0, 10);
-  const dateTo = today.toISOString().slice(0, 10);
+      : leaguesParam.split(",").map((code) => code.trim());
 
   try {
-    // Each competition+status combo is its own getOrSet entry so one
-    // rate-limited request doesn't take the rest down with it, and each
-    // one falls back to its own last known-good list instead of an empty
-    // one - this is what used to make only *some* leagues' matches show
-    // up on a given page load.
-    const requests = requestedCompetitions.flatMap((code) => [
-      ...STATUSES.map((status) =>
-        getOrSet(
-          `matches:${code}:${status}`,
-          60 * 1000,
-          async () => {
-            const response = await fetchWithRetry(
-              `https://api.football-data.org/v4/competitions/${code}/matches?status=${status}`,
-              { headers: { "X-Auth-Token": apiKey }, cache: "no-store" }
-            );
-            if (!response.ok) {
-              throw new Error(`football-data.org returned ${response.status}`);
-            }
-            return response.json();
-          }
-        ).catch(() => ({ matches: [] }))
-      ),
-      // Used to be cached 15 minutes ("a finished result doesn't change,
-      // so why ask often") - but that's the TTL for the match's own
-      // score, not for whether it's SHOWN as finished yet at all. A
-      // match that just ended is still sitting in the (separately
-      // cached, 60s) LIVE list until that expires, then needs this cache
-      // to also refresh before the Matches page can show it as
-      // "Full-time" - worst case the two combined used to be a 16-minute
-      // wait. Matching the LIVE/SCHEDULED cadence here instead closes
-      // that gap down to the same ~60s everything else already updates
-      // on.
-      getOrSet(
-        `matches:${code}:FINISHED:recent`,
-        60 * 1000,
-        async () => {
-          const response = await fetchWithRetry(
-            `https://api.football-data.org/v4/competitions/${code}/matches?status=FINISHED&dateFrom=${dateFrom}&dateTo=${dateTo}`,
-            { headers: { "X-Auth-Token": apiKey }, cache: "no-store" }
-          );
-          if (!response.ok) {
-            throw new Error(`football-data.org returned ${response.status}`);
-          }
-          return response.json();
-        }
-      ).catch(() => ({ matches: [] })),
-    ]);
-
-    const results = await Promise.all(requests);
-    const rawMatches = results.flatMap(
-      (result) => (result as { matches?: unknown[] }).matches ?? []
-    );
-    const allMatches = dedupeByMostAdvancedStatus(rawMatches);
-
-    return NextResponse.json({ matches: allMatches });
+    // Fetch/cache/dedup logic now lives in src/lib/matchesData.ts,
+    // shared with /api/club-bundle - see that file.
+    const data = await getMatches(requestedCompetitions, apiKey);
+    return NextResponse.json(data);
   } catch (error) {
     return NextResponse.json(
       { error: "Something went wrong", details: String(error) },

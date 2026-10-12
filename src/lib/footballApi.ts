@@ -500,6 +500,35 @@ type RawStandingsResponse = {
   }[];
 };
 
+// Turns football-data.org's raw standings JSON into our own StandingsRow
+// shape. Pulled out of fetchStandings so fetchClubBundle (which gets this
+// same raw JSON from the aggregated /api/club-bundle route instead of
+// /api/standings directly) can produce identical results without
+// duplicating this mapping.
+function mapStandingsRaw(data: RawStandingsResponse): StandingsRow[] {
+  const totalTable = data.standings?.find((s) => s.type === "TOTAL")?.table ?? [];
+  return totalTable.map((row) => {
+    const clubId = matchClubId(row.team.name);
+    // Prefer our own crest for a club we track (consistent branding,
+    // already used everywhere else in the app) and only fall back to
+    // whatever football-data.org sent for a club we don't track - same
+    // convention as crestFor() on the match detail page.
+    const ownCrest = clubId ? clubs.find((c) => c.id === clubId)?.crest : undefined;
+    return {
+      position: row.position,
+      teamName: row.team.name,
+      clubId,
+      crest: ownCrest ?? row.team.crest ?? undefined,
+      playedGames: row.playedGames,
+      won: row.won,
+      draw: row.draw,
+      lost: row.lost,
+      points: row.points,
+      goalDifference: row.goalDifference,
+    };
+  });
+}
+
 export async function fetchStandings(
   competitionCode: string
 ): Promise<StandingsRow[]> {
@@ -514,28 +543,7 @@ export async function fetchStandings(
       throw new Error("Failed to fetch standings");
     }
     const data: RawStandingsResponse = await response.json();
-    const totalTable =
-      data.standings?.find((s) => s.type === "TOTAL")?.table ?? [];
-    return totalTable.map((row) => {
-      const clubId = matchClubId(row.team.name);
-      // Prefer our own crest for a club we track (consistent branding,
-      // already used everywhere else in the app) and only fall back to
-      // whatever football-data.org sent for a club we don't track - same
-      // convention as crestFor() on the match detail page.
-      const ownCrest = clubId ? clubs.find((c) => c.id === clubId)?.crest : undefined;
-      return {
-        position: row.position,
-        teamName: row.team.name,
-        clubId,
-        crest: ownCrest ?? row.team.crest ?? undefined,
-        playedGames: row.playedGames,
-        won: row.won,
-        draw: row.draw,
-        lost: row.lost,
-        points: row.points,
-        goalDifference: row.goalDifference,
-      };
-    });
+    return mapStandingsRaw(data);
   });
 }
 
@@ -583,6 +591,19 @@ type RawScorersResponse = {
   }[];
 };
 
+// Same reasoning as mapStandingsRaw above - pulled out so fetchClubBundle
+// can reuse it on raw JSON that came from /api/club-bundle instead.
+function mapScorersRaw(data: RawScorersResponse): Scorer[] {
+  const rawScorers = data.scorers ?? [];
+  return rawScorers.map((s) => ({
+    playerName: s.player.name,
+    teamName: s.team.name,
+    clubId: matchClubId(s.team.name),
+    goals: s.goals,
+    assists: s.assists ?? null,
+  }));
+}
+
 export async function fetchScorers(competitionCode: string): Promise<Scorer[]> {
   // Same idea as fetchStandings above - top scorers/assists for a league
   // don't change from one click to the next, so this is cached in the
@@ -593,14 +614,7 @@ export async function fetchScorers(competitionCode: string): Promise<Scorer[]> {
       throw new Error("Failed to fetch scorers");
     }
     const data: RawScorersResponse = await response.json();
-    const rawScorers = data.scorers ?? [];
-    return rawScorers.map((s) => ({
-      playerName: s.player.name,
-      teamName: s.team.name,
-      clubId: matchClubId(s.team.name),
-      goals: s.goals,
-      assists: s.assists ?? null,
-    }));
+    return mapScorersRaw(data);
   });
 }
 
@@ -631,6 +645,34 @@ type RawFinishedMatch = {
   };
 };
 
+// Same reasoning as mapStandingsRaw above - pulled out so fetchClubBundle
+// can reuse it on raw JSON that came from /api/club-bundle instead.
+function mapFinishedMatchesRaw(data: {
+  matches?: RawFinishedMatch[];
+}): FinishedMatch[] {
+  const rawMatches: RawFinishedMatch[] = data.matches ?? [];
+  return rawMatches.map((match) => ({
+    id: String(match.id),
+    competition: match.competition.name,
+    // Same fallback as mapRawMatch above: if this team isn't one of our
+    // 132 tracked clubs, use their name itself as a stand-in ID rather
+    // than null. Without this, a tracked club's own "recent form" pills
+    // would wrongly come up empty for every match they played against a
+    // club we don't track (e.g. a Champions League game vs.
+    // Galatasaray), because this list of past matches couldn't be
+    // matched back to the club at all.
+    homeClubId: matchClubId(match.homeTeam.name) ?? match.homeTeam.name,
+    awayClubId: matchClubId(match.awayTeam.name) ?? match.awayTeam.name,
+    homeTeamName: match.homeTeam.name,
+    awayTeamName: match.awayTeam.name,
+    homeCrest: match.homeTeam.crest ?? null,
+    awayCrest: match.awayTeam.crest ?? null,
+    homeScore: match.score?.fullTime?.home ?? null,
+    awayScore: match.score?.fullTime?.away ?? null,
+    kickoff: match.utcDate,
+  }));
+}
+
 export async function fetchFinishedMatches(
   competitionCode: string,
   season?: string
@@ -646,29 +688,70 @@ export async function fetchFinishedMatches(
       const data = await fetchJsonWithRetry<{ matches?: RawFinishedMatch[] }>(
         `/api/finished-matches?competition=${competitionCode}${seasonParam}`
       );
-      const rawMatches: RawFinishedMatch[] = data.matches ?? [];
-      return rawMatches.map((match) => ({
-        id: String(match.id),
-        competition: match.competition.name,
-        // Same fallback as mapRawMatch above: if this team isn't one of our
-        // 132 tracked clubs, use their name itself as a stand-in ID rather
-        // than null. Without this, a tracked club's own "recent form" pills
-        // would wrongly come up empty for every match they played against a
-        // club we don't track (e.g. a Champions League game vs.
-        // Galatasaray), because this list of past matches couldn't be
-        // matched back to the club at all.
-        homeClubId: matchClubId(match.homeTeam.name) ?? match.homeTeam.name,
-        awayClubId: matchClubId(match.awayTeam.name) ?? match.awayTeam.name,
-        homeTeamName: match.homeTeam.name,
-        awayTeamName: match.awayTeam.name,
-        homeCrest: match.homeTeam.crest ?? null,
-        awayCrest: match.awayTeam.crest ?? null,
-        homeScore: match.score?.fullTime?.home ?? null,
-        awayScore: match.score?.fullTime?.away ?? null,
-        kickoff: match.utcDate,
-      }));
+      return mapFinishedMatchesRaw(data);
     }
   );
+}
+
+// One request to /api/club-bundle instead of five separate ones
+// (standings, scorers, this club's finished matches, Champions League
+// finished matches, upcoming/live matches) - see that route for why.
+// Reuses the exact same mapping functions the standalone fetchX
+// functions above use, just fed from one combined response instead of
+// five separate ones, so there's no risk of this ever disagreeing with
+// what those functions would have produced on their own.
+export type ClubBundle = {
+  standings: StandingsRow[];
+  scorers: Scorer[];
+  recentMatches: FinishedMatch[];
+  upcomingMatches: LiveMatch[];
+};
+
+type RawClubBundleResponse = {
+  standings: RawStandingsResponse | null;
+  scorers: RawScorersResponse | null;
+  recentMatches: { matches?: RawFinishedMatch[] } | null;
+  recentMatchesCL: { matches?: RawFinishedMatch[] } | null;
+  upcoming: { matches?: RawApiMatch[] };
+};
+
+export async function fetchClubBundle(
+  competitionCode: string | null,
+  season?: string
+): Promise<ClubBundle> {
+  const cacheKey = `client:club-bundle:${competitionCode ?? "none"}:${season ?? "current"}`;
+  return cachedFetch(cacheKey, 30 * 1000, async () => {
+    const params = new URLSearchParams();
+    if (competitionCode) params.set("code", competitionCode);
+    if (season) params.set("season", season);
+    const response = await fetch(`/api/club-bundle?${params.toString()}`);
+    if (!response.ok) {
+      throw new Error("Failed to fetch club bundle");
+    }
+    const data: RawClubBundleResponse = await response.json();
+
+    const standings = data.standings ? mapStandingsRaw(data.standings) : [];
+    const scorers = data.scorers ? mapScorersRaw(data.scorers) : [];
+    const ownFinished = data.recentMatches ? mapFinishedMatchesRaw(data.recentMatches) : [];
+    const clFinished = data.recentMatchesCL
+      ? mapFinishedMatchesRaw(data.recentMatchesCL)
+      : [];
+
+    const rawUpcoming: RawApiMatch[] = data.upcoming?.matches ?? [];
+    const mappedUpcoming = rawUpcoming
+      .map(mapRawMatch)
+      .filter((match) => VISIBLE_STATUSES.has(match.status));
+    // Same reasoning as fetchLiveMatches above - remember these so
+    // tapping into one from here shows up instantly.
+    rememberMatches(mappedUpcoming);
+
+    return {
+      standings,
+      scorers,
+      recentMatches: [...ownFinished, ...clFinished],
+      upcomingMatches: mappedUpcoming,
+    };
+  });
 }
 
 // --- Live match polling (for the match detail page) ---

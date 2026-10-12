@@ -12,15 +12,13 @@ import { clubSpotlights } from "../../../data/clubSpotlights";
 import { categoryStyles } from "../../../lib/categoryStyles";
 import { fetchLiveUpdates, NewsUpdate } from "../../../lib/newsApi";
 import {
-  fetchStandings,
-  fetchScorers,
-  fetchFinishedMatches,
-  fetchLiveMatches,
+  fetchClubBundle,
   LEAGUE_TO_CODE,
   StandingsRow,
   Scorer,
   FinishedMatch,
   LiveMatch,
+  ClubBundle,
 } from "../../../lib/footballApi";
 import ClubBadge from "../../../components/ClubBadge";
 import { readPersisted, writePersisted } from "../../../lib/persistentCache";
@@ -210,28 +208,30 @@ export default function ClubDetailClient({ id }: { id: string }) {
     // below, which is cheap: this data is shared and cached across every
     // visitor, not refetched per club, so most of the time this costs
     // nothing extra at all rather than one wasted request per club.
-    const codesWithChampionsLeague = code
-      ? Array.from(new Set([code, "CL"]))
-      : [];
+    // Used to be 6 separate requests (standings, scorers, this club's
+    // finished matches, Champions League finished matches, upcoming/live
+    // matches, news) each firing their own round trip the moment this
+    // page mounted. The first 4 are now one request to /api/club-bundle,
+    // which does those same lookups server-side - see that route. News
+    // keeps its own separate call since it has its own, already-cached/
+    // pre-warmed pipeline that isn't worth coupling in here.
     Promise.all([
-      code ? fetchStandings(code).catch(() => []) : Promise.resolve([]),
-      code ? fetchScorers(code).catch(() => []) : Promise.resolve([]),
-      code
-        ? fetchFinishedMatches(code, currentSeasonYear).catch(() => [])
-        : Promise.resolve([]),
-      code
-        ? fetchFinishedMatches("CL", currentSeasonYear).catch(() => [])
-        : Promise.resolve([]),
-      fetchLiveMatches(codesWithChampionsLeague).catch(() => []),
+      fetchClubBundle(code ?? null, currentSeasonYear).catch(
+        (): ClubBundle => ({
+          standings: [],
+          scorers: [],
+          recentMatches: [],
+          upcomingMatches: [],
+        })
+      ),
       fetchLiveUpdates(newsQueryNames, followedLeagues).catch(() => []),
     ])
-      .then(([standingsRes, scorersRes, finishedRes, clFinishedRes, liveRes, newsRes]) => {
+      .then(([bundle, newsRes]) => {
         if (cancelled) return;
-        const combinedFinished = [...finishedRes, ...clFinishedRes];
-        setStandings(standingsRes);
-        setScorers(scorersRes);
-        setRecentMatches(combinedFinished);
-        setUpcomingMatches(liveRes);
+        setStandings(bundle.standings);
+        setScorers(bundle.scorers);
+        setRecentMatches(bundle.recentMatches);
+        setUpcomingMatches(bundle.upcomingMatches);
         // fetchLiveUpdates already tags every article with the specific
         // club(s) it's genuinely about (that's how the Updates page shows
         // each article under the right club) - so getting this club's news
@@ -239,10 +239,10 @@ export default function ClubDetailClient({ id }: { id: string }) {
         const clubNews = newsRes.filter((update) => update.clubId === club.id);
         setNews(clubNews);
         writePersisted<ClubDetailBundle>(cacheKey, {
-          standings: standingsRes,
-          scorers: scorersRes,
-          recentMatches: combinedFinished,
-          upcomingMatches: liveRes,
+          standings: bundle.standings,
+          scorers: bundle.scorers,
+          recentMatches: bundle.recentMatches,
+          upcomingMatches: bundle.upcomingMatches,
           news: clubNews,
         });
       })
