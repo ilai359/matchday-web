@@ -2,6 +2,19 @@ import { NextResponse } from "next/server";
 import { getOrSet } from "@/lib/cache";
 import { fetchWithRetry } from "@/lib/fetchWithRetry";
 
+// Runs on Vercel's Edge Runtime instead of the default Node.js serverless
+// runtime. This route only does fetch() calls and talks to Upstash Redis over
+// its REST API (@upstash/redis) - no Node-only APIs (crypto, fs, the web-push
+// library) - so it's safe to run on the edge. The payoff: on a low-traffic app
+// like this one, functions sit cold between visits most of the day, and edge
+// functions start markedly faster from cold than Node serverless functions do,
+// plus they run from a location close to the visitor instead of one fixed
+// region. Routes that need Node-only APIs (check-goals, push/test, anything
+// touching src/lib/pushSubscriptions.ts) intentionally stay on the default
+// runtime.
+export const runtime = "edge";
+
+
 // Used only as a fallback for clubs outside our own 132-club list (e.g. a
 // Champions League opponent we don't track) when football-data.org's
 // match data itself didn't include a venue. Deliberately returns just the
