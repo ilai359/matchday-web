@@ -22,17 +22,22 @@ const nextConfig: NextConfig = {
   // default, but only applies to a <Link prefetch={true}>, which nothing
   // here uses.)
   //
-  // Raising `dynamic` to match `static` removes that round-trip for
-  // revisits within 5 minutes. This is safe to do with zero loss of
-  // freshness here specifically: every page already re-fetches its own
-  // real data on mount (see the persisted-cache + background-refetch
-  // pattern used throughout, e.g. src/app/page.tsx) regardless of this
-  // setting, and that's governed by its own cache TTLs (tuned
-  // separately) - this setting only controls whether Next re-fetches the
-  // route's own static shell before it can even show that page.
+  // Raising `dynamic` removes that round-trip for a revisit within the
+  // window below. Originally set to 300 (5 minutes) - too long in
+  // practice: Next's router cache doesn't just skip the shell
+  // round-trip, it can also reuse the previous React instance outright
+  // on some navigations (e.g. the browser/gesture back action), which
+  // skips that page's own effects re-running too - meaning its on-mount
+  // refetch (the thing that was supposed to make this safe) doesn't
+  // happen either, and a time-sensitive page like the match detail one
+  // can sit showing however-old a status it had last time for the whole
+  // window. 20 seconds still removes the round-trip for genuine rapid
+  // back-and-forth (the original complaint), while keeping that window
+  // short enough that it's never the reason a score or match status
+  // looks wrong.
   experimental: {
     staleTimes: {
-      dynamic: 300,
+      dynamic: 20,
     },
   },
 };

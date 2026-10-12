@@ -14,6 +14,42 @@ import { COMPETITIONS } from "@/lib/competitions";
 // SCHEDULED alone excludes them).
 const STATUSES = ["SCHEDULED", "LIVE"];
 
+// Each status (SCHEDULED/LIVE/FINISHED:recent) above is its own
+// independently-cached request, refreshed on its own schedule - so right
+// around when a match actually changes status, it's entirely possible
+// for the SAME match to still be sitting in one cache's answer (e.g.
+// LIVE, not yet expired) while it's already showing up in another's
+// (e.g. FINISHED:recent, which just refreshed a moment later). Without
+// deduplicating, that match renders twice on the Matches page - once
+// mid-game, once as a finished result - until both caches happen to
+// catch up with each other, which is exactly the "shows up as 2
+// different matches" symptom Ilai ran into.
+//
+// A match's real status only ever moves forward (scheduled -> live ->
+// finished, never back), so when the same id shows up more than once,
+// keeping whichever copy reports the more advanced status is always the
+// correct answer, not a guess - same idea used for the match detail
+// page's own live-status/displayed-status reconciliation.
+function statusRank(status: unknown): number {
+  if (status === "FINISHED") return 2;
+  if (status === "IN_PLAY" || status === "PAUSED") return 1;
+  return 0;
+}
+
+function dedupeByMostAdvancedStatus(matches: unknown[]): unknown[] {
+  const byId = new Map<string | number, { match: unknown; rank: number }>();
+  for (const match of matches) {
+    const id = (match as { id?: string | number } | null)?.id;
+    if (id === undefined || id === null) continue;
+    const rank = statusRank((match as { status?: unknown } | null)?.status);
+    const existing = byId.get(id);
+    if (!existing || rank >= existing.rank) {
+      byId.set(id, { match, rank });
+    }
+  }
+  return Array.from(byId.values(), (entry) => entry.match);
+}
+
 export async function GET(request: Request) {
   const apiKey = process.env.FOOTBALL_DATA_API_KEY;
 
@@ -112,9 +148,10 @@ export async function GET(request: Request) {
     ]);
 
     const results = await Promise.all(requests);
-    const allMatches = results.flatMap(
+    const rawMatches = results.flatMap(
       (result) => (result as { matches?: unknown[] }).matches ?? []
     );
+    const allMatches = dedupeByMostAdvancedStatus(rawMatches);
 
     return NextResponse.json({ matches: allMatches });
   } catch (error) {

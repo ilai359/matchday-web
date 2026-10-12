@@ -490,35 +490,75 @@ export default function MatchDetailClient({ id }: { id: string }) {
     const kickoffTime = new Date(kickoffForPolling).getTime();
     if (Number.isNaN(kickoffTime)) return;
 
-    // Date.now() here is intentional and safe: this whole block only runs
-    // inside this effect (never during render), which is exactly where
-    // reading the real current time belongs - it decides whether it's
-    // worth polling at all, it doesn't affect what gets rendered directly.
-    // eslint-disable-next-line react-hooks/purity
-    const minutesSinceKickoff = (Date.now() - kickoffTime) / 60000;
-    const withinLiveWindow = minutesSinceKickoff >= -15 && minutesSinceKickoff <= 180;
-    if (!withinLiveWindow) return;
+    const windowStart = kickoffTime - 15 * 60000;
+    const windowEnd = kickoffTime + 180 * 60000;
 
     let cancelled = false;
+    let intervalId: ReturnType<typeof setInterval> | undefined;
+    let armTimeoutId: ReturnType<typeof setTimeout> | undefined;
 
     function poll() {
       fetchLiveMatchStatus(id)
         .then((result) => {
           if (cancelled || !result) return;
           setLiveStatus(result);
-          if (result.status === "FINISHED") {
+          if (result.status === "FINISHED" && intervalId) {
             clearInterval(intervalId);
           }
         })
         .catch(() => {});
     }
 
-    poll();
-    const intervalId = setInterval(poll, 45000);
+    function startPolling() {
+      if (intervalId) return;
+      poll();
+      intervalId = setInterval(poll, 45000);
+    }
+
+    // Used to only ever check this once, right as the page first
+    // mounted: open the page more than 15 minutes before kickoff (or
+    // leave an already-open tab sitting there through it) and the
+    // window's own start time had already come and gone with nobody
+    // checking - the page would just sit showing "Scheduled" forever,
+    // since nothing ever told it to start polling later. Re-arming
+    // below (both on a timer and when the tab becomes visible again)
+    // means it starts the moment the window is actually reached,
+    // whether or not this component happens to still be the same
+    // instance it was 20 minutes ago.
+    function armForWindow() {
+      if (cancelled || intervalId) return;
+      const now = Date.now();
+      if (now > windowEnd) return;
+      if (now >= windowStart) {
+        startPolling();
+        return;
+      }
+      if (armTimeoutId) clearTimeout(armTimeoutId);
+      armTimeoutId = setTimeout(armForWindow, windowStart - now);
+    }
+
+    armForWindow();
+
+    // A match page can be left open (or, with Next's client-side route
+    // cache, revisited without actually remounting) well past when this
+    // effect first ran - re-checking on every return to the tab is what
+    // actually keeps a long-open or long-cached instance from going
+    // stale, rather than relying on this effect having happened to run
+    // at exactly the right moment.
+    function handleVisibilityChange() {
+      if (document.visibilityState === "visible") {
+        armForWindow();
+      }
+    }
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", armForWindow);
 
     return () => {
       cancelled = true;
-      clearInterval(intervalId);
+      if (intervalId) clearInterval(intervalId);
+      if (armTimeoutId) clearTimeout(armTimeoutId);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", armForWindow);
     };
   }, [id, kickoffForPolling]);
 
@@ -602,26 +642,39 @@ export default function MatchDetailClient({ id }: { id: string }) {
     ? selectedIds.includes(displayMatch.awayClubId)
     : false;
 
-  // Falls back to the status we already knew about the match (from the
-  // list it was found in, or the by-id lookup) whenever the dedicated
-  // live-status poll hasn't returned anything yet - otherwise a match
-  // that's already known to be live shows as "not started" for the few
-  // seconds before that poll's first response comes back, which is
-  // exactly the confusing gap Ilai ran into.
-  const isLive =
-    liveStatus?.status === "IN_PLAY" ||
-    liveStatus?.status === "PAUSED" ||
-    (!liveStatus &&
-      (displayMatch.statusLabel === "IN_PLAY" ||
-        displayMatch.statusLabel === "PAUSED"));
-  const isMatchFinished =
-    liveStatus?.status === "FINISHED" || displayMatch.statusLabel === "FINISHED";
-  // Same fallback idea as isLive above: half-time should still show as
-  // half-time even before the poll has answered, if that's what the
-  // status we already had says.
-  const isHalftime =
-    liveStatus?.status === "PAUSED" ||
-    (!liveStatus && displayMatch.statusLabel === "PAUSED");
+  // The fallback-to-what-we-already-knew idea (see the old comment this
+  // replaced) only covered ONE direction: showing live/finished before
+  // the first poll answers. It didn't cover the other direction, which
+  // turned out to be the actual bug Ilai kept hitting - once a poll DOES
+  // answer, its value was trusted unconditionally, even if that answer
+  // was a less-advanced status than what was already known (e.g. this
+  // page's own by-id lookup already said FINISHED, but the live-status
+  // endpoint's own 30s-old cached snapshot still said SCHEDULED/TIMED -
+  // two independently-cached football-data.org calls, so they're not
+  // guaranteed to agree at every instant). That regression is exactly
+  // what made this page disagree with the Matches page: whichever of the
+  // two data sources happened to answer last "won", even backwards.
+  //
+  // A match's real lifecycle only ever moves forward - scheduled, then
+  // live, then finished, never back - so the fix is to never let a
+  // fresher-but-less-advanced answer undo a more-advanced one already on
+  // screen. Comparing by rank (not by "which one answered last") makes
+  // this page converge on the true status instead of flickering between
+  // whichever source happens to be more stale at that instant.
+  function statusRank(status: string | null | undefined): number {
+    if (status === "FINISHED") return 2;
+    if (status === "IN_PLAY" || status === "PAUSED") return 1;
+    return 0;
+  }
+  const polledStatus = liveStatus?.status ?? null;
+  const effectiveStatus =
+    polledStatus && statusRank(polledStatus) >= statusRank(displayMatch.statusLabel)
+      ? polledStatus
+      : displayMatch.statusLabel;
+
+  const isLive = effectiveStatus === "IN_PLAY" || effectiveStatus === "PAUSED";
+  const isMatchFinished = effectiveStatus === "FINISHED";
+  const isHalftime = effectiveStatus === "PAUSED";
   const statusPillLabel = isLive
     ? isHalftime
       ? "Half-time"
