@@ -1138,12 +1138,6 @@ export default function MatchDetailClient({ id }: { id: string }) {
                 </div>
               </div>
             )}
-
-            {!isLive && !isMatchFinished && (
-              <div className="mt-6 text-center text-[11px] font-medium text-zinc-300 dark:text-zinc-600">
-                Live score updates automatically once kickoff arrives.
-              </div>
-            )}
           </div>
         </article>
       </div>

@@ -224,7 +224,7 @@ async function runCheckGoals(): Promise<NextResponse> {
   const liveMatchesById = new Map<string, RawLiveMatch>();
 
   await withSection("kickoff/reminder loop", async () => {
-  for (const competition of COMPETITIONS) {
+  await Promise.all(COMPETITIONS.map(async (competition) => {
     let liveMatches: RawLiveMatch[];
     try {
       // IMPORTANT: this cache key is shared with src/app/api/matches/
@@ -324,11 +324,7 @@ async function runCheckGoals(): Promise<NextResponse> {
       );
     }
 
-    // Spread requests out so this job stays well under
-    // football-data.org's shared rate limit, same spacing used by the
-    // other cron job.
-    await new Promise((resolve) => setTimeout(resolve, 800));
-  }
+  }));
   });
 
   // Any match that was tracked as started last run, but isn't in any
@@ -337,8 +333,8 @@ async function runCheckGoals(): Promise<NextResponse> {
   // (not repeatedly) to get the real final score and send the full-time
   // alert, then stop tracking it.
   await withSection("full-time loop", async () => {
-  for (const matchId of previouslyStarted) {
-    if (stillLiveIds.has(matchId)) continue;
+  await Promise.all(Array.from(previouslyStarted).map(async (matchId) => {
+    if (stillLiveIds.has(matchId)) return;
 
     const liveMatch = liveMatchesById.get(matchId);
     try {
@@ -379,7 +375,7 @@ async function runCheckGoals(): Promise<NextResponse> {
       // tries again, rather than risk missing its full-time alert.
       console.error(`check-goals: couldn't confirm final state for match ${matchId}`, error);
     }
-  }
+  }));
   });
 
   // Table-position alerts: for every competition whose table isn't
@@ -392,8 +388,8 @@ async function runCheckGoals(): Promise<NextResponse> {
   // after every individual result and possibly flip-flopping mid-round.
   let positionChangesSent = 0;
   await withSection("standings loop", async () => {
-  for (const competition of COMPETITIONS) {
-    if (await isCompetitionLive(competition)) continue;
+  await Promise.all(COMPETITIONS.map(async (competition) => {
+    if (await isCompetitionLive(competition)) return;
 
     let table: RawStandingsRow[];
     try {
@@ -421,7 +417,7 @@ async function runCheckGoals(): Promise<NextResponse> {
     } catch {
       // Couldn't get this competition's table this run (most likely a
       // rate-limit hit) - skip it, try again next run.
-      continue;
+      return;
     }
 
     const knownPositions = await getKnownPositions(competition);
@@ -454,8 +450,7 @@ async function runCheckGoals(): Promise<NextResponse> {
       await setKnownPositions(competition, updatedPositions);
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 800));
-  }
+  }));
   });
 
   return NextResponse.json({
