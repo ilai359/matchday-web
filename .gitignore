@@ -40,3 +40,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 _to_delete/
+
+# iOS (Capacitor)
+ios/App/Pods/
+ios/App/build/
+ios/App/DerivedData/
+ios/.xcode.env.local
