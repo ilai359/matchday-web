@@ -569,6 +569,16 @@ export default function Settings() {
               </span>
               <span className="text-zinc-300 dark:text-zinc-600">›</span>
             </Link>
+            <div className="h-px bg-black/[0.045] dark:bg-white/[0.06]" />
+            <Link
+              href="/support"
+              className="flex items-center justify-between px-5 py-4"
+            >
+              <span className="text-sm font-bold text-zinc-500 dark:text-zinc-400">
+                Support
+              </span>
+              <span className="text-zinc-300 dark:text-zinc-600">›</span>
+            </Link>
           </div>
         </section>
       </div>
