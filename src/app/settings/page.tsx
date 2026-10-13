@@ -37,6 +37,7 @@ export default function Settings() {
   const [pushPermissionDenied, setPushPermissionDenied] = useState(false);
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
   const selectedIdsKey = selectedIds.join(",");
 
   useEffect(() => {
@@ -201,6 +202,34 @@ export default function Settings() {
     );
     if (confirmed) {
       resetClubs();
+    }
+  }
+
+  async function handleShare() {
+    // TODO: once the App Store listing is live, swap this for the real
+    // App Store link (https://apps.apple.com/app/id<YOUR_APP_ID>) so
+    // shares send people straight to the download page.
+    const shareUrl = "https://matchday-web-zeta.vercel.app";
+    const shareText =
+      "I've been using Clubside to keep up with my club - fixtures, scores, and news in one place. Check it out:";
+
+    if (typeof navigator !== "undefined" && navigator.share) {
+      try {
+        await navigator.share({ title: "Clubside", text: shareText, url: shareUrl });
+      } catch {
+        // User backed out of the native share sheet - nothing to do.
+      }
+      return;
+    }
+
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      try {
+        await navigator.clipboard.writeText(`${shareText} ${shareUrl}`);
+        setShareCopied(true);
+        setTimeout(() => setShareCopied(false), 2000);
+      } catch {
+        // Clipboard access denied - nothing more we can do here.
+      }
     }
   }
 
@@ -541,6 +570,37 @@ export default function Settings() {
                   </div>
                 </div>
               </div>
+            </button>
+          </div>
+        </section>
+
+        <section className="mb-6">
+          <h2 className="mb-3 px-1 text-xs font-black uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
+            Spread the Word
+          </h2>
+
+          <div className="overflow-hidden rounded-[26px] border border-black/[0.045] bg-white shadow-[0_6px_24px_rgba(0,0,0,0.045)] dark:border-white/[0.06] dark:bg-[#14171F] dark:shadow-none">
+            <button
+              type="button"
+              onClick={handleShare}
+              className="flex w-full items-center justify-between px-5 py-4 text-left"
+            >
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#F2F4F7] text-lg dark:bg-white/[0.06]">
+                  📤
+                </div>
+                <div>
+                  <div className="text-sm font-black text-[#111318] dark:text-white">
+                    Share Clubside
+                  </div>
+                  <div className="text-[11px] font-medium text-zinc-400 dark:text-zinc-500">
+                    {shareCopied
+                      ? "Link copied!"
+                      : "Invite a friend to follow their club"}
+                  </div>
+                </div>
+              </div>
+              <span className="text-zinc-300 dark:text-zinc-600">›</span>
             </button>
           </div>
         </section>
