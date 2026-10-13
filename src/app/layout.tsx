@@ -56,7 +56,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             __html: `
               try {
                 var theme = localStorage.getItem("matchday-theme");
-                if (theme === "dark") {
+                if (theme !== "light") {
                   document.documentElement.classList.add("dark");
                 }
               } catch (e) {}
