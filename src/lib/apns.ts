@@ -46,10 +46,7 @@ function getJwt(): string {
 
   const keyId = process.env.APNS_KEY_ID as string;
   const teamId = process.env.APNS_TEAM_ID as string;
-  // Accept the key pasted either with real line breaks or with literal
-  // "\n" sequences - both are common ways a multi-line value ends up in
-  // an environment variable.
-  const privateKey = (process.env.APNS_PRIVATE_KEY as string).replace(/\\n/g, "\n");
+  const privateKey = normalizePem(process.env.APNS_PRIVATE_KEY as string);
 
   const header = Buffer.from(JSON.stringify({ alg: "ES256", kid: keyId })).toString("base64url");
   const claims = Buffer.from(JSON.stringify({ iss: teamId, iat: now })).toString("base64url");
@@ -61,6 +58,21 @@ function getJwt(): string {
   const token = `${signingInput}.${signature}`;
   cachedJwt = { token, issuedAt: now };
   return token;
+}
+
+// The .p8 key can end up in the environment variable in different
+// shapes depending on how it was pasted: with real line breaks, with
+// literal "\n" sequences, or with the line breaks stripped out entirely
+// (some single-line input boxes do that). Node only accepts a properly
+// formatted PEM, so this rebuilds one from whatever arrived.
+function normalizePem(raw: string): string {
+  const body = raw
+    .replace(/\\n/g, "\n")
+    .replace(/-----BEGIN PRIVATE KEY-----/g, "")
+    .replace(/-----END PRIVATE KEY-----/g, "")
+    .replace(/\s+/g, "");
+  const lines = body.match(/.{1,64}/g) ?? [];
+  return `-----BEGIN PRIVATE KEY-----\n${lines.join("\n")}\n-----END PRIVATE KEY-----\n`;
 }
 
 function sendOnce(
