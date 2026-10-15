@@ -357,32 +357,40 @@ export async function unsubscribeFromPush(): Promise<void> {
 const AUTO_PROMPT_KEY = "matchday-push-auto-prompted";
 
 /**
- * Called the moment someone follows their very first club - the
- * natural first time to ask for notification permission, instead of
- * only offering it once someone finds the toggle in Settings.
+ * Asks for notification permission automatically - once per device,
+ * ever - so nobody has to go looking for the toggle in Settings. Called
+ * by ClubsContext:
+ *   - the moment someone follows their very first club (works in
+ *     browsers too, since it happens right as they tap), and
+ *   - in the iPhone app, shortly after it opens for anyone who already
+ *     follows clubs but has never been asked (e.g. people updating from
+ *     the first app version, which couldn't do notifications).
  *
- * Only ever tries this once per device, whatever the outcome (granted,
- * denied, or dismissed) - tracked in localStorage so it doesn't ask
- * again on every first-follow (e.g. after resetting followed clubs).
- * Settings keeps its own "Goal alerts" toggle for turning this on (or
- * back on) any time after, so nobody's stuck with whatever they chose
- * in this one moment.
+ * Tracked in localStorage so it never asks twice, whatever the answer
+ * (allowed, denied, or dismissed) - Settings keeps its own toggle for
+ * turning alerts on any time after. Returns true if this device ended
+ * up subscribed.
  */
-export async function maybeAskForNotificationsOnFirstFollow(clubId: string): Promise<void> {
-  if (!isPushSupported()) return;
+export async function maybeAskForNotificationsOnce(clubIds: string[]): Promise<boolean> {
+  if (!isPushSupported() || clubIds.length === 0) return false;
 
   try {
-    if (localStorage.getItem(AUTO_PROMPT_KEY)) return;
+    if (localStorage.getItem(AUTO_PROMPT_KEY)) return false;
     localStorage.setItem(AUTO_PROMPT_KEY, "1");
   } catch {
     // localStorage unavailable (private browsing etc.) - skip rather
-    // than risk asking on every single "first" follow.
-    return;
+    // than risk asking every time.
+    return false;
   }
 
-  // Already answered before (e.g. via Settings, on another visit) -
-  // nothing new to ask.
-  if ((await getNotificationPermission()) !== "default") return;
+  // Already answered before (e.g. via Settings) - nothing new to ask.
+  // Checked synchronously in browsers so the permission prompt stays
+  // inside the tap that triggered it, which Safari requires.
+  if (isNativePushApp()) {
+    if ((await getNotificationPermission()) !== "default") return false;
+  } else if (Notification.permission !== "default") {
+    return false;
+  }
 
-  await subscribeToPush([clubId]);
+  return subscribeToPush(clubIds);
 }

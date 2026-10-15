@@ -21,7 +21,6 @@ import {
   getLastPushError,
   subscribeToPush,
   unsubscribeFromPush,
-  updatePushClubs,
 } from "../../lib/pushClient";
 
 export default function Settings() {
@@ -45,7 +44,6 @@ export default function Settings() {
   const [pushBusy, setPushBusy] = useState(false);
   const [pushError, setPushError] = useState<string | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
-  const selectedIdsKey = selectedIds.join(",");
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -61,15 +59,8 @@ export default function Settings() {
     hasActivePushSubscription().then(setPushEnabled);
   }, []);
 
-  useEffect(() => {
-    // Keeps an already-subscribed device's "which clubs to notify about"
-    // list in sync whenever the user follows/unfollows a club - without
-    // this, turning alerts on once and then following a new club later
-    // would silently never alert for that new club.
-    if (!pushEnabled) return;
-    updatePushClubs(selectedIds).catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pushEnabled, selectedIdsKey]);
+  // Keeping the server's club list in sync now happens app-wide, in
+  // ClubsContext - not only while this page is open.
 
   async function handleTogglePush() {
     if (pushBusy) return;

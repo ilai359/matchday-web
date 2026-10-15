@@ -1,7 +1,11 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { maybeAskForNotificationsOnFirstFollow } from "../lib/pushClient";
+import { createContext, useContext, useState, useEffect, useRef, ReactNode } from "react";
+import {
+  isNativePushApp,
+  maybeAskForNotificationsOnce,
+  updatePushClubs,
+} from "../lib/pushClient";
 
 type ClubsContextType = {
   selectedIds: string[];
@@ -39,6 +43,49 @@ export function ClubsProvider({ children }: { children: ReactNode }) {
     }
   }, [selectedIds, loaded]);
 
+  // Always the latest selection, for code that finishes after a delay
+  // (e.g. someone answering the notification prompt while they keep
+  // picking clubs during onboarding).
+  const latestIds = useRef<string[]>(selectedIds);
+  useEffect(() => {
+    latestIds.current = selectedIds;
+  }, [selectedIds]);
+
+  // Keeps the server's "which clubs should this device get alerts for"
+  // list in step with the clubs actually followed, from anywhere in the
+  // app - not just while Settings is open, which used to mean someone
+  // who allowed alerts on their first follow only ever got alerts for
+  // that one club. Short delay so tapping several clubs in a row sends
+  // one update, not one per tap. Does nothing on a device that hasn't
+  // turned alerts on.
+  useEffect(() => {
+    if (!loaded) return;
+    const timer = setTimeout(() => {
+      updatePushClubs(selectedIds).catch(() => {});
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [selectedIds, loaded]);
+
+  // iPhone app: anyone who already follows clubs but has never been
+  // asked about notifications (e.g. updating from the first app version,
+  // which couldn't do them) gets asked once, a moment after the app
+  // opens - so alerts are on by default as far as possible, without
+  // anyone needing to find the toggle in Settings.
+  const askedOnLaunch = useRef(false);
+  useEffect(() => {
+    if (!loaded || askedOnLaunch.current || !isNativePushApp()) return;
+    if (latestIds.current.length === 0) return;
+    askedOnLaunch.current = true;
+    const timer = setTimeout(() => {
+      maybeAskForNotificationsOnce(latestIds.current)
+        .then((subscribed) => {
+          if (subscribed) return updatePushClubs(latestIds.current);
+        })
+        .catch(() => {});
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [loaded]);
+
   function toggleClub(id: string) {
     const isFirstEverFollow = selectedIds.length === 0 && !selectedIds.includes(id);
 
@@ -50,11 +97,16 @@ export function ClubsProvider({ children }: { children: ReactNode }) {
     // point to ask for notification permission - there's finally
     // something to notify them about, and it doesn't require them to
     // separately find the toggle in Settings. This only ever fires
-    // once per browser (see maybeAskForNotificationsOnFirstFollow) -
+    // once per device (see maybeAskForNotificationsOnce) -
     // Settings still has the toggle any time after, including to turn
     // it on if this moment was missed or dismissed.
     if (isFirstEverFollow) {
-      maybeAskForNotificationsOnFirstFollow(id);
+      maybeAskForNotificationsOnce([id])
+        .then((subscribed) => {
+          // They may have followed more clubs while the prompt was up.
+          if (subscribed) return updatePushClubs(latestIds.current);
+        })
+        .catch(() => {});
     }
   }
 
