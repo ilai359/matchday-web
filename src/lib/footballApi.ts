@@ -324,6 +324,32 @@ const VISIBLE_STATUSES = new Set(["TIMED", "SCHEDULED", "IN_PLAY", "PAUSED"]);
 // to-full-time gap is only a couple of hours out of this 24.
 const RECENTLY_FINISHED_WINDOW_MS = 24 * 60 * 60 * 1000;
 
+// How long a still-SCHEDULED/TIMED match stays visible as "upcoming"
+// after its own kickoff time before being treated as stale instead. A
+// match's kickoff-to-full-time gap is only a couple of hours, so
+// anything still reporting SCHEDULED/TIMED this long after kickoff
+// almost certainly HAS been played already - football-data.org has
+// just failed to update its status (seen in practice for lower-profile
+// matches/leagues, sometimes staying stuck for days). Showing "Score
+// not yet available" for a match from days ago is far more misleading
+// than simply leaving it off the list until the provider catches up (or
+// it ages into the recently-finished window once they do).
+const STALE_SCHEDULED_WINDOW_MS = 6 * 60 * 60 * 1000;
+
+// Shared by every place that lists "upcoming or live" matches
+// (fetchLiveMatches, fetchTeamMatches, fetchClubBundle) so they all
+// agree on when a SCHEDULED/TIMED match has gone stale, instead of each
+// repeating (and potentially drifting from) its own copy of this check.
+function isBelievablyVisible(match: LiveMatch): boolean {
+  if (!VISIBLE_STATUSES.has(match.status)) return false;
+  if (match.status !== "SCHEDULED" && match.status !== "TIMED") return true;
+  const kickoffTime = new Date(match.kickoff).getTime();
+  return (
+    Number.isNaN(kickoffTime) ||
+    Date.now() - kickoffTime <= STALE_SCHEDULED_WINDOW_MS
+  );
+}
+
 // A single match by its own id, regardless of status - unlike
 // fetchLiveMatches (which deliberately only returns what's upcoming or
 // live right now), this works for a match that's already finished too.
@@ -419,7 +445,7 @@ export async function fetchLiveMatches(
     const data = await response.json();
     const rawMatches: RawApiMatch[] = data.matches ?? [];
     const mapped = rawMatches.map(mapRawMatch).filter((match) => {
-      if (VISIBLE_STATUSES.has(match.status)) return true;
+      if (isBelievablyVisible(match)) return true;
       if (!includeRecentlyFinished || match.status !== "FINISHED") return false;
       const kickoffTime = new Date(match.kickoff).getTime();
       return (
@@ -453,7 +479,7 @@ export async function fetchTeamMatches(teamId: string): Promise<LiveMatch[]> {
     const rawMatches: RawApiMatch[] = data.matches ?? [];
     return rawMatches
       .map(mapRawMatch)
-      .filter((match) => VISIBLE_STATUSES.has(match.status));
+      .filter(isBelievablyVisible);
   });
 }
 
@@ -740,7 +766,7 @@ export async function fetchClubBundle(
     const rawUpcoming: RawApiMatch[] = data.upcoming?.matches ?? [];
     const mappedUpcoming = rawUpcoming
       .map(mapRawMatch)
-      .filter((match) => VISIBLE_STATUSES.has(match.status));
+      .filter(isBelievablyVisible);
     // Same reasoning as fetchLiveMatches above - remember these so
     // tapping into one from here shows up instantly.
     rememberMatches(mappedUpcoming);
