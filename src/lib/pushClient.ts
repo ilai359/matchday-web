@@ -59,9 +59,13 @@ function pushLog(message: string): void {
   console.log(`[push] ${message}`);
 }
 
-async function nativePush() {
-  const { PushNotifications } = await import("@capacitor/push-notifications");
-  return PushNotifications;
+// Returns the module, never the plugin object itself. Capacitor plugins
+// are Proxies that answer to ANY property name - including "then" - so
+// returning one from an async function (or resolving a promise with it)
+// makes JavaScript treat it as a promise and wait on it forever. That's
+// exactly what left the Settings toggle stuck on "Turning on…".
+function loadPushModule() {
+  return import("@capacitor/push-notifications");
 }
 
 function readLocal(key: string): string | null {
@@ -83,7 +87,7 @@ function writeLocal(key: string, value: string | null): void {
 }
 
 async function nativePermission(): Promise<NotificationPermission> {
-  const push = await nativePush();
+  const { PushNotifications: push } = await loadPushModule();
   const { receive } = await push.checkPermissions();
   if (receive === "granted") return "granted";
   if (receive === "denied") return "denied";
@@ -93,7 +97,7 @@ async function nativePermission(): Promise<NotificationPermission> {
 // Asks iOS for this device's push token. Resolves to null if
 // registration fails or doesn't answer within 15 seconds.
 async function registerNative(): Promise<string | null> {
-  const push = await nativePush();
+  const { PushNotifications: push } = await loadPushModule();
   return new Promise<string | null>((resolve) => {
     let done = false;
     const handles: { remove: () => Promise<void> }[] = [];
@@ -157,7 +161,7 @@ async function removeNativeTokenFromServer(token: string): Promise<void> {
 
 async function subscribeNative(clubIds: string[]): Promise<boolean> {
   lastPushError = null;
-  const push = await nativePush();
+  const { PushNotifications: push } = await loadPushModule();
   let { receive } = await push.checkPermissions();
   pushLog(`permission before asking: ${receive}`);
   if (receive === "prompt" || receive === "prompt-with-rationale") {
