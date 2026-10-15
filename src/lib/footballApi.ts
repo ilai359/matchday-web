@@ -324,17 +324,21 @@ const VISIBLE_STATUSES = new Set(["TIMED", "SCHEDULED", "IN_PLAY", "PAUSED"]);
 // to-full-time gap is only a couple of hours out of this 24.
 const RECENTLY_FINISHED_WINDOW_MS = 24 * 60 * 60 * 1000;
 
-// How long a still-SCHEDULED/TIMED match stays visible as "upcoming"
-// after its own kickoff time before being treated as stale instead. A
-// match's kickoff-to-full-time gap is only a couple of hours, so
-// anything still reporting SCHEDULED/TIMED this long after kickoff
-// almost certainly HAS been played already - football-data.org has
-// just failed to update its status (seen in practice for lower-profile
-// matches/leagues, sometimes staying stuck for days). Showing "Score
-// not yet available" for a match from days ago is far more misleading
-// than simply leaving it off the list until the provider catches up (or
-// it ages into the recently-finished window once they do).
-const STALE_SCHEDULED_WINDOW_MS = 6 * 60 * 60 * 1000;
+// The rules for what the match lists show:
+//   - not kicked off yet -> shown as scheduled
+//   - live (IN_PLAY/PAUSED) -> shown with its score
+//   - finished -> shown with its final score for 24h after kickoff
+//     (Matches page only, see RECENTLY_FINISHED_WINDOW_MS)
+// The one case that fits none of those: a match whose kickoff has
+// passed but whose data still says "scheduled". During the match's own
+// play window (kickoff to +3h - the same window the live-score polling
+// uses everywhere else) that's just the data source being a few
+// minutes behind, so it stays and shows as "Kicked off". Past that
+// window the match is certainly over, and showing it as not-yet-played
+// ("Score not yet available") is simply wrong - it's left off instead,
+// and shows up again with its real result as soon as one is available
+// (inside the 24h finished window).
+const STALE_SCHEDULED_WINDOW_MS = 3 * 60 * 60 * 1000;
 
 // Shared by every place that lists "upcoming or live" matches
 // (fetchLiveMatches, fetchTeamMatches, fetchClubBundle) so they all

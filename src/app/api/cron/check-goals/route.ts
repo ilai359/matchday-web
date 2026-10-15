@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import webpush from "web-push";
 import { fetchWithRetry } from "@/lib/fetchWithRetry";
 import { getOrSet, isCompetitionLive } from "@/lib/cache";
-import { COMPETITIONS } from "@/lib/competitions";
-import { matchClubId } from "@/lib/footballApi";
+import { matchClubId, leaguesToCodes } from "@/lib/footballApi";
 import { formatCompetition } from "@/lib/competitionNames";
 import {
   getStartedMatchIds,
@@ -206,6 +205,20 @@ async function runCheckGoals(): Promise<NextResponse> {
     });
   }
 
+  // Only the competitions someone subscribed actually follows a club in
+  // (plus CL - see leaguesToCodes). This job now runs every 5 minutes
+  // (cron-job.org) instead of every few hours, and checking all 8
+  // competitions each time fired ~16 football-data.org requests in one
+  // burst against a 10-per-minute limit shared with every visitor -
+  // which starved the Matches page itself and made it fall back to old
+  // cached match lists.
+  const watchedCompetitions = leaguesToCodes(
+    subscriptions
+      .flatMap((s) => s.clubIds)
+      .map((id) => getClub(id)?.league)
+      .filter((league): league is string => Boolean(league))
+  );
+
   async function notifySubscribers(clubIds: string[], title: string, body: string, url: string) {
     if (clubIds.length === 0) return;
     if (!pushConfigured) return;
@@ -237,7 +250,7 @@ async function runCheckGoals(): Promise<NextResponse> {
   const liveMatchesById = new Map<string, RawLiveMatch>();
 
   await withSection("kickoff/reminder loop", async () => {
-  await Promise.all(COMPETITIONS.map(async (competition) => {
+  await Promise.all(watchedCompetitions.map(async (competition) => {
     let liveMatches: RawLiveMatch[];
     try {
       // IMPORTANT: this cache key is shared with src/app/api/matches/
@@ -419,7 +432,7 @@ async function runCheckGoals(): Promise<NextResponse> {
   // after every individual result and possibly flip-flopping mid-round.
   let positionChangesSent = 0;
   await withSection("standings loop", async () => {
-  await Promise.all(COMPETITIONS.map(async (competition) => {
+  await Promise.all(watchedCompetitions.map(async (competition) => {
     if (await isCompetitionLive(competition)) return;
 
     let table: RawStandingsRow[];
