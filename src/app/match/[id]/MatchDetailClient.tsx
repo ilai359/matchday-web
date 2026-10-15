@@ -340,7 +340,22 @@ export default function MatchDetailClient({ id }: { id: string }) {
         // fetch (found === null, usually a transient rate limit) should
         // never erase an already-remembered match and flip a working
         // page over to "not found".
-        if (found) setLiveMatch(found);
+        if (!found) return;
+        setLiveMatch((prev) => {
+          // Same backwards-flicker bug the big comment near statusRank
+          // below describes for the live-status poll, just hitting this
+          // effect instead: this single-match lookup can land on a
+          // cached snapshot that's a step behind what's already on
+          // screen (e.g. the Matches list had already shown this game
+          // live or finished - see `remembered` above - but this fetch
+          // still answers "TIMED"). Trusting it unconditionally is
+          // exactly what demoted an already-correct live/finished match
+          // back to showing its kickoff time a couple of seconds after
+          // the page opened. Only accept this result when it's not a
+          // step backwards.
+          if (!prev) return found;
+          return statusRank(found.status) >= statusRank(prev.status) ? found : prev;
+        });
       })
       .catch(() => {})
       .finally(() => setLiveLoading(false));
