@@ -46,6 +46,19 @@ export function isNativePushApp(): boolean {
   );
 }
 
+// Why the last attempt to turn notifications on didn't work, in plain
+// words - shown under the toggle in Settings so a failure isn't silent.
+let lastPushError: string | null = null;
+
+export function getLastPushError(): string | null {
+  return lastPushError;
+}
+
+function pushLog(message: string): void {
+  // Shows up in Xcode's console when the app is run from Xcode.
+  console.log(`[push] ${message}`);
+}
+
 async function nativePush() {
   const { PushNotifications } = await import("@capacitor/push-notifications");
   return PushNotifications;
@@ -91,27 +104,45 @@ async function registerNative(): Promise<string | null> {
       handles.forEach((h) => h.remove().catch(() => {}));
       resolve(token);
     };
-    const timer = setTimeout(() => finish(null), 15_000);
+    const timer = setTimeout(() => {
+      pushLog("timed out waiting for a device token");
+      lastPushError = "iPhone didn't answer the notification registration in time.";
+      finish(null);
+    }, 15_000);
 
     Promise.all([
-      push.addListener("registration", (token) => finish(token.value)),
-      push.addListener("registrationError", () => finish(null)),
+      push.addListener("registration", (token) => {
+        pushLog("got device token from iOS");
+        finish(token.value);
+      }),
+      push.addListener("registrationError", (error) => {
+        pushLog(`registration error: ${error.error}`);
+        lastPushError = `iPhone couldn't register for notifications (${error.error}).`;
+        finish(null);
+      }),
     ])
       .then((added) => {
         handles.push(...added);
         if (done) added.forEach((h) => h.remove().catch(() => {}));
         return push.register();
       })
-      .catch(() => finish(null));
+      .catch((error) => {
+        pushLog(`register() failed: ${String(error)}`);
+        lastPushError = `Couldn't start notification registration (${String(error)}).`;
+        finish(null);
+      });
   });
 }
 
 async function sendNativeTokenToServer(token: string, clubIds: string[]): Promise<void> {
-  await fetch("/api/push/subscribe", {
+  const response = await fetch("/api/push/subscribe", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ apnsToken: token, clubIds }),
   });
+  if (!response.ok) {
+    throw new Error(`server answered ${response.status}`);
+  }
   writeLocal(NATIVE_TOKEN_KEY, token);
   writeLocal(NATIVE_CLUBS_KEY, JSON.stringify(clubIds));
 }
@@ -125,16 +156,29 @@ async function removeNativeTokenFromServer(token: string): Promise<void> {
 }
 
 async function subscribeNative(clubIds: string[]): Promise<boolean> {
+  lastPushError = null;
   const push = await nativePush();
   let { receive } = await push.checkPermissions();
+  pushLog(`permission before asking: ${receive}`);
   if (receive === "prompt" || receive === "prompt-with-rationale") {
     ({ receive } = await push.requestPermissions());
+    pushLog(`permission after asking: ${receive}`);
   }
-  if (receive !== "granted") return false;
+  if (receive !== "granted") {
+    lastPushError = "Notifications weren't allowed.";
+    return false;
+  }
 
   const token = await registerNative();
   if (!token) return false;
-  await sendNativeTokenToServer(token, clubIds);
+  try {
+    await sendNativeTokenToServer(token, clubIds);
+  } catch (error) {
+    pushLog(`saving token failed: ${String(error)}`);
+    lastPushError = "Couldn't reach Clubside's server - check your connection and try again.";
+    return false;
+  }
+  pushLog("subscribed");
   return true;
 }
 
@@ -240,7 +284,9 @@ export async function subscribeToPush(clubIds: string[]): Promise<boolean> {
   if (isNativePushApp()) {
     try {
       return await subscribeNative(clubIds);
-    } catch {
+    } catch (error) {
+      pushLog(`subscribe failed: ${String(error)}`);
+      lastPushError = `Something went wrong turning on alerts (${String(error)}).`;
       return false;
     }
   }

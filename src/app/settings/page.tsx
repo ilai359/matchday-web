@@ -18,6 +18,7 @@ import {
   isInsideNativeApp,
   getNotificationPermission,
   hasActivePushSubscription,
+  getLastPushError,
   subscribeToPush,
   unsubscribeFromPush,
   updatePushClubs,
@@ -42,6 +43,7 @@ export default function Settings() {
   const [pushPermissionDenied, setPushPermissionDenied] = useState(false);
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
+  const [pushError, setPushError] = useState<string | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
   const selectedIdsKey = selectedIds.join(",");
 
@@ -77,8 +79,10 @@ export default function Settings() {
         await unsubscribeFromPush();
         setPushEnabled(false);
       } else {
+        setPushError(null);
         const ok = await subscribeToPush(selectedIds);
         setPushEnabled(ok);
+        if (!ok) setPushError(getLastPushError());
         if (!ok && (await getNotificationPermission()) === "denied") {
           setPushPermissionDenied(true);
         }
@@ -536,8 +540,17 @@ export default function Settings() {
                       Goal alerts
                     </div>
                     <div className="text-[11px] font-medium text-zinc-400 dark:text-zinc-500">
-                      Get notified when a club you follow scores
+                      {pushBusy
+                        ? pushEnabled
+                          ? "Turning off…"
+                          : "Turning on…"
+                        : "Get notified when a club you follow scores"}
                     </div>
+                    {pushError && !pushBusy && (
+                      <div className="mt-1 text-[11px] font-medium text-red-500 dark:text-red-400">
+                        {pushError}
+                      </div>
+                    )}
                   </div>
                 </div>
                 {pushEnabled ? (
