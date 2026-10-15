@@ -310,8 +310,13 @@ async function runCheckGoals(): Promise<NextResponse> {
 
     let scheduledMatches: RawScheduledMatch[];
     try {
-      // Same shared-cache-key reasoning as the LIVE fetch above.
-      const data = await getOrSet(`matches:${competition}:SCHEDULED`, 60 * 1000, async () => {
+      // Its own key with a 30-minute TTL instead of sharing /api/matches'
+      // 60s one: this list is only used for pre-kickoff reminders, and
+      // kickoff times don't change minute to minute. Re-fetching it for
+      // every competition on every 5-minute run was one of the biggest
+      // drains on football-data.org's 10-requests-per-minute limit -
+      // the same limit the Matches page needs for itself.
+      const data = await getOrSet(`goals:scheduled:${competition}`, 30 * 60 * 1000, async () => {
         const response = await fetchWithRetry(
           `https://api.football-data.org/v4/competitions/${competition}/matches?status=SCHEDULED`,
           { headers: { "X-Auth-Token": apiKey }, cache: "no-store" }
@@ -437,18 +442,15 @@ async function runCheckGoals(): Promise<NextResponse> {
 
     let table: RawStandingsRow[];
     try {
-      // Same cache key /api/standings already keeps fresh (see that
-      // route) - reading it here costs an extra football-data.org
-      // request only when nobody's looked at this competition's table
-      // in the last 5 minutes. /api/standings caches the RAW
-      // football-data.org response object under this key (same reason
-      // as the LIVE/SCHEDULED fix above) - matching that shape here,
-      // and extracting the TOTAL table after the cache call instead of
-      // before it, is what keeps this correct regardless of which of
-      // the two routes last wrote this key.
-      // Must stay in sync with the TTL /api/standings/route.ts uses for
-      // this same cache key (see that file) - both now 60s.
-      const standingsData = await getOrSet(`standings:${competition}`, 60 * 1000, async () => {
+      // Caches the RAW football-data.org response object (same shape
+      // /api/standings uses), extracting the TOTAL table after the cache
+      // call rather than before it.
+      // Its own key with a 10-minute TTL, separate from the 60s one
+      // /api/standings keeps for visitors: a table only changes when a
+      // match finishes, so a position alert arriving a few minutes after
+      // the round settles is fine - and it stops this 5-minute job from
+      // re-fetching every followed league's table on every single run.
+      const standingsData = await getOrSet(`goals:standings:${competition}`, 10 * 60 * 1000, async () => {
         const response = await fetchWithRetry(
           `https://api.football-data.org/v4/competitions/${competition}/standings`,
           { headers: { "X-Auth-Token": apiKey }, cache: "no-store" }
