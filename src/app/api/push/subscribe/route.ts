@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
-import { saveSubscription, StoredPushSubscription } from "@/lib/pushSubscriptions";
+import { saveSubscription, saveApnsToken, StoredPushSubscription } from "@/lib/pushSubscriptions";
 
-// Called by the browser right after it subscribes to push notifications
-// (or whenever the user's followed clubs change while already
-// subscribed - see updatePushClubs in pushClient.ts), to save/update
-// which clubs this device should get goal alerts for.
+// Called right after a device turns on notifications (or whenever the
+// user's followed clubs change while already subscribed - see
+// updatePushClubs in pushClient.ts), to save/update which clubs this
+// device should get alerts for. Accepts either a browser's web push
+// subscription or, from the iPhone app, an Apple push device token.
 export async function POST(request: Request) {
   let body: unknown;
   try {
@@ -13,24 +14,37 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { subscription, clubIds } = (body ?? {}) as {
+  const { subscription, apnsToken, clubIds } = (body ?? {}) as {
     subscription?: StoredPushSubscription;
+    apnsToken?: unknown;
     clubIds?: unknown;
   };
+
+  if (!Array.isArray(clubIds)) {
+    return NextResponse.json({ error: "Invalid subscription" }, { status: 400 });
+  }
+  const cleanClubIds = clubIds.filter((id): id is string => typeof id === "string");
+
+  // Apple device tokens are hex strings (64 characters today; allowed to
+  // be longer in future).
+  if (apnsToken !== undefined) {
+    if (typeof apnsToken !== "string" || !/^[0-9a-fA-F]{64,200}$/.test(apnsToken)) {
+      return NextResponse.json({ error: "Invalid device token" }, { status: 400 });
+    }
+    await saveApnsToken(apnsToken, cleanClubIds);
+    return NextResponse.json({ ok: true });
+  }
 
   if (
     !subscription ||
     typeof subscription.endpoint !== "string" ||
     !subscription.keys ||
     typeof subscription.keys.p256dh !== "string" ||
-    typeof subscription.keys.auth !== "string" ||
-    !Array.isArray(clubIds)
+    typeof subscription.keys.auth !== "string"
   ) {
     return NextResponse.json({ error: "Invalid subscription" }, { status: 400 });
   }
 
-  const cleanClubIds = clubIds.filter((id): id is string => typeof id === "string");
   await saveSubscription(subscription, cleanClubIds);
-
   return NextResponse.json({ ok: true });
 }

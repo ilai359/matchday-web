@@ -13,7 +13,9 @@ import {
   clearMatchReminded,
 } from "@/lib/goalWatch";
 import { getKnownPositions, setKnownPositions, PositionMap } from "@/lib/tableWatch";
-import { getAllSubscriptions, removeSubscriptionByEndpoint } from "@/lib/pushSubscriptions";
+import { getAllSubscriptions } from "@/lib/pushSubscriptions";
+import { sendToDevice } from "@/lib/pushSend";
+import { isApnsConfigured } from "@/lib/apns";
 import { getClub, getClubName } from "@/lib/clubHelpers";
 import { fetchLiveUpdates } from "@/lib/newsApi";
 import { refreshScorersAfterMatch } from "@/lib/scorersData";
@@ -221,26 +223,13 @@ async function runCheckGoals(): Promise<NextResponse> {
 
   async function notifySubscribers(clubIds: string[], title: string, body: string, url: string) {
     if (clubIds.length === 0) return;
-    if (!pushConfigured) return;
-    const payload = JSON.stringify({ title, body, url });
+    // Browsers (web push) and the iPhone app (APNs) both go through
+    // sendToDevice, which also cleans up any device that's no longer
+    // valid. One device failing never stops the rest from being sent.
     for (const sub of subscriptions) {
       if (!sub.clubIds.some((id) => clubIds.includes(id))) continue;
-      try {
-        await webpush.sendNotification(sub.subscription, payload);
-        notificationsSent += 1;
-      } catch (error) {
-        // A 404/410 means this subscription is no longer valid (the
-        // user uninstalled, cleared data, or revoked permission) -
-        // clean it up so future runs stop wasting time on it. Any
-        // other error is logged and otherwise ignored, so one broken
-        // subscription can't stop everyone else from being notified.
-        const statusCode = (error as { statusCode?: number }).statusCode;
-        if (statusCode === 404 || statusCode === 410) {
-          await removeSubscriptionByEndpoint(sub.subscription.endpoint);
-        } else {
-          console.error("check-goals: sendNotification failed", error);
-        }
-      }
+      const outcome = await sendToDevice(sub, { title, body, url }, pushConfigured);
+      if (outcome === "sent") notificationsSent += 1;
     }
   }
 
@@ -543,7 +532,12 @@ async function runCheckGoals(): Promise<NextResponse> {
     positionChangesSent,
     notificationsSent,
     subscribers: subscriptions.length,
+    // How many of those are the iPhone app rather than a browser, and
+    // whether Apple push is set up - makes it obvious from this response
+    // alone whether app notifications can actually go out.
+    appSubscribers: subscriptions.filter((s) => s.apnsToken).length,
     pushConfigured,
+    apnsConfigured: isApnsConfigured(),
     newsWarmed,
   });
 }

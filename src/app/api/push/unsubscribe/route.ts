@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
-import { removeSubscriptionByEndpoint } from "@/lib/pushSubscriptions";
+import { removeSubscriptionByEndpoint, removeApnsToken } from "@/lib/pushSubscriptions";
 
 // Called when the user turns notifications off in Settings, so this
-// device stops getting checked/notified going forward.
+// device stops getting checked/notified going forward. Takes a browser's
+// web push `endpoint`, or the iPhone app's `apnsToken`.
 export async function POST(request: Request) {
   let body: unknown;
   try {
@@ -11,7 +12,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { endpoint } = (body ?? {}) as { endpoint?: unknown };
+  const { endpoint, apnsToken } = (body ?? {}) as { endpoint?: unknown; apnsToken?: unknown };
+  if (typeof apnsToken === "string") {
+    await removeApnsToken(apnsToken);
+    return NextResponse.json({ ok: true });
+  }
   if (typeof endpoint !== "string") {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }

@@ -27,8 +27,12 @@ export type StoredPushSubscription = {
   keys: { p256dh: string; auth: string };
 };
 
+// Exactly one of `subscription` (a browser, sent via web push) or
+// `apnsToken` (the iPhone app, sent via Apple's push service - see
+// apns.ts) is set on each record.
 export type PushSubscriptionRecord = {
-  subscription: StoredPushSubscription;
+  subscription?: StoredPushSubscription;
+  apnsToken?: string;
   clubIds: string[];
 };
 
@@ -68,6 +72,45 @@ export async function removeSubscriptionByEndpoint(endpoint: string): Promise<vo
     await redis.srem(INDEX_KEY, key);
   } catch (error) {
     console.error("removeSubscriptionByEndpoint: Redis write failed", error);
+  }
+}
+
+// iPhone-app devices share the same index and storage as browser
+// subscriptions, keyed by their device token instead of an endpoint.
+function keyForApns(token: string): string {
+  return keyFor(`apns:${token}`);
+}
+
+/** Saves (or updates) an iPhone-app device and which clubs it should be notified about. */
+export async function saveApnsToken(token: string, clubIds: string[]): Promise<void> {
+  if (!redis) return;
+  const key = keyForApns(token);
+  try {
+    await redis.set(key, { apnsToken: token, clubIds });
+    await redis.sadd(INDEX_KEY, key);
+  } catch (error) {
+    console.error("saveApnsToken: Redis write failed", error);
+  }
+}
+
+/** Removes an iPhone-app device - when notifications are turned off, or Apple reports the token is no longer valid. */
+export async function removeApnsToken(token: string): Promise<void> {
+  if (!redis) return;
+  const key = keyForApns(token);
+  try {
+    await redis.del(key);
+    await redis.srem(INDEX_KEY, key);
+  } catch (error) {
+    console.error("removeApnsToken: Redis write failed", error);
+  }
+}
+
+/** Forgets whichever kind of device this record is. */
+export async function removeRecord(record: PushSubscriptionRecord): Promise<void> {
+  if (record.apnsToken) {
+    await removeApnsToken(record.apnsToken);
+  } else if (record.subscription) {
+    await removeSubscriptionByEndpoint(record.subscription.endpoint);
   }
 }
 

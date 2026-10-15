@@ -5,6 +5,7 @@ import { ClubsProvider } from "../context/ClubsContext";
 import { ThemeProvider } from "../context/ThemeContext";
 import Navigation from "../components/Navigation";
 import ServiceWorkerRegister from "../components/ServiceWorkerRegister";
+import NativePushBridge from "../components/NativePushBridge";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -64,6 +65,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           }}
         />
         <ServiceWorkerRegister />
+        <NativePushBridge />
         <ThemeProvider>
           <ClubsProvider>
             <div

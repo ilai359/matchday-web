@@ -15,6 +15,7 @@ import {
 } from "../../lib/footballApi";
 import {
   isPushSupported,
+  isInsideNativeApp,
   getNotificationPermission,
   hasActivePushSubscription,
   subscribeToPush,
@@ -34,6 +35,10 @@ export default function Settings() {
 
   const [pushMounted, setPushMounted] = useState(false);
   const [pushSupported, setPushSupported] = useState(true);
+  // Inside an older iPhone app build that can't do notifications yet:
+  // the whole Notifications section is hidden there rather than showing
+  // a "not supported" message for something the app itself advertises.
+  const [pushHiddenInApp, setPushHiddenInApp] = useState(false);
   const [pushPermissionDenied, setPushPermissionDenied] = useState(false);
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
@@ -45,11 +50,12 @@ export default function Settings() {
     setPushMounted(true);
     if (!isPushSupported()) {
       setPushSupported(false);
+      if (isInsideNativeApp()) setPushHiddenInApp(true);
       return;
     }
-    if (getNotificationPermission() === "denied") {
-      setPushPermissionDenied(true);
-    }
+    getNotificationPermission().then((permission) => {
+      if (permission === "denied") setPushPermissionDenied(true);
+    });
     hasActivePushSubscription().then(setPushEnabled);
   }, []);
 
@@ -73,7 +79,7 @@ export default function Settings() {
       } else {
         const ok = await subscribeToPush(selectedIds);
         setPushEnabled(ok);
-        if (!ok && getNotificationPermission() === "denied") {
+        if (!ok && (await getNotificationPermission()) === "denied") {
           setPushPermissionDenied(true);
         }
       }
@@ -482,6 +488,7 @@ export default function Settings() {
           </div>
         </section>
 
+        {!pushHiddenInApp && (
         <section className="mb-6">
           <h2 className="mb-3 px-1 text-xs font-black uppercase tracking-widest text-zinc-400 dark:text-zinc-500">
             Notifications
@@ -544,6 +551,7 @@ export default function Settings() {
             )}
           </div>
         </section>
+        )}
 
         <section className="mb-6">
           <h2 className="mb-3 px-1 text-xs font-black uppercase tracking-widest text-zinc-400 dark:text-zinc-500">

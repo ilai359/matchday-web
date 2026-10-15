@@ -21,6 +21,19 @@ const config: CapacitorConfig = {
   ios: {
     contentInset: "automatic",
   },
+  // Lets the live site tell this build apart from build 1, which has the
+  // push plugin but not the native code that hands its device token back
+  // (see AppDelegate.swift) - pushClient.ts only turns on app
+  // notifications when it sees this marker. Bump the number if a future
+  // build changes how native push works.
+  appendUserAgent: "ClubsideNativePush/1",
+  plugins: {
+    PushNotifications: {
+      // Show alerts even while the app is open on screen, not only when
+      // it's in the background.
+      presentationOptions: ["badge", "sound", "alert"],
+    },
+  },
 };
 
 export default config;
