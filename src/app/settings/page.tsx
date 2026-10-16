@@ -535,7 +535,7 @@ export default function Settings() {
                         ? pushEnabled
                           ? "Turning off…"
                           : "Turning on…"
-                        : "Get notified when a club you follow scores"}
+                        : "Kickoff reminders, final scores and table moves"}
                     </div>
                     {pushError && !pushBusy && (
                       <div className="mt-1 text-[11px] font-medium text-red-500 dark:text-red-400">
