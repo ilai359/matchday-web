@@ -3,7 +3,6 @@ import webpush from "web-push";
 import { fetchWithRetry } from "@/lib/fetchWithRetry";
 import { getOrSet, isCompetitionLive } from "@/lib/cache";
 import { matchClubId, leaguesToCodes } from "@/lib/footballApi";
-import { formatCompetition } from "@/lib/competitionNames";
 import {
   getStartedMatchIds,
   markMatchStarted,
@@ -517,9 +516,23 @@ async function runCheckGoals(): Promise<NextResponse> {
       anyChange = true;
       positionChangesSent += 1;
       const movedUp = row.position < previousPosition;
+      const places = Math.abs(previousPosition - row.position);
+      const placesText = places === 1 ? "one place" : `${places} places`;
+      const leagueName = LEAGUE_IN_SENTENCE[competition] ?? competition;
+      // e.g. "⬆️ Tottenham climbed 3 places to 4th in the Premier League",
+      // "⬆️ Tottenham climbed one place to the top of the Premier League",
+      // "⬇️ Tottenham dropped 2 places to 6th in the Premier League".
+      // The app's short club name, not the API's full one ("Tottenham
+      // Hotspur FC").
+      const clubName = getClubName(clubId);
+      const title = movedUp
+        ? row.position === 1
+          ? `⬆️ ${clubName} climbed ${placesText} to the top of ${leagueName}`
+          : `⬆️ ${clubName} climbed ${placesText} to ${ordinal(row.position)} in ${leagueName}`
+        : `⬇️ ${clubName} dropped ${placesText} to ${ordinal(row.position)} in ${leagueName}`;
       await notifySubscribers(
         [clubId],
-        `${movedUp ? "⬆️" : "⬇️"} ${row.team.name} ${movedUp ? "moved up to" : "dropped to"} ${ordinal(row.position)} in ${formatCompetition(competition)}`,
+        title,
         `Now on ${row.points} points`,
         `/clubs/${clubId}`
       );
@@ -610,6 +623,22 @@ export async function GET(request: Request) {
     });
   }
 }
+
+// How each league reads in the middle of a table alert ("...to 4th in the
+// Premier League", "...to the top of La Liga") - keyed by football-data's
+// competition code, which is what the standings loop works with. This used
+// to go through formatCompetition, which expects a full competition name,
+// so the alert said "in PL".
+const LEAGUE_IN_SENTENCE: Record<string, string> = {
+  PL: "the Premier League",
+  PD: "La Liga",
+  BL1: "the Bundesliga",
+  FL1: "Ligue 1",
+  SA: "Serie A",
+  CL: "the Champions League",
+  DED: "the Eredivisie",
+  PPL: "the Primeira Liga",
+};
 
 function ordinal(n: number): string {
   const lastTwo = n % 100;
