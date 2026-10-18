@@ -34,12 +34,22 @@ const memoryReminded = new Set<string>();
 
 const STARTED_INDEX_KEY = "goalwatch:started-ids";
 
+// The Redis client automatically turns anything that looks like JSON back
+// into a JavaScript value - so a stored match id like "537901" comes back
+// as the NUMBER 537901, not the string. The check-goals job compares ids
+// as strings, so without this every lookup missed: each run treated every
+// match as brand new, re-sending "starting soon" and "kickoff" alerts
+// every 5 minutes and never getting as far as the full-time one.
+function asIdSet(ids: unknown[]): Set<string> {
+  return new Set(ids.map((id) => String(id)));
+}
+
 /** Every match id currently being tracked as "kicked off, not yet confirmed finished". */
 export async function getStartedMatchIds(): Promise<Set<string>> {
   if (redis) {
     try {
       const ids = await redis.smembers(STARTED_INDEX_KEY);
-      return new Set(ids);
+      return asIdSet(ids);
     } catch (error) {
       console.error("getStartedMatchIds: Redis read failed", error);
       return new Set();
@@ -81,7 +91,7 @@ export async function getRemindedMatchIds(): Promise<Set<string>> {
   if (redis) {
     try {
       const ids = await redis.smembers(REMINDED_INDEX_KEY);
-      return new Set(ids);
+      return asIdSet(ids);
     } catch (error) {
       console.error("getRemindedMatchIds: Redis read failed", error);
       return new Set();

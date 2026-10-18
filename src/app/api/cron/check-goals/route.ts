@@ -406,7 +406,20 @@ async function runCheckGoals(): Promise<NextResponse> {
           await refreshScorersAfterMatch(single.competition.code, apiKey);
         }
       }
-      await clearMatchStarted(matchId);
+      // Only stop tracking a match once it has really left play
+      // (finished, postponed, cancelled...). If it's still in play - e.g.
+      // its competition's live list just failed to load this run - keep
+      // tracking it, otherwise the next run would see it "kick off" again
+      // and send a second kickoff alert.
+      const stillInPlay =
+        single.status === "IN_PLAY" ||
+        single.status === "PAUSED" ||
+        single.status === "LIVE" ||
+        single.status === "TIMED" ||
+        single.status === "SCHEDULED";
+      if (!stillInPlay) {
+        await clearMatchStarted(matchId);
+      }
     } catch (error) {
       // Couldn't confirm this match's final state this run (likely a
       // rate-limit hit) - leave it tracked as started so the next run
@@ -460,6 +473,11 @@ async function runCheckGoals(): Promise<NextResponse> {
     const knownPositions = await getKnownPositions(competition);
     const updatedPositions: PositionMap = { ...knownPositions };
     let anyChange = false;
+    // Also true when a club is seen for the first time, so that position
+    // gets saved as the starting point to compare against next time.
+    // (Without this the very first table was never saved, nothing ever
+    // had anything to compare to, and no table alert could ever fire.)
+    let anyNew = false;
 
     for (const row of table) {
       const clubId = matchClubId(row.team.name);
@@ -470,7 +488,11 @@ async function runCheckGoals(): Promise<NextResponse> {
       // First time this club's ever been checked (e.g. right after this
       // feature shipped) - just record where it is, nothing to compare
       // against yet.
-      if (previousPosition === undefined || previousPosition === row.position) continue;
+      if (previousPosition === undefined) {
+        anyNew = true;
+        continue;
+      }
+      if (previousPosition === row.position) continue;
 
       anyChange = true;
       positionChangesSent += 1;
@@ -483,7 +505,7 @@ async function runCheckGoals(): Promise<NextResponse> {
       );
     }
 
-    if (anyChange) {
+    if (anyChange || anyNew) {
       await setKnownPositions(competition, updatedPositions);
     }
 
