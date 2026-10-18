@@ -237,6 +237,12 @@ async function runCheckGoals(): Promise<NextResponse> {
   const previouslyReminded = await getRemindedMatchIds();
   const stillLiveIds = new Set<string>();
   const liveMatchesById = new Map<string, RawLiveMatch>();
+  // For table alerts (see the standings loop below): competitions whose
+  // current round isn't over yet - a match kicks off within the next 30
+  // hours, or kicked off within the last 3 - and competitions whose
+  // fixture list couldn't be loaded this run (so we can't tell).
+  const roundStillGoing = new Set<string>();
+  const fixturesUnknown = new Set<string>();
 
   await withSection("kickoff/reminder loop", async () => {
   await Promise.all(watchedCompetitions.map(async (competition) => {
@@ -316,8 +322,19 @@ async function runCheckGoals(): Promise<NextResponse> {
         return response.json();
       });
       scheduledMatches = ((data as { matches?: RawScheduledMatch[] })?.matches ?? []) as RawScheduledMatch[];
+      const now = Date.now();
+      const roundOngoing = scheduledMatches.some((match) => {
+        const kickoff = new Date(match.utcDate).getTime();
+        return (
+          !Number.isNaN(kickoff) &&
+          kickoff > now - 3 * 60 * 60 * 1000 &&
+          kickoff < now + 30 * 60 * 60 * 1000
+        );
+      });
+      if (roundOngoing) roundStillGoing.add(competition);
     } catch {
       scheduledMatches = [];
+      fixturesUnknown.add(competition);
     }
 
     for (const match of scheduledMatches) {
@@ -429,17 +446,20 @@ async function runCheckGoals(): Promise<NextResponse> {
   }));
   });
 
-  // Table-position alerts: for every competition whose table isn't
-  // currently frozen (see isCompetitionLive - "frozen" means a match in
-  // it is still being played), compare each tracked club's position to
-  // the last time we checked, and tell anyone subscribed to a club that
-  // moved. Checked once per competition per run rather than tied to any
-  // single match, so a Saturday with several kickoff times settles once
-  // the whole round is actually over, instead of firing a notification
-  // after every individual result and possibly flip-flopping mid-round.
+  // Table-position alerts: one per round, not one per match. A league's
+  // table only counts as settled once its whole round is over - no match
+  // being played (isCompetitionLive) and none kicking off in the next 30
+  // hours (roundStillGoing, from the fixture list above). Only then is
+  // each tracked club's position compared to where it was after the
+  // previous round, and anyone following a club that moved is told once.
+  // Without the 30-hour check, a matchday with several kickoff times
+  // sent an alert after every game, often contradicting the previous one
+  // (up to 3rd after your club's game, back to 4th after a later one).
+  // 30 hours covers the usual Friday-to-Monday spread of a weekend round.
   let positionChangesSent = 0;
   await withSection("standings loop", async () => {
   await Promise.all(watchedCompetitions.map(async (competition) => {
+    if (roundStillGoing.has(competition) || fixturesUnknown.has(competition)) return;
     if (await isCompetitionLive(competition)) return;
 
     let table: RawStandingsRow[];
