@@ -18,6 +18,10 @@ function statusRank(status: unknown): number {
   return 0;
 }
 
+// Marks a request that failed outright, so a real empty answer ("no
+// matches today") can be told apart from "couldn't load anything".
+const FAILED = Symbol("failed");
+
 function dedupeByMostAdvancedStatus(matches: unknown[]): unknown[] {
   const byId = new Map<string | number, { match: unknown; rank: number }>();
   for (const match of matches) {
@@ -69,7 +73,7 @@ export async function getMatches(
           throw new Error(`football-data.org returned ${response.status}`);
         }
         return response.json();
-      }).catch(() => ({ matches: [] }))
+      }).catch(() => FAILED)
     ),
     getOrSet(
       `matches:${code}:FINISHED:recent`,
@@ -84,12 +88,19 @@ export async function getMatches(
         }
         return response.json();
       }
-    ).catch(() => ({ matches: [] })),
+    ).catch(() => FAILED),
   ]);
 
   const results = await Promise.all(requests);
-  const rawMatches = results.flatMap(
-    (result) => (result as { matches?: unknown[] }).matches ?? []
+  // If EVERY request failed (data source unreachable or rate-limited, and
+  // no saved copy to fall back on), say so instead of answering "no
+  // matches": the app then keeps showing the matches it already has on
+  // the phone rather than replacing them with an empty screen.
+  if (results.length > 0 && results.every((result) => result === FAILED)) {
+    throw new Error("Couldn't load any match data right now");
+  }
+  const rawMatches = results.flatMap((result) =>
+    result === FAILED ? [] : (result as { matches?: unknown[] }).matches ?? []
   );
   const allMatches = dedupeByMostAdvancedStatus(rawMatches);
 
