@@ -19,9 +19,10 @@ name: Check for goals
 # automatically disabled if the repository goes 60 days with no commits
 # at all (a manual run, or any new push, re-enables it). Fine for a goal
 # alert - a few minutes' delay is a minor tradeoff for this being free.
+# The schedule now runs from cron-job.org (every 5 minutes, reliably).
+# GitHub's own schedule is turned off so the check doesn't run twice;
+# this can still be run by hand from the Actions tab.
 on:
-  schedule:
-    - cron: "*/5 * * * *"
   workflow_dispatch: {}
 
 jobs:
