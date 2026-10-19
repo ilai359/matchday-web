@@ -53,7 +53,14 @@ export async function getMatches(
 
   const requests = requestedCompetitions.flatMap((code) => [
     ...STATUSES.map((status) =>
-      getOrSet(`matches:${code}:${status}`, 60 * 1000, async () => {
+      // LIVE refreshes every minute (scores change). SCHEDULED - the list
+      // of upcoming fixtures - every 10: kickoff times barely change, and
+      // a match that just started already shows up via LIVE (the
+      // dedupe below keeps the more advanced copy). Re-fetching every
+      // league's whole fixture list every minute was a big share of the
+      // 10-requests-a-minute data limit, and running out of it is what
+      // makes pages slow or fail to load.
+      getOrSet(`matches:${code}:${status}`, status === "LIVE" ? 60 * 1000 : 10 * 60 * 1000, async () => {
         const response = await fetchWithRetry(
           `https://api.football-data.org/v4/competitions/${code}/matches?status=${status}`,
           { headers: { "X-Auth-Token": apiKey }, cache: "no-store" }

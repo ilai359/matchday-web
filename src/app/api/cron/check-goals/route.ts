@@ -74,6 +74,7 @@ type RawLiveMatch = {
 
 type RawScheduledMatch = {
   id: number;
+  status?: string;
   competition: { name: string };
   homeTeam: RawTeam;
   awayTeam: RawTeam;
@@ -243,23 +244,24 @@ async function runCheckGoals(): Promise<NextResponse> {
   const roundStillGoing = new Set<string>();
   const fixturesUnknown = new Set<string>();
 
+  // Per competition: its fixtures from yesterday to two days ahead, every
+  // status (cached 30 minutes - kickoff times don't change minute to
+  // minute). Everything below that only needs kickoff times works off
+  // this one list: whether a match is close enough to bother checking
+  // live scores at all, the "starting soon" reminders, and whether the
+  // round is over for table alerts.
+  const fixturesByCompetition = new Map<string, RawScheduledMatch[]>();
+
   await withSection("kickoff/reminder loop", async () => {
   await Promise.all(watchedCompetitions.map(async (competition) => {
-    let liveMatches: RawLiveMatch[];
+    const now = Date.now();
+    let fixtures: RawScheduledMatch[];
     try {
-      // IMPORTANT: this cache key is shared with src/app/api/matches/
-      // route.ts, which real visitors hit constantly - it caches the
-      // RAW football-data.org response object (`{ matches: [...], ... }`),
-      // not a bare array. Caching just the array here (as this used to
-      // do) meant that whenever /api/matches had refreshed this key more
-      // recently (the overwhelmingly common case), getOrSet's cache hit
-      // would hand back that object where an array was expected, and
-      // `for (const match of liveMatches)` below would throw "is not
-      // iterable". Matching the same shape here is what actually fixes
-      // that, not just masks it.
-      const data = await getOrSet(`matches:${competition}:LIVE`, 60 * 1000, async () => {
+      const dateFrom = new Date(now - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      const dateTo = new Date(now + 2 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      const data = await getOrSet(`goals:fixtures:${competition}`, 30 * 60 * 1000, async () => {
         const response = await fetchWithRetry(
-          `https://api.football-data.org/v4/competitions/${competition}/matches?status=LIVE`,
+          `https://api.football-data.org/v4/competitions/${competition}/matches?dateFrom=${dateFrom}&dateTo=${dateTo}`,
           { headers: { "X-Auth-Token": apiKey }, cache: "no-store" }
         );
         if (!response.ok) {
@@ -267,15 +269,76 @@ async function runCheckGoals(): Promise<NextResponse> {
         }
         return response.json();
       });
-      liveMatches = ((data as { matches?: RawLiveMatch[] })?.matches ?? []) as RawLiveMatch[];
+      fixtures = ((data as { matches?: RawScheduledMatch[] })?.matches ?? []) as RawScheduledMatch[];
+      fixturesByCompetition.set(competition, fixtures);
     } catch {
-      // This competition's live check failed (most likely a rate-limit
-      // hit) - skip it this run rather than fail the whole job; it'll
-      // be tried again on the next scheduled run a few minutes later.
-      // Any match from this competition that was already tracked as
-      // started stays tracked (we just didn't see it this run), so it
-      // won't falsely trigger a full-time alert either.
-      liveMatches = [];
+      // Can't tell what's on in this competition right now - skip it
+      // this run (nothing tracked is lost; the next run tries again) and
+      // keep its table untouched.
+      fixturesUnknown.add(competition);
+      return;
+    }
+
+    const kickoffOf = (match: RawScheduledMatch) => new Date(match.utcDate).getTime();
+    const notOverYet = (match: RawScheduledMatch) =>
+      match.status !== "FINISHED" &&
+      match.status !== "POSTPONED" &&
+      match.status !== "CANCELLED" &&
+      match.status !== "SUSPENDED" &&
+      match.status !== "AWARDED";
+
+    // Round not over yet: a match still to be finished that kicks off in
+    // the next 30 hours, or kicked off in the last 3.
+    if (
+      fixtures.some((match) => {
+        const kickoff = kickoffOf(match);
+        return (
+          notOverYet(match) &&
+          kickoff > now - 3 * 60 * 60 * 1000 &&
+          kickoff < now + 30 * 60 * 60 * 1000
+        );
+      })
+    ) {
+      roundStillGoing.add(competition);
+    }
+
+    // Only spend a live-score request on this competition when a match in
+    // it could actually be in play: kicking off in the next 20 minutes,
+    // kicked off in the last 3.5 hours, or already being tracked as
+    // started. Most of the day nothing is on, and this job (which runs
+    // every 5 minutes) used to ask football-data.org for live scores in
+    // every followed league on every single run anyway - using up the
+    // same 10-requests-a-minute limit the app's own pages depend on.
+    const mightBeLive = fixtures.some((match) => {
+      const kickoff = kickoffOf(match);
+      return (
+        previouslyStarted.has(String(match.id)) ||
+        (kickoff > now - 3.5 * 60 * 60 * 1000 && kickoff < now + 20 * 60 * 1000)
+      );
+    });
+
+    let liveMatches: RawLiveMatch[] = [];
+    if (mightBeLive) {
+      try {
+        // Shared with /api/matches, which caches the raw football-data.org
+        // response object ({ matches: [...] }) under this same key.
+        const data = await getOrSet(`matches:${competition}:LIVE`, 60 * 1000, async () => {
+          const response = await fetchWithRetry(
+            `https://api.football-data.org/v4/competitions/${competition}/matches?status=LIVE`,
+            { headers: { "X-Auth-Token": apiKey }, cache: "no-store" }
+          );
+          if (!response.ok) {
+            throw new Error(`football-data.org returned ${response.status}`);
+          }
+          return response.json();
+        });
+        liveMatches = ((data as { matches?: RawLiveMatch[] })?.matches ?? []) as RawLiveMatch[];
+      } catch {
+        // Live check failed (most likely a rate limit) - try again next
+        // run. Tracked matches stay tracked, so nothing is lost or
+        // falsely announced.
+        liveMatches = [];
+      }
     }
 
     for (const match of liveMatches) {
@@ -302,47 +365,13 @@ async function runCheckGoals(): Promise<NextResponse> {
       );
     }
 
-    let scheduledMatches: RawScheduledMatch[];
-    try {
-      // Its own key with a 30-minute TTL instead of sharing /api/matches'
-      // 60s one: this list is only used for pre-kickoff reminders, and
-      // kickoff times don't change minute to minute. Re-fetching it for
-      // every competition on every 5-minute run was one of the biggest
-      // drains on football-data.org's 10-requests-per-minute limit -
-      // the same limit the Matches page needs for itself.
-      const data = await getOrSet(`goals:scheduled:${competition}`, 30 * 60 * 1000, async () => {
-        const response = await fetchWithRetry(
-          `https://api.football-data.org/v4/competitions/${competition}/matches?status=SCHEDULED`,
-          { headers: { "X-Auth-Token": apiKey }, cache: "no-store" }
-        );
-        if (!response.ok) {
-          throw new Error(`football-data.org returned ${response.status}`);
-        }
-        return response.json();
-      });
-      scheduledMatches = ((data as { matches?: RawScheduledMatch[] })?.matches ?? []) as RawScheduledMatch[];
-      const now = Date.now();
-      const roundOngoing = scheduledMatches.some((match) => {
-        const kickoff = new Date(match.utcDate).getTime();
-        return (
-          !Number.isNaN(kickoff) &&
-          kickoff > now - 3 * 60 * 60 * 1000 &&
-          kickoff < now + 30 * 60 * 60 * 1000
-        );
-      });
-      if (roundOngoing) roundStillGoing.add(competition);
-    } catch {
-      scheduledMatches = [];
-      fixturesUnknown.add(competition);
-    }
-
-    for (const match of scheduledMatches) {
+    for (const match of fixtures) {
+      if (match.status !== "SCHEDULED" && match.status !== "TIMED") continue;
       const matchId = String(match.id);
       if (previouslyReminded.has(matchId)) continue;
 
-      const minutesUntilKickoff = (new Date(match.utcDate).getTime() - Date.now()) / 60_000;
-      // Outside the reminder window (too far away, or already started -
-      // negative means it should already be in the LIVE list above) -
+      const minutesUntilKickoff = (kickoffOf(match) - Date.now()) / 60_000;
+      // Outside the reminder window (too far away, or already started) -
       // nothing to do yet.
       if (minutesUntilKickoff > REMINDER_WINDOW_MINUTES || minutesUntilKickoff <= 0) continue;
 
@@ -460,6 +489,19 @@ async function runCheckGoals(): Promise<NextResponse> {
   await Promise.all(watchedCompetitions.map(async (competition) => {
     if (roundStillGoing.has(competition) || fixturesUnknown.has(competition)) return;
     if (await isCompetitionLive(competition)) return;
+    // A table only changes when a match finishes, so only look at it when
+    // a match in this league finished in the last 12 hours - or when
+    // there's no saved starting point yet. Otherwise there's nothing new
+    // to compare, and fetching it every few minutes all day just uses up
+    // the data limit the app's own pages need.
+    const recentlyFinished = (fixturesByCompetition.get(competition) ?? []).some(
+      (match) =>
+        match.status === "FINISHED" &&
+        new Date(match.utcDate).getTime() > Date.now() - 12 * 60 * 60 * 1000
+    );
+    if (!recentlyFinished && Object.keys(await getKnownPositions(competition)).length > 0) {
+      return;
+    }
 
     let table: RawStandingsRow[];
     try {
@@ -572,7 +614,14 @@ async function runCheckGoals(): Promise<NextResponse> {
       )
     );
     if (clubNames.length > 0) {
-      await fetchLiveUpdates(clubNames, leagues, SITE_BASE_URL);
+      // At most once every 3 hours, not on every 5-minute run: the news
+      // source only publishes articles with a ~12-hour delay anyway, and
+      // warming it every 5 minutes burned through its small daily quota
+      // (and the cache's request allowance) for nothing.
+      await getOrSet("goals:news-warmed", 3 * 60 * 60 * 1000, async () => {
+        await fetchLiveUpdates(clubNames, leagues, SITE_BASE_URL);
+        return true;
+      });
       newsWarmed = true;
     }
   } catch (error) {
