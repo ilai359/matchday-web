@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cdnCacheHeaders } from "@/lib/httpCache";
 import { getStandings } from "@/lib/standingsData";
 
 // Runs on Vercel's Edge Runtime instead of the default Node.js serverless
@@ -32,7 +33,7 @@ export async function GET(request: Request) {
     // Fetch/cache/freeze logic now lives in src/lib/standingsData.ts,
     // shared with /api/club-bundle - see that file.
     const data = await getStandings(competition, apiKey);
-    return NextResponse.json(data);
+    return NextResponse.json(data, { headers: cdnCacheHeaders(60) });
   } catch (error) {
     console.error(`standings failed for competition=${competition}`, error);
     return NextResponse.json(

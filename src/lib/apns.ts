@@ -75,6 +75,27 @@ function normalizePem(raw: string): string {
   return `-----BEGIN PRIVATE KEY-----\n${lines.join("\n")}\n-----END PRIVATE KEY-----\n`;
 }
 
+// One HTTP/2 connection per Apple server, reused for every notification
+// in a run instead of opening a new one per device - Apple's recommended
+// way, and what keeps sending to many devices fast.
+const sessions = new Map<string, http2.ClientHttp2Session>();
+
+function getSession(host: string): http2.ClientHttp2Session {
+  const existing = sessions.get(host);
+  if (existing && !existing.closed && !existing.destroyed) return existing;
+  const session = http2.connect(`https://${host}`);
+  const forget = () => {
+    if (sessions.get(host) === session) sessions.delete(host);
+  };
+  session.on("error", forget);
+  session.on("close", forget);
+  session.on("goaway", forget);
+  // Don't let an idle connection keep the server function running.
+  session.unref();
+  sessions.set(host, session);
+  return session;
+}
+
 function sendOnce(
   host: string,
   deviceToken: string,
@@ -86,26 +107,25 @@ function sendOnce(
     const finish = (result: { status: number; reason?: string }) => {
       if (settled) return;
       settled = true;
-      try {
-        client.close();
-      } catch {
-        // already closed
-      }
       resolve(result);
     };
 
-    const client = http2.connect(`https://${host}`);
-    client.on("error", (error) => finish({ status: 0, reason: String(error) }));
-
-    const request = client.request({
-      ":method": "POST",
-      ":path": `/3/device/${deviceToken}`,
-      authorization: `bearer ${jwt}`,
-      "apns-topic": BUNDLE_ID,
-      "apns-push-type": "alert",
-      "apns-priority": "10",
-      "content-type": "application/json",
-    });
+    let request: http2.ClientHttp2Stream;
+    try {
+      request = getSession(host).request({
+        ":method": "POST",
+        ":path": `/3/device/${deviceToken}`,
+        authorization: `bearer ${jwt}`,
+        "apns-topic": BUNDLE_ID,
+        "apns-push-type": "alert",
+        "apns-priority": "10",
+        "content-type": "application/json",
+      });
+    } catch (error) {
+      sessions.delete(host);
+      finish({ status: 0, reason: String(error) });
+      return;
+    }
 
     let status = 0;
     let responseBody = "";

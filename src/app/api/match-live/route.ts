@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cdnCacheHeaders } from "@/lib/httpCache";
 import { slimMatch } from "@/lib/slimFootballData";
 import { fetchWithRetry } from "@/lib/fetchWithRetry";
 import { getOrSet } from "@/lib/cache";
@@ -40,7 +41,7 @@ export async function GET(request: Request) {
       }
       return slimMatch(await response.json());
     });
-    return NextResponse.json(data);
+    return NextResponse.json(data, { headers: cdnCacheHeaders(20, 40) });
   } catch (error) {
     console.error(`match-live failed for id=${id}`, error);
     return NextResponse.json(

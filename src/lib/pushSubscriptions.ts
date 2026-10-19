@@ -120,16 +120,19 @@ export async function getAllSubscriptions(): Promise<PushSubscriptionRecord[]> {
   try {
     const keys = await redis.smembers(INDEX_KEY);
     if (keys.length === 0) return [];
-    const records = await Promise.all(
-      keys.map(async (key) => {
-        try {
-          return await redis.get<PushSubscriptionRecord>(key);
-        } catch {
-          return null;
-        }
-      })
-    );
-    return records.filter((r): r is PushSubscriptionRecord => r !== null);
+    // Read in batches of 100 with one MGET each, instead of one request per
+    // device - with many users, the alert check would otherwise make
+    // thousands of separate cache requests on every run.
+    const records: (PushSubscriptionRecord | null)[] = [];
+    for (let i = 0; i < keys.length; i += 100) {
+      const batch = keys.slice(i, i + 100);
+      try {
+        records.push(...(await redis.mget<(PushSubscriptionRecord | null)[]>(...batch)));
+      } catch {
+        // This batch couldn't be read this run - skipped, tried again next run.
+      }
+    }
+    return records.filter((r): r is PushSubscriptionRecord => r !== null && typeof r === "object");
   } catch (error) {
     console.error("getAllSubscriptions: Redis read failed", error);
     return [];

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cdnCacheHeaders } from "@/lib/httpCache";
 import { getFinishedMatches } from "@/lib/finishedMatchesData";
 
 // Runs on Vercel's Edge Runtime instead of the default Node.js serverless
@@ -30,7 +31,7 @@ export async function GET(request: Request) {
     // Fetch/cache logic now lives in src/lib/finishedMatchesData.ts,
     // shared with /api/club-bundle - see that file.
     const data = await getFinishedMatches(competition, season, apiKey);
-    return NextResponse.json(data);
+    return NextResponse.json(data, { headers: cdnCacheHeaders(300, 3600) });
   } catch (error) {
     console.error(
       `finished-matches failed for competition=${competition} season=${season}`,

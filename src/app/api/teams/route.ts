@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cdnCacheHeaders } from "@/lib/httpCache";
 import { fetchWithRetry } from "@/lib/fetchWithRetry";
 
 const COMPETITIONS = ["PL", "PD", "BL1", "FL1", "SA", "CL", "DED", "PPL"];
@@ -27,7 +28,7 @@ export async function GET() {
       crest: t.crest,
     }));
 
-    return NextResponse.json({ teams: simplified });
+    return NextResponse.json({ teams: simplified }, { headers: cdnCacheHeaders(86400) });
   } catch (error) {
     return NextResponse.json(
       { error: "Something went wrong", details: String(error) },

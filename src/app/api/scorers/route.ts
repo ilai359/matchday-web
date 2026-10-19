@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cdnCacheHeaders } from "@/lib/httpCache";
 import { getScorers } from "@/lib/scorersData";
 
 // Runs on Vercel's Edge Runtime instead of the default Node.js serverless
@@ -33,7 +34,7 @@ export async function GET(request: Request) {
     // check-goals (which forces a refresh here right after a match
     // finishes) - see that file for the caching strategy.
     const data = await getScorers(competition, apiKey);
-    return NextResponse.json(data);
+    return NextResponse.json(data, { headers: cdnCacheHeaders(300) });
   } catch (error) {
     console.error(`scorers failed for competition=${competition}`, error);
     return NextResponse.json(

@@ -441,13 +441,37 @@ export async function fetchLiveMatches(
     includeRecentlyFinished ? ":with-recent-finished" : ""
   }`;
   return cachedFetch(cacheKey, 30 * 1000, async () => {
-    const query = `?leagues=${encodeURIComponent(sortedCodes.join(","))}`;
-    const response = await fetch(`/api/matches${query}`);
-    if (!response.ok) {
+    // One request per league instead of one for this person's exact mix
+    // of leagues. Every user following, say, the Premier League then asks
+    // for the very same URL, which Vercel's CDN can answer from one shared
+    // copy (see src/lib/httpCache.ts) - so how often the data actually
+    // gets fetched doesn't grow with the number of users.
+    const perLeague = await Promise.all(
+      sortedCodes.map(async (code) => {
+        try {
+          const response = await fetch(`/api/matches?leagues=${encodeURIComponent(code)}`);
+          if (!response.ok) return null;
+          const data = await response.json();
+          return (data.matches ?? []) as RawApiMatch[];
+        } catch {
+          return null;
+        }
+      })
+    );
+    // Every league failed - report it, so pages keep what they already
+    // show instead of switching to "no matches".
+    if (sortedCodes.length > 0 && perLeague.every((list) => list === null)) {
       throw new Error("Failed to fetch live matches");
     }
-    const data = await response.json();
-    const rawMatches: RawApiMatch[] = data.matches ?? [];
+    const seenIds = new Set<number>();
+    const rawMatches: RawApiMatch[] = [];
+    for (const list of perLeague) {
+      for (const match of list ?? []) {
+        if (seenIds.has(match.id)) continue;
+        seenIds.add(match.id);
+        rawMatches.push(match);
+      }
+    }
     const mapped = rawMatches.map(mapRawMatch).filter((match) => {
       if (isBelievablyVisible(match)) return true;
       if (!includeRecentlyFinished || match.status !== "FINISHED") return false;

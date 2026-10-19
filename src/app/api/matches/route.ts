@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cdnCacheHeaders } from "@/lib/httpCache";
 import { getMatches } from "@/lib/matchesData";
 import { COMPETITIONS } from "@/lib/competitions";
 
@@ -38,7 +39,7 @@ export async function GET(request: Request) {
     // Fetch/cache/dedup logic now lives in src/lib/matchesData.ts,
     // shared with /api/club-bundle - see that file.
     const data = await getMatches(requestedCompetitions, apiKey);
-    return NextResponse.json(data);
+    return NextResponse.json(data, { headers: cdnCacheHeaders(30, 60) });
   } catch (error) {
     return NextResponse.json(
       { error: "Something went wrong", details: String(error) },

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cdnCacheHeaders } from "@/lib/httpCache";
 import { rememberArticles } from "@/lib/newsArchive";
 
 // Runs on Vercel's Edge Runtime instead of the default Node.js serverless
@@ -103,7 +104,7 @@ export async function GET(request: Request) {
     const results = await Promise.all(requests);
     const allArticles = results.flat();
 
-    return NextResponse.json({ articles: allArticles });
+    return NextResponse.json({ articles: allArticles }, { headers: cdnCacheHeaders(600, 3600) });
   } catch (error) {
     return NextResponse.json(
       { error: "Something went wrong", details: String(error) },

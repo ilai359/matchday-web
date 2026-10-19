@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cdnCacheHeaders } from "@/lib/httpCache";
 import { getStandings } from "@/lib/standingsData";
 import { getScorers } from "@/lib/scorersData";
 import { getFinishedMatches } from "@/lib/finishedMatchesData";
@@ -51,11 +52,14 @@ export async function GET(request: Request) {
       getMatches(leagueCodes, apiKey).catch(() => ({ matches: [] })),
     ]);
 
-  return NextResponse.json({
-    standings,
-    scorers,
-    recentMatches,
-    recentMatchesCL,
-    upcoming,
-  });
+  return NextResponse.json(
+    {
+      standings,
+      scorers,
+      recentMatches,
+      recentMatchesCL,
+      upcoming,
+    },
+    { headers: cdnCacheHeaders(60) }
+  );
 }

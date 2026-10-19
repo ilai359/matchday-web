@@ -235,10 +235,19 @@ async function runCheckGoals(): Promise<NextResponse> {
     // Browsers (web push) and the iPhone app (APNs) both go through
     // sendToDevice, which also cleans up any device that's no longer
     // valid. One device failing never stops the rest from being sent.
-    for (const sub of subscriptions) {
-      if (!sub.clubIds.some((id) => clubIds.includes(id))) continue;
-      const outcome = await sendToDevice(sub, { title, body, url }, pushConfigured);
-      if (outcome === "sent") notificationsSent += 1;
+    // Sent 20 at a time rather than one after another, so an alert for a
+    // popular club still goes out in seconds even with thousands of
+    // followers, well inside this job's time limit.
+    const recipients = subscriptions.filter((sub) =>
+      sub.clubIds.some((id) => clubIds.includes(id))
+    );
+    for (let i = 0; i < recipients.length; i += 20) {
+      const outcomes = await Promise.all(
+        recipients
+          .slice(i, i + 20)
+          .map((sub) => sendToDevice(sub, { title, body, url }, pushConfigured))
+      );
+      notificationsSent += outcomes.filter((outcome) => outcome === "sent").length;
     }
   }
 

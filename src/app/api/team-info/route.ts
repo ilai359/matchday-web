@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cdnCacheHeaders } from "@/lib/httpCache";
 import { getOrSet } from "@/lib/cache";
 import { fetchWithRetry } from "@/lib/fetchWithRetry";
 
@@ -50,7 +51,7 @@ export async function GET(request: Request) {
         return { venue: (data.venue as string | null) ?? null };
       }
     );
-    return NextResponse.json(result);
+    return NextResponse.json(result, { headers: cdnCacheHeaders(86400) });
   } catch (error) {
     return NextResponse.json(
       { error: "Something went wrong", details: String(error) },
