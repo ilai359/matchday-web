@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
-import { slimMatchesResponse } from "@/lib/slimFootballData";
-import { fetchWithRetry } from "@/lib/fetchWithRetry";
-import { getOrSet } from "@/lib/cache";
 import { COMPETITIONS } from "@/lib/competitions";
+import { getFinishedMatches } from "@/lib/finishedMatchesData";
+import { getScorers } from "@/lib/scorersData";
+import { getStandings } from "@/lib/standingsData";
+import { FootballDataBusyError, footballDataCallsStarted } from "@/lib/footballBudget";
 
 // Runs once a day (see vercel.json) to pre-load match-history and top
 // scorers into the shared cache BEFORE any real visitor asks for them -
@@ -52,16 +53,17 @@ function getSeasonStartYear(date: Date): number {
 }
 
 export async function GET(request: Request) {
-  // Only Vercel's own cron trigger should be able to run this - it makes
-  // ~24 real football-data.org requests every time, so a stray bot or
-  // crawler hitting this URL repeatedly could burn through the same
-  // scarce rate-limit budget this job exists to protect. Vercel
-  // automatically sends this header (using the CRON_SECRET environment
-  // variable) when it invokes a route listed in vercel.json's crons - see
-  // NOTES.md for the one-time setup step this needs in Vercel's project
-  // settings.
+  // Only Vercel's own cron trigger (CRON_SECRET) - or someone with the
+  // app's alert-check secret, e.g. to fill an empty cache right away -
+  // can run this: it makes ~40 real football-data.org requests.
   const authHeader = request.headers.get("authorization");
-  if (!process.env.CRON_SECRET || authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  const secretParam = new URL(request.url).searchParams.get("secret");
+  const allowed =
+    (process.env.CRON_SECRET && authHeader === `Bearer ${process.env.CRON_SECRET}`) ||
+    (process.env.GOALS_CRON_SECRET &&
+      (authHeader === `Bearer ${process.env.GOALS_CRON_SECRET}` ||
+        secretParam === process.env.GOALS_CRON_SECRET));
+  if (!allowed) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -71,65 +73,57 @@ export async function GET(request: Request) {
   }
 
   const currentSeasonYear = getSeasonStartYear(new Date());
-  const seasons = [currentSeasonYear, currentSeasonYear - 1, currentSeasonYear - 2];
 
-  const results: { competition: string; season: number; status: string }[] = [];
-
+  // Most-viewed first, so if time runs out the important things are done.
+  type Task = { label: string; run: () => Promise<unknown> };
+  const tasks: Task[] = [];
   for (const competition of COMPETITIONS) {
-    for (const season of seasons) {
-      // Must match the cache key format finished-matches/route.ts uses
-      // exactly, or a real visitor's request won't find what this job
-      // warmed.
-      const cacheKey = `finished-matches:${competition}:${season}`;
-      const isCurrentSeason = season === currentSeasonYear;
-      const ttlMs = isCurrentSeason ? 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000;
-
-      try {
-        await getOrSet(cacheKey, ttlMs, async () => {
-          const response = await fetchWithRetry(
-            `https://api.football-data.org/v4/competitions/${competition}/matches?status=FINISHED&season=${season}`,
-            { headers: { "X-Auth-Token": apiKey }, cache: "no-store" }
-          );
-          if (!response.ok) {
-            throw new Error(`football-data.org returned ${response.status}`);
-          }
-          return slimMatchesResponse(await response.json());
-        });
-        results.push({ competition, season, status: "ok" });
-      } catch (error) {
-        results.push({ competition, season, status: `failed: ${String(error)}` });
-      }
-
-      // Spread requests out so this job stays well under
-      // football-data.org's 10-requests/minute shared limit - it would be
-      // self-defeating for the job meant to avoid that limit to be the
-      // thing that trips it.
-      await new Promise((resolve) => setTimeout(resolve, 6500));
+    tasks.push({ label: `standings ${competition}`, run: () => getStandings(competition, apiKey) });
+  }
+  for (const competition of COMPETITIONS) {
+    tasks.push({ label: `scorers ${competition}`, run: () => getScorers(competition, apiKey) });
+  }
+  for (const offset of [0, 1, 2]) {
+    const season = String(currentSeasonYear - offset);
+    for (const competition of COMPETITIONS) {
+      tasks.push({
+        label: `finished ${competition} ${season}`,
+        run: () => getFinishedMatches(competition, season, apiKey),
+      });
     }
   }
 
-  // Same idea, now for top scorers - one request per competition, same
-  // cache key format scorers/route.ts uses, same spacing.
-  for (const competition of COMPETITIONS) {
-    const cacheKey = `scorers:${competition}`;
+  const startedAt = Date.now();
+  const results: { task: string; status: string }[] = [];
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-    try {
-      await getOrSet(cacheKey, 6 * 60 * 60 * 1000, async () => {
-        const response = await fetchWithRetry(
-          `https://api.football-data.org/v4/competitions/${competition}/scorers?limit=50`,
-          { headers: { "X-Auth-Token": apiKey }, cache: "no-store" }
-        );
-        if (!response.ok) {
-          throw new Error(`football-data.org returned ${response.status}`);
-        }
-        return response.json();
-      });
-      results.push({ competition, season: 0, status: "ok (scorers)" });
-    } catch (error) {
-      results.push({ competition, season: 0, status: `failed (scorers): ${String(error)}` });
+  for (const task of tasks) {
+    // Stop with time to spare before Vercel's 5-minute cut-off - whatever
+    // is left gets filled by the next run or by people's visits.
+    if (Date.now() - startedAt > 270_000) {
+      results.push({ task: task.label, status: "skipped (out of time)" });
+      continue;
     }
-
-    await new Promise((resolve) => setTimeout(resolve, 6500));
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const callsBefore = footballDataCallsStarted();
+      try {
+        await task.run();
+        const fetched = footballDataCallsStarted() > callsBefore;
+        results.push({ task: task.label, status: fetched ? "fetched" : "already saved" });
+        // Only wait after a real request - spacing them out keeps this
+        // job from using up the per-minute allowance people need.
+        if (fetched) await sleep(7000);
+        break;
+      } catch (error) {
+        if (error instanceof FootballDataBusyError && attempt === 0) {
+          // The minute's allowance is used up - wait for it to reset.
+          await sleep(20_000);
+          continue;
+        }
+        results.push({ task: task.label, status: `failed: ${String(error)}` });
+        break;
+      }
+    }
   }
 
   return NextResponse.json({ warmed: results });

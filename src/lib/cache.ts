@@ -47,6 +47,7 @@
  */
 
 import { Redis } from "@upstash/redis";
+import { after } from "next/server";
 
 type CacheEntry<T> = {
   value: T;
@@ -74,6 +75,65 @@ const redis =
 // cache instead (see the comment inside getOrSet).
 let redisDownUntil = 0;
 
+export type GetOrSetOptions = {
+  /**
+   * When the saved copy has expired but an older one is still around,
+   * answer straight away with that older copy and fetch the fresh one in
+   * the background (for the next person), instead of making this person
+   * wait on football-data.org - or see nothing at all when its shared
+   * per-minute allowance is used up. Used for everything people look at
+   * (tables, form, head-to-head, fixtures). Left off for the alert check,
+   * which needs the real current state every time.
+   */
+  serveStale?: boolean;
+};
+
+// Keys this server is already refreshing in the background.
+const refreshingLocally = new Set<string>();
+
+// Runs `work` after the response has been sent, so the person doesn't
+// wait for it. Falls back to just starting it if we're not inside a
+// request (e.g. called from a background job).
+function runInBackground(work: () => Promise<void>) {
+  try {
+    after(work);
+  } catch {
+    void work();
+  }
+}
+
+function refreshInBackground<T>(key: string, ttlMs: number, fetcher: () => Promise<T>) {
+  if (refreshingLocally.has(key)) return;
+  refreshingLocally.add(key);
+  runInBackground(async () => {
+    try {
+      if (redis && Date.now() >= redisDownUntil) {
+        // Only one server refreshes a given key at a time - with lots of
+        // people opening the same table at once, that's still one request
+        // to football-data.org, not one per person.
+        const gotLock = await redis
+          .set(`refreshing:${key}`, 1, { nx: true, px: 30_000 })
+          .catch(() => "OK");
+        if (gotLock !== "OK") return;
+        const value = await fetcher();
+        await redis.set(key, value as unknown, { px: ttlMs });
+        await redis.set(`stale:${key}`, value as unknown);
+        store.set(key, { value, expiresAt: Date.now() + ttlMs });
+        lastGood.set(key, value);
+      } else {
+        const value = await fetcher();
+        store.set(key, { value, expiresAt: Date.now() + ttlMs });
+        lastGood.set(key, value);
+      }
+    } catch (error) {
+      // The older copy stays in place; someone else's visit tries again.
+      console.error(`getOrSet: background refresh failed for key "${key}"`, error);
+    } finally {
+      refreshingLocally.delete(key);
+    }
+  });
+}
+
 /**
  * Returns a cached value for `key` if it hasn't expired yet. Otherwise
  * calls `fetcher` - coalescing concurrent calls for the same key into a
@@ -92,14 +152,29 @@ let redisDownUntil = 0;
 export async function getOrSet<T>(
   key: string,
   ttlMs: number,
-  fetcher: () => Promise<T>
+  fetcher: () => Promise<T>,
+  options: GetOrSetOptions = {}
 ): Promise<T> {
+  // This server already has a fresh copy in memory: use it without
+  // asking Redis at all. Every Redis read counts against its free
+  // monthly allowance, so this alone saves a lot as more people use the
+  // app (busy servers answer many people in a row).
+  const inMemory = store.get(key);
+  if (inMemory && inMemory.expiresAt > Date.now()) {
+    return inMemory.value as T;
+  }
+
   const pending = inFlight.get(key);
   if (pending) {
     return pending as Promise<T>;
   }
 
   const promise = (async () => {
+    // Make sure the "in progress" marker below is recorded before this
+    // can finish and remove it - otherwise an answer that needs no
+    // waiting would leave the marker behind for good, and this key
+    // would keep returning that same old answer forever.
+    await Promise.resolve();
     try {
       // If the cache recently failed (e.g. its free monthly allowance ran
       // out), skip it for a minute and work from this server's own memory
@@ -123,14 +198,33 @@ export async function getOrSet<T>(
       if (redisUsable && redis) {
         if (cachedFromRedis !== null && cachedFromRedis !== undefined) {
           // Also kept in memory, so if the cache goes down later this
-          // server still has something to show.
+          // server still has something to show. (Kept as "fresh" for a
+          // short while only, since we don't know how long the Redis
+          // copy has left.)
           lastGood.set(key, cachedFromRedis);
+          store.set(key, {
+            value: cachedFromRedis,
+            expiresAt: Date.now() + Math.min(ttlMs, 30_000),
+          });
           return cachedFromRedis;
         }
         // A second, never-expiring copy of the last value that fetched
         // successfully. Consulted only as a fallback when a live fetch
         // fails and the normal (TTL'd) key is empty or expired.
         const staleKey = `stale:${key}`;
+
+        if (options.serveStale) {
+          try {
+            const stale = await redis.get<T>(staleKey);
+            if (stale !== null && stale !== undefined) {
+              lastGood.set(key, stale);
+              refreshInBackground(key, ttlMs, fetcher);
+              return stale;
+            }
+          } catch (redisError) {
+            console.error(`getOrSet: Redis GET (stale) failed for key "${key}"`, redisError);
+          }
+        }
 
         try {
           const value = await fetcher();
@@ -187,6 +281,10 @@ export async function getOrSet<T>(
       const existing = store.get(key);
       if (existing && existing.expiresAt > now) {
         return existing.value as T;
+      }
+      if (options.serveStale && lastGood.has(key)) {
+        refreshInBackground(key, ttlMs, fetcher);
+        return lastGood.get(key) as T;
       }
 
       try {
@@ -249,9 +347,26 @@ export async function isCompetitionLive(competition: string): Promise<boolean> {
       : cached && typeof cached === "object" && "matches" in cached
         ? (cached as { matches?: unknown[] }).matches
         : undefined;
-    return Array.isArray(matches) && matches.length > 0;
+    if (Array.isArray(matches) && matches.length > 0) return true;
+    // The matches list now fetches every league's live matches in one go
+    // (see matchesData.ts) and notes which leagues have a game on right
+    // now in this small key.
+    const liveNow = await redis.get<string[]>(LIVE_COMPETITIONS_KEY);
+    return Array.isArray(liveNow) && liveNow.includes(competition);
   } catch {
     return false;
+  }
+}
+
+const LIVE_COMPETITIONS_KEY = "live-competitions";
+
+/** Saves which leagues have a match being played right now (see isCompetitionLive). */
+export async function setLiveCompetitions(codes: string[]): Promise<void> {
+  if (!redis) return;
+  try {
+    await redis.set(LIVE_COMPETITIONS_KEY, codes, { px: 3 * 60 * 1000 });
+  } catch {
+    // Best-effort.
   }
 }
 

@@ -1,3 +1,10 @@
+import {
+  FootballDataBusyError,
+  isFootballDataUrl,
+  noteFootballDataResponse,
+  reserveFootballDataCall,
+} from "@/lib/footballBudget";
+
 // Retries a fetch a couple of times before giving up, instead of failing
 // on the very first hiccup.
 //
@@ -31,16 +38,26 @@ export async function fetchWithRetry(
   attempts = 3,
   delayMs = 600
 ): Promise<Response> {
+  const footballData = isFootballDataUrl(url);
   let lastResponse: Response | null = null;
 
   for (let i = 0; i < attempts; i++) {
     try {
+      // football-data.org: check the app-wide allowance first (throws
+      // FootballDataBusyError if it's used up - see footballBudget.ts).
+      if (footballData) await reserveFootballDataCall();
       const response = await fetch(url, init);
+      if (footballData) await noteFootballDataResponse(response);
       if (response.ok || !isRetryableStatus(response.status)) {
         return response;
       }
       lastResponse = response;
+      // Retrying football-data.org's "too many requests" a split second
+      // later can't work - the limit is per minute - and each retry only
+      // uses up more of it. Give up on this one; the saved copy is used.
+      if (footballData && response.status === 429) return response;
     } catch (error) {
+      if (error instanceof FootballDataBusyError) throw error;
       if (i === attempts - 1) throw error;
     }
     if (i < attempts - 1) {

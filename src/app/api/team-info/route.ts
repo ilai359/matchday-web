@@ -49,7 +49,8 @@ export async function GET(request: Request) {
         }
         const data = await response.json();
         return { venue: (data.venue as string | null) ?? null };
-      }
+      },
+      { serveStale: true }
     );
     return NextResponse.json(result, { headers: cdnCacheHeaders(86400) });
   } catch (error) {

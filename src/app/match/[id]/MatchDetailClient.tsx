@@ -401,6 +401,8 @@ export default function MatchDetailClient({ id }: { id: string }) {
   const [previousSeasonMatches, setPreviousSeasonMatches] = useState<FinishedMatch[]>([]);
   const [twoSeasonsAgoMatches, setTwoSeasonsAgoMatches] = useState<FinishedMatch[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
+  // Bumped to try again shortly when a season's results couldn't load.
+  const [historyRetry, setHistoryRetry] = useState(0);
 
   const rawCompetition = displayMatch?.rawCompetition;
   const homeClubId = displayMatch?.homeClubId;
@@ -416,6 +418,7 @@ export default function MatchDetailClient({ id }: { id: string }) {
       return;
     }
     let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
     // This is the standard "start loading, then resolve" data-fetching
     // pattern: mark loading true right as the fetch kicks off, then false
     // in .finally() below once it settles. The linter would rather this
@@ -423,8 +426,15 @@ export default function MatchDetailClient({ id }: { id: string }) {
     // meaningful downside to the extra render here, and restructuring this
     // well-understood, safe pattern just to satisfy it would only make the
     // code harder to follow.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setHistoryLoading(true);
+    // (Only on the first try - a quiet retry keeps what's showing.)
+    if (historyRetry === 0) {
+      /* eslint-disable react-hooks/set-state-in-effect */
+      setHistoryLoading(true);
+      setCurrentSeasonMatches([]);
+      setPreviousSeasonMatches([]);
+      setTwoSeasonsAgoMatches([]);
+      /* eslint-enable react-hooks/set-state-in-effect */
+    }
     const currentSeasonYear = getSeasonStartYear(new Date());
     const previousSeasonYear = currentSeasonYear - 1;
     const twoSeasonsAgoYear = currentSeasonYear - 2;
@@ -444,17 +454,27 @@ export default function MatchDetailClient({ id }: { id: string }) {
         // matches" for teams that had clearly played plenty of games
         // this season: one rate-limited request out of three was enough
         // to blank the whole section. Found 2026-09-22.
-        setCurrentSeasonMatches(current.status === "fulfilled" ? current.value : []);
-        setPreviousSeasonMatches(previous.status === "fulfilled" ? previous.value : []);
-        setTwoSeasonsAgoMatches(twoAgo.status === "fulfilled" ? twoAgo.value : []);
+        // A season that failed keeps whatever was already showing, and
+        // the whole thing is tried again a few seconds later - instead of
+        // wrongly saying "haven't met" / "no matches played".
+        if (current.status === "fulfilled") setCurrentSeasonMatches(current.value);
+        if (previous.status === "fulfilled") setPreviousSeasonMatches(previous.value);
+        if (twoAgo.status === "fulfilled") setTwoSeasonsAgoMatches(twoAgo.value);
+        const anyFailed = [current, previous, twoAgo].some((r) => r.status === "rejected");
+        if (anyFailed && historyRetry < 4) {
+          retryTimer = setTimeout(() => setHistoryRetry((n) => n + 1), 8000 * (historyRetry + 1));
+        } else {
+          setHistoryLoading(false);
+        }
       })
-      .finally(() => {
+      .catch(() => {
         if (!cancelled) setHistoryLoading(false);
       });
     return () => {
       cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
     };
-  }, [leagueCode, homeClubId, awayClubId]);
+  }, [leagueCode, homeClubId, awayClubId, historyRetry]);
 
   // League-table position for each side, shown under their name below.
   // Deliberately skipped for Champions League (leagueCode === "CL"):

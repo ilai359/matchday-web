@@ -1,13 +1,8 @@
 import { fetchWithRetry } from "@/lib/fetchWithRetry";
 import { slimMatchesResponse } from "@/lib/slimFootballData";
-import { getOrSet } from "@/lib/cache";
+import { getOrSet, setLiveCompetitions } from "@/lib/cache";
 import { COMPETITIONS } from "@/lib/competitions";
 
-// football-data.org's docs only ever show a single status value in their
-// examples, so combining values in one request isn't confirmed to work -
-// each status is asked for separately and merged. LIVE is their
-// pseudo-status covering both IN_PLAY and PAUSED.
-const STATUSES = ["SCHEDULED", "LIVE"];
 
 // A match's real status only ever moves forward (scheduled -> live ->
 // finished, never back), so when the same id shows up more than once
@@ -22,6 +17,11 @@ function statusRank(status: unknown): number {
 // Marks a request that failed outright, so a real empty answer ("no
 // matches today") can be told apart from "couldn't load anything".
 const FAILED = Symbol("failed");
+
+// If football-data.org ever refuses the all-leagues list (e.g. a plan
+// change), stop asking for it for a while instead of wasting a request
+// every minute - the per-league requests are used meanwhile.
+let allLeaguesUnsupportedUntil = 0;
 
 function dedupeByMostAdvancedStatus(matches: unknown[]): unknown[] {
   const byId = new Map<string | number, { match: unknown; rank: number }>();
@@ -56,41 +56,104 @@ export async function getMatches(
   const dateFrom = yesterday.toISOString().slice(0, 10);
   const dateTo = today.toISOString().slice(0, 10);
 
-  const requests = requestedCompetitions.flatMap((code) => [
-    ...STATUSES.map((status) =>
-      // LIVE refreshes every minute (scores change). SCHEDULED - the list
-      // of upcoming fixtures - every 10: kickoff times barely change, and
-      // a match that just started already shows up via LIVE (the
-      // dedupe below keeps the more advanced copy). Re-fetching every
-      // league's whole fixture list every minute was a big share of the
-      // 10-requests-a-minute data limit, and running out of it is what
-      // makes pages slow or fail to load.
-      getOrSet(`matches:${code}:${status}`, status === "LIVE" ? 60 * 1000 : 10 * 60 * 1000, async () => {
-        const response = await fetchWithRetry(
-          `https://api.football-data.org/v4/competitions/${code}/matches?status=${status}`,
-          { headers: { "X-Auth-Token": apiKey }, cache: "no-store" }
-        );
-        if (!response.ok) {
-          throw new Error(`football-data.org returned ${response.status}`);
+  // Live and just-finished matches for EVERY league in one request,
+  // shared by everyone: football-data.org's /matches list covers all the
+  // leagues on our plan at once. Asking each league separately (live +
+  // finished, every minute) took up to 16 of the 10 requests a minute the
+  // whole app is allowed - which is what made tables, form and
+  // head-to-head fail to load. Falls back to asking per league if this
+  // combined request ever fails.
+  const recentAll =
+    requestedCompetitions.length === 0 || Date.now() < allLeaguesUnsupportedUntil
+      ? FAILED
+      : await getOrSet(
+    `matches:all:recent:${dateFrom}`,
+    60 * 1000,
+    async () => {
+      const response = await fetchWithRetry(
+        `https://api.football-data.org/v4/matches?dateFrom=${dateFrom}&dateTo=${dateTo}`,
+        { headers: { "X-Auth-Token": apiKey }, cache: "no-store" }
+      );
+      if (!response.ok) {
+        if (response.status === 400 || response.status === 403) {
+          allLeaguesUnsupportedUntil = Date.now() + 6 * 60 * 60 * 1000;
         }
-        return slimMatchesResponse(await response.json());
-      }).catch(() => FAILED)
-    ),
-    getOrSet(
-      `matches:${code}:FINISHED:recent`,
-      60 * 1000,
-      async () => {
-        const response = await fetchWithRetry(
-          `https://api.football-data.org/v4/competitions/${code}/matches?status=FINISHED&dateFrom=${dateFrom}&dateTo=${dateTo}`,
-          { headers: { "X-Auth-Token": apiKey }, cache: "no-store" }
-        );
-        if (!response.ok) {
-          throw new Error(`football-data.org returned ${response.status}`);
-        }
-        return slimMatchesResponse(await response.json());
+        throw new Error(`football-data.org returned ${response.status}`);
       }
-    ).catch(() => FAILED),
+      const all = slimMatchesResponse(await response.json());
+      // Only our leagues (the plan also includes a few others).
+      const slim = {
+        matches: all.matches.filter((m) => COMPETITIONS.includes(String(m.competition.code))),
+      };
+      const liveCodes = new Set<string>();
+      for (const match of slim.matches) {
+        if ((match.status === "IN_PLAY" || match.status === "PAUSED") && match.competition.code) {
+          liveCodes.add(match.competition.code);
+        }
+      }
+      await setLiveCompetitions([...liveCodes]);
+      return slim;
+    }
+  ).catch(() => FAILED);
+
+  const recentForRequested =
+    recentAll === FAILED
+      ? null
+      : {
+          matches: ((recentAll as { matches?: unknown[] }).matches ?? []).filter((match) =>
+            requestedCompetitions.includes(
+              String((match as { competition?: { code?: string } }).competition?.code)
+            )
+          ),
+        };
+
+  const perLeague = (code: string, status: string, url: string, ttlMs: number) =>
+    getOrSet(
+      `matches:${code}:${status}`,
+      ttlMs,
+      async () => {
+        const response = await fetchWithRetry(url, {
+          headers: { "X-Auth-Token": apiKey },
+          cache: "no-store",
+        });
+        if (!response.ok) {
+          throw new Error(`football-data.org returned ${response.status}`);
+        }
+        return slimMatchesResponse(await response.json());
+      },
+      // Upcoming fixtures barely change, so an older saved copy is fine
+      // to show while a fresh one loads. Live scores aren't - those are
+      // always fetched fresh.
+      { serveStale: status === "SCHEDULED" }
+    ).catch(() => FAILED);
+
+  const requests: Promise<unknown>[] = requestedCompetitions.flatMap((code) => [
+    // Upcoming fixtures: every 10 minutes - kickoff times barely change,
+    // and a match that just started already shows up via the live list.
+    perLeague(
+      code,
+      "SCHEDULED",
+      `https://api.football-data.org/v4/competitions/${code}/matches?status=SCHEDULED`,
+      10 * 60 * 1000
+    ),
+    ...(recentForRequested
+      ? []
+      : [
+          perLeague(
+            code,
+            "LIVE",
+            `https://api.football-data.org/v4/competitions/${code}/matches?status=LIVE`,
+            60 * 1000
+          ),
+          perLeague(
+            code,
+            "FINISHED:recent",
+            `https://api.football-data.org/v4/competitions/${code}/matches?status=FINISHED&dateFrom=${dateFrom}&dateTo=${dateTo}`,
+            60 * 1000
+          ),
+        ]),
   ]);
+  if (recentForRequested) requests.push(Promise.resolve(recentForRequested));
 
   const results = await Promise.all(requests);
   // If EVERY request failed (data source unreachable or rate-limited, and

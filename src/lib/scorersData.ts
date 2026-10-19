@@ -33,8 +33,11 @@ async function fetchScorersFromApi(competition: string, apiKey: string) {
  * both always agree on the same cache key/TTL/fetch logic.
  */
 export async function getScorers(competition: string, apiKey: string) {
-  return getOrSet(scorersCacheKey(competition), SCORERS_TTL_MS, () =>
-    fetchScorersFromApi(competition, apiKey)
+  return getOrSet(
+    scorersCacheKey(competition),
+    SCORERS_TTL_MS,
+    () => fetchScorersFromApi(competition, apiKey),
+    { serveStale: true }
   );
 }
 

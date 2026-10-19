@@ -43,7 +43,8 @@ export async function GET(request: Request) {
           throw new Error(`football-data.org returned ${response.status}`);
         }
         return slimMatchesResponse(await response.json());
-      }
+      },
+      { serveStale: true }
     );
     return NextResponse.json(data, { headers: cdnCacheHeaders(180) });
   } catch (error) {

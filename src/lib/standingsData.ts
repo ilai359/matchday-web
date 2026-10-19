@@ -27,7 +27,10 @@ export async function getStandings(competition: string, apiKey: string) {
   // cache - it serves the last known-good table instead of showing
   // nothing if a live request lands during football-data.org's shared
   // rate limit, and never caches the failure itself.
-  return getOrSet(`standings:${competition}`, 60 * 1000, async () => {
+  // 5 minutes: a table only moves when a match ends, and re-asking every
+  // minute for every league was a big slice of the shared 10-a-minute
+  // football-data.org allowance.
+  return getOrSet(`standings:${competition}`, 5 * 60 * 1000, async () => {
     const response = await fetchWithRetry(
       `https://api.football-data.org/v4/competitions/${competition}/standings`,
       { headers: { "X-Auth-Token": apiKey }, cache: "no-store" }
@@ -36,5 +39,5 @@ export async function getStandings(competition: string, apiKey: string) {
       throw new Error(`football-data.org returned ${response.status}`);
     }
     return response.json();
-  });
+  }, { serveStale: true });
 }

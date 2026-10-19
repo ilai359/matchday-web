@@ -33,5 +33,5 @@ export async function getFinishedMatches(
       throw new Error(`football-data.org returned ${response.status}`);
     }
     return slimMatchesResponse(await response.json());
-  });
+  }, { serveStale: true });
 }

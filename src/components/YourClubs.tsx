@@ -52,11 +52,15 @@ export default function YourClubs() {
     () => readPersisted<Record<string, LeagueData>>(cacheKey) === null
   );
 
+  // Bumped to try again shortly when a league's table couldn't be loaded.
+  const [retryCount, setRetryCount] = useState(0);
+
   useEffect(() => {
     if (supportedLeagues.length === 0) {
       return;
     }
     let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
     // If we've saved this exact set of leagues before, show it right
     // away and drop out of the loading state immediately - the fetch
     // below still runs regardless, to quietly bring it up to date.
@@ -75,29 +79,42 @@ export default function YourClubs() {
       supportedLeagues.map(async (league) => {
         const code = LEAGUE_TO_CODE[league];
         const [standings, scorers] = await Promise.all([
-          fetchStandings(code).catch(() => []),
-          fetchScorers(code).catch(() => []),
+          fetchStandings(code).catch(() => null),
+          fetchScorers(code).catch(() => null),
         ]);
-        return [league, { standings, scorers }] as const;
+        return [league, standings, scorers] as const;
       })
     )
       .then((results) => {
         if (cancelled) return;
+        // Something that failed to load keeps what was already showing
+        // (or saved on the phone) instead of being wiped to "No league
+        // info" - and is tried again in a few seconds.
+        const previous = readPersisted<Record<string, LeagueData>>(cacheKey) ?? {};
         const next: Record<string, LeagueData> = {};
-        for (const [league, data] of results) {
-          next[league] = data;
+        let anyFailed = false;
+        for (const [league, standings, scorers] of results) {
+          if (standings === null || scorers === null) anyFailed = true;
+          next[league] = {
+            standings: standings ?? previous[league]?.standings ?? [],
+            scorers: scorers ?? previous[league]?.scorers ?? [],
+          };
         }
         setLeagueData(next);
         writePersisted(cacheKey, next);
+        if (anyFailed && retryCount < 4) {
+          retryTimer = setTimeout(() => setRetryCount((n) => n + 1), 8000 * (retryCount + 1));
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
     return () => {
       cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [leaguesKey, cacheKey]);
+  }, [leaguesKey, cacheKey, retryCount]);
 
   if (followedClubs.length === 0) {
     return null;
