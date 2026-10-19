@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { slimMatch, slimMatchesResponse } from "@/lib/slimFootballData";
 import webpush from "web-push";
 import { fetchWithRetry } from "@/lib/fetchWithRetry";
 import { getOrSet, isCompetitionLive } from "@/lib/cache";
@@ -276,7 +277,7 @@ async function runCheckGoals(): Promise<NextResponse> {
         if (!response.ok) {
           throw new Error(`football-data.org returned ${response.status}`);
         }
-        return response.json();
+        return slimMatchesResponse(await response.json());
       });
       fixtures = ((data as { matches?: RawScheduledMatch[] })?.matches ?? []) as RawScheduledMatch[];
       fixturesByCompetition.set(competition, fixtures);
@@ -341,7 +342,7 @@ async function runCheckGoals(): Promise<NextResponse> {
           if (!response.ok) {
             throw new Error(`football-data.org returned ${response.status}`);
           }
-          return response.json();
+          return slimMatchesResponse(await response.json());
         });
         liveMatches = ((data as { matches?: RawLiveMatch[] })?.matches ?? []) as RawLiveMatch[];
       } catch {
@@ -422,7 +423,7 @@ async function runCheckGoals(): Promise<NextResponse> {
         if (!response.ok) {
           throw new Error(`football-data.org returned ${response.status}`);
         }
-        return response.json() as Promise<RawSingleMatch>;
+        return slimMatch(await response.json()) as RawSingleMatch;
       });
 
       // Only send a full-time alert for a match that's actually

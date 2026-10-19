@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { slimMatch } from "@/lib/slimFootballData";
 import { fetchWithRetry } from "@/lib/fetchWithRetry";
 import { getOrSet } from "@/lib/cache";
 
@@ -37,7 +38,7 @@ export async function GET(request: Request) {
       if (!response.ok) {
         throw new Error(`football-data.org returned ${response.status}`);
       }
-      return response.json();
+      return slimMatch(await response.json());
     });
     return NextResponse.json(data);
   } catch (error) {

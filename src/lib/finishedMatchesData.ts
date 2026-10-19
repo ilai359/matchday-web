@@ -1,4 +1,5 @@
 import { fetchWithRetry } from "@/lib/fetchWithRetry";
+import { slimMatchesResponse } from "@/lib/slimFootballData";
 import { getOrSet } from "@/lib/cache";
 
 /**
@@ -31,6 +32,6 @@ export async function getFinishedMatches(
     if (!response.ok) {
       throw new Error(`football-data.org returned ${response.status}`);
     }
-    return response.json();
+    return slimMatchesResponse(await response.json());
   });
 }
