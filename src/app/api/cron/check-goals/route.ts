@@ -10,6 +10,8 @@ import {
   getRemindedMatchIds,
   markMatchReminded,
   clearMatchReminded,
+  getIdleUntil,
+  setIdleUntil,
 } from "@/lib/goalWatch";
 import { getKnownPositions, setKnownPositions, PositionMap } from "@/lib/tableWatch";
 import { getAllSubscriptions } from "@/lib/pushSubscriptions";
@@ -187,6 +189,12 @@ async function runCheckGoals(): Promise<NextResponse> {
     );
   }
 
+  // Nothing on right now (see the end of this function) - skip this run.
+  const idleUntil = await getIdleUntil();
+  if (Date.now() < idleUntil) {
+    return NextResponse.json({ ok: true, idleUntil: new Date(idleUntil).toISOString() });
+  }
+
   const subscriptions = await getAllSubscriptions();
   let remindersSent = 0;
   let kickoffsSent = 0;
@@ -251,6 +259,7 @@ async function runCheckGoals(): Promise<NextResponse> {
   // live scores at all, the "starting soon" reminders, and whether the
   // round is over for table alerts.
   const fixturesByCompetition = new Map<string, RawScheduledMatch[]>();
+  let anyMightBeLive = false;
 
   await withSection("kickoff/reminder loop", async () => {
   await Promise.all(watchedCompetitions.map(async (competition) => {
@@ -316,6 +325,8 @@ async function runCheckGoals(): Promise<NextResponse> {
         (kickoff > now - 3.5 * 60 * 60 * 1000 && kickoff < now + 20 * 60 * 1000)
       );
     });
+
+    if (mightBeLive) anyMightBeLive = true;
 
     let liveMatches: RawLiveMatch[] = [];
     if (mightBeLive) {
@@ -628,8 +639,32 @@ async function runCheckGoals(): Promise<NextResponse> {
     console.error("check-goals: news warm-up failed", error);
   }
 
+  // When nothing is on - no match about to start or being played, nothing
+  // being tracked, and every league's fixtures loaded fine - the next runs
+  // can be skipped until 20 minutes before the next kickoff (in time for
+  // its "starting soon" reminder), and at most 30 minutes, so fixtures,
+  // tables and followed clubs still get re-checked regularly. Most of the
+  // day this turns the every-5-minutes job into one cheap read.
+  let nextIdleUntil = 0;
+  if (!anyMightBeLive && previouslyStarted.size === 0 && fixturesUnknown.size === 0) {
+    const now = Date.now();
+    let earliestKickoff = Infinity;
+    for (const list of fixturesByCompetition.values()) {
+      for (const match of list) {
+        if (match.status !== "SCHEDULED" && match.status !== "TIMED") continue;
+        const kickoff = new Date(match.utcDate).getTime();
+        if (kickoff > now && kickoff < earliestKickoff) earliestKickoff = kickoff;
+      }
+    }
+    nextIdleUntil = Math.min(earliestKickoff - 20 * 60 * 1000, now + 30 * 60 * 1000);
+    if (nextIdleUntil > now) {
+      await setIdleUntil(nextIdleUntil);
+    }
+  }
+
   return NextResponse.json({
     ok: true,
+    idleUntil: nextIdleUntil > Date.now() ? new Date(nextIdleUntil).toISOString() : null,
     remindersSent,
     kickoffsSent,
     fullTimesSent,

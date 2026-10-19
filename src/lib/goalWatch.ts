@@ -27,7 +27,7 @@ import { Redis } from "@upstash/redis";
 const redisUrl = process.env.UPSTASH_REDIS_REST_URL;
 const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
 const redis =
-  redisUrl && redisToken ? new Redis({ url: redisUrl, token: redisToken }) : null;
+  redisUrl && redisToken ? new Redis({ url: redisUrl, token: redisToken, retry: { retries: 1, backoff: () => 100 } }) : null;
 
 const memoryStarted = new Set<string>();
 const memoryReminded = new Set<string>();
@@ -124,4 +124,32 @@ export async function clearMatchReminded(matchId: string): Promise<void> {
     }
   }
   memoryReminded.delete(matchId);
+}
+
+const IDLE_UNTIL_KEY = "goalwatch:idle-until";
+
+/**
+ * When nothing is on, the 5-minute alert check can skip its whole run
+ * until this time (a timestamp in ms) - one cheap read instead of a full
+ * run. Keeps the cache's free monthly allowance from being used up by
+ * runs that have nothing to do. 0 if not set or unreadable.
+ */
+export async function getIdleUntil(): Promise<number> {
+  if (!redis) return 0;
+  try {
+    const value = await redis.get<number | string>(IDLE_UNTIL_KEY);
+    const asNumber = Number(value);
+    return Number.isFinite(asNumber) ? asNumber : 0;
+  } catch {
+    return 0;
+  }
+}
+
+export async function setIdleUntil(timestamp: number): Promise<void> {
+  if (!redis) return;
+  try {
+    await redis.set(IDLE_UNTIL_KEY, timestamp, { px: Math.max(1000, timestamp - Date.now()) });
+  } catch {
+    // Not saved - the next run just does a full check, nothing breaks.
+  }
 }

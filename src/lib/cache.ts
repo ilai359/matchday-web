@@ -66,7 +66,13 @@ const redisUrl = process.env.UPSTASH_REDIS_REST_URL;
 const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
 
 const redis =
-  redisUrl && redisToken ? new Redis({ url: redisUrl, token: redisToken }) : null;
+  redisUrl && redisToken
+    ? new Redis({ url: redisUrl, token: redisToken, retry: { retries: 1, backoff: () => 100 } })
+    : null;
+
+// Set after a Redis call fails - until then getOrSet uses the in-memory
+// cache instead (see the comment inside getOrSet).
+let redisDownUntil = 0;
 
 /**
  * Returns a cached value for `key` if it hasn't expired yet. Otherwise
@@ -95,27 +101,36 @@ export async function getOrSet<T>(
 
   const promise = (async () => {
     try {
-      if (redis) {
+      // If the cache recently failed (e.g. its free monthly allowance ran
+      // out), skip it for a minute and work from this server's own memory
+      // instead, rather than paying for a failing round trip on every
+      // single request - that's what made every screen slow.
+      let redisUsable = Boolean(redis) && Date.now() >= redisDownUntil;
+      let cachedFromRedis: T | null | undefined;
+      if (redisUsable && redis) {
+        try {
+          cachedFromRedis = await redis.get<T>(key);
+        } catch (redisError) {
+          console.error(
+            `getOrSet: Redis GET failed for key "${key}" - using in-memory cache for the next minute`,
+            redisError
+          );
+          redisDownUntil = Date.now() + 60_000;
+          redisUsable = false;
+        }
+      }
+
+      if (redisUsable && redis) {
+        if (cachedFromRedis !== null && cachedFromRedis !== undefined) {
+          // Also kept in memory, so if the cache goes down later this
+          // server still has something to show.
+          lastGood.set(key, cachedFromRedis);
+          return cachedFromRedis;
+        }
         // A second, never-expiring copy of the last value that fetched
         // successfully. Consulted only as a fallback when a live fetch
         // fails and the normal (TTL'd) key is empty or expired.
         const staleKey = `stale:${key}`;
-
-        try {
-          const cached = await redis.get<T>(key);
-          if (cached !== null && cached !== undefined) {
-            return cached;
-          }
-        } catch (redisError) {
-          // Reading the cache failed - not fatal, just means we can't
-          // skip the real fetch this time. Logged so this is visible in
-          // Vercel's Logs instead of only showing up as a generic 500
-          // with no clue why.
-          console.error(
-            `getOrSet: Redis GET failed for key "${key}", fetching directly instead`,
-            redisError
-          );
-        }
 
         try {
           const value = await fetcher();
@@ -138,6 +153,8 @@ export async function getOrSet<T>(
             );
           }
 
+          store.set(key, { value, expiresAt: Date.now() + ttlMs });
+          lastGood.set(key, value);
           return value;
         } catch (fetchError) {
           // The live fetch itself failed - most likely football-data.org's
@@ -158,6 +175,8 @@ export async function getOrSet<T>(
               redisError
             );
           }
+          // Last resort: a copy this server kept in memory.
+          if (lastGood.has(key)) return lastGood.get(key) as T;
           // No fresh data and no stale fallback either - genuinely
           // nothing to serve.
           throw fetchError;

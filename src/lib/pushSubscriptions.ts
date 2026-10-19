@@ -20,7 +20,7 @@ import crypto from "crypto";
 const redisUrl = process.env.UPSTASH_REDIS_REST_URL;
 const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
 const redis =
-  redisUrl && redisToken ? new Redis({ url: redisUrl, token: redisToken }) : null;
+  redisUrl && redisToken ? new Redis({ url: redisUrl, token: redisToken, retry: { retries: 1, backoff: () => 100 } }) : null;
 
 export type StoredPushSubscription = {
   endpoint: string;

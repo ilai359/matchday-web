@@ -28,7 +28,7 @@ const MAX_AGE_MS = 4 * 24 * 60 * 60 * 1000;
 const redisUrl = process.env.UPSTASH_REDIS_REST_URL;
 const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN;
 const redis =
-  redisUrl && redisToken ? new Redis({ url: redisUrl, token: redisToken }) : null;
+  redisUrl && redisToken ? new Redis({ url: redisUrl, token: redisToken, retry: { retries: 1, backoff: () => 100 } }) : null;
 
 // In-memory fallback for local dev without Redis configured - fine for a
 // single process, just not shared across server instances (same caveat
