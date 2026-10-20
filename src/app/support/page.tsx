@@ -33,10 +33,10 @@ export default function Support() {
               Clubside is a one-person project. If something&apos;s broken,
               a score looks wrong, or you have an idea for the app, email{" "}
               <a
-                href="mailto:kugelmann.ilai@gmail.com"
+                href="mailto:tidewavegames@gmail.com"
                 className="font-bold text-[#111318] underline dark:text-white"
               >
-                kugelmann.ilai@gmail.com
+                tidewavegames@gmail.com
               </a>{" "}
               and I&apos;ll get back to you.
             </p>
