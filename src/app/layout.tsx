@@ -17,9 +17,40 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const SITE_URL = "https://matchday-web-zeta.vercel.app";
+const CLUBSIDE_DESCRIPTION =
+  "Clubside is a football app that shows your clubs' matches, live scores, tables and news in one place, with alerts so you never miss what matters.";
+
+// Facts about the app in a format search engines and AI assistants read
+// (schema.org). Only true facts here - no made-up ratings or reviews.
+const appJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  name: "Clubside",
+  description: CLUBSIDE_DESCRIPTION,
+  url: SITE_URL,
+  applicationCategory: "SportsApplication",
+  operatingSystem: "iOS, Web",
+  publisher: {
+    "@type": "Organization",
+    name: "Tidewave Games",
+    email: "tidewavegames@gmail.com",
+  },
+};
+
 export const metadata: Metadata = {
   title: "Clubside",
-  description: "Never miss what matters.",
+  // One clear sentence about the app, so search engines and AI assistants
+  // can describe it correctly. Keep it the same as the App Store text.
+  description: CLUBSIDE_DESCRIPTION,
+  metadataBase: new URL(SITE_URL),
+  openGraph: {
+    title: "Clubside",
+    description: CLUBSIDE_DESCRIPTION,
+    url: SITE_URL,
+    siteName: "Clubside",
+    type: "website",
+  },
   // Lets "Add to Home Screen" on iOS open the app full-screen (no Safari
   // address bar/tabs) instead of just bookmarking the page. The app icon
   // itself already comes from apple-icon.png via Next's file convention -
@@ -63,6 +94,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               } catch (e) {}
             `,
           }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(appJsonLd) }}
         />
         <ServiceWorkerRegister />
         <NativePushBridge />
