@@ -1,5 +1,7 @@
 import { fetchWithRetry } from "@/lib/fetchWithRetry";
-import { slimMatchesResponse } from "@/lib/slimFootballData";
+import { slimMatchesResponse, slimMatch } from "@/lib/slimFootballData";
+
+type SlimMatch = ReturnType<typeof slimMatch>;
 import { getOrSet, setLiveCompetitions } from "@/lib/cache";
 import { COMPETITIONS } from "@/lib/competitions";
 
@@ -22,6 +24,59 @@ const FAILED = Symbol("failed");
 // change), stop asking for it for a while instead of wasting a request
 // every minute - the per-league requests are used meanwhile.
 let allLeaguesUnsupportedUntil = 0;
+
+// The window of "recent" matches: yesterday, today and tomorrow. Asking
+// football-data.org's all-leagues list for "yesterday to today" left
+// today's own matches out, which is why matches being played right now
+// (and ones that finished earlier today) vanished from the app once the
+// live list started coming from this request. Ending the range at
+// tomorrow always includes today.
+function recentWindow(): { dateFrom: string; dateTo: string } {
+  const now = Date.now();
+  return {
+    dateFrom: new Date(now - 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+    dateTo: new Date(now + 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+  };
+}
+
+/**
+ * Every live, just-finished and today's upcoming match in all of our
+ * leagues, from ONE football-data.org request shared by everyone (cached
+ * for a minute). Used by the Matches page and by the notification check,
+ * so both see the same matches at the same moment - two games kicking off
+ * at once are noticed together.
+ */
+export async function getRecentAllMatches(apiKey: string): Promise<{ matches: SlimMatch[] }> {
+  if (Date.now() < allLeaguesUnsupportedUntil) {
+    throw new Error("All-leagues match list unavailable");
+  }
+  const { dateFrom, dateTo } = recentWindow();
+  return getOrSet(`matches:all:window:${dateFrom}`, 60 * 1000, async () => {
+    const response = await fetchWithRetry(
+      `https://api.football-data.org/v4/matches?dateFrom=${dateFrom}&dateTo=${dateTo}`,
+      { headers: { "X-Auth-Token": apiKey }, cache: "no-store" }
+    );
+    if (!response.ok) {
+      if (response.status === 400 || response.status === 403) {
+        allLeaguesUnsupportedUntil = Date.now() + 6 * 60 * 60 * 1000;
+      }
+      throw new Error(`football-data.org returned ${response.status}`);
+    }
+    const all = slimMatchesResponse(await response.json());
+    // Only our leagues (the plan also includes a few others).
+    const slim = {
+      matches: all.matches.filter((m) => COMPETITIONS.includes(String(m.competition.code))),
+    };
+    const liveCodes = new Set<string>();
+    for (const match of slim.matches) {
+      if ((match.status === "IN_PLAY" || match.status === "PAUSED") && match.competition.code) {
+        liveCodes.add(match.competition.code);
+      }
+    }
+    await setLiveCompetitions([...liveCodes]);
+    return slim;
+  });
+}
 
 function dedupeByMostAdvancedStatus(matches: unknown[]): unknown[] {
   const byId = new Map<string | number, { match: unknown; rank: number }>();
@@ -51,50 +106,10 @@ export async function getMatches(
     COMPETITIONS.includes(code)
   );
 
-  const today = new Date();
-  const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
-  const dateFrom = yesterday.toISOString().slice(0, 10);
-  const dateTo = today.toISOString().slice(0, 10);
-
-  // Live and just-finished matches for EVERY league in one request,
-  // shared by everyone: football-data.org's /matches list covers all the
-  // leagues on our plan at once. Asking each league separately (live +
-  // finished, every minute) took up to 16 of the 10 requests a minute the
-  // whole app is allowed - which is what made tables, form and
-  // head-to-head fail to load. Falls back to asking per league if this
-  // combined request ever fails.
   const recentAll =
-    requestedCompetitions.length === 0 || Date.now() < allLeaguesUnsupportedUntil
+    requestedCompetitions.length === 0
       ? FAILED
-      : await getOrSet(
-    `matches:all:recent:${dateFrom}`,
-    60 * 1000,
-    async () => {
-      const response = await fetchWithRetry(
-        `https://api.football-data.org/v4/matches?dateFrom=${dateFrom}&dateTo=${dateTo}`,
-        { headers: { "X-Auth-Token": apiKey }, cache: "no-store" }
-      );
-      if (!response.ok) {
-        if (response.status === 400 || response.status === 403) {
-          allLeaguesUnsupportedUntil = Date.now() + 6 * 60 * 60 * 1000;
-        }
-        throw new Error(`football-data.org returned ${response.status}`);
-      }
-      const all = slimMatchesResponse(await response.json());
-      // Only our leagues (the plan also includes a few others).
-      const slim = {
-        matches: all.matches.filter((m) => COMPETITIONS.includes(String(m.competition.code))),
-      };
-      const liveCodes = new Set<string>();
-      for (const match of slim.matches) {
-        if ((match.status === "IN_PLAY" || match.status === "PAUSED") && match.competition.code) {
-          liveCodes.add(match.competition.code);
-        }
-      }
-      await setLiveCompetitions([...liveCodes]);
-      return slim;
-    }
-  ).catch(() => FAILED);
+      : await getRecentAllMatches(apiKey).catch(() => FAILED);
 
   const recentForRequested =
     recentAll === FAILED
@@ -106,6 +121,8 @@ export async function getMatches(
             )
           ),
         };
+
+  const { dateFrom, dateTo } = recentWindow();
 
   const perLeague = (code: string, status: string, url: string, ttlMs: number) =>
     getOrSet(

@@ -3,6 +3,7 @@ import { slimMatch, slimMatchesResponse } from "@/lib/slimFootballData";
 import webpush from "web-push";
 import { fetchWithRetry } from "@/lib/fetchWithRetry";
 import { getOrSet, isCompetitionLive } from "@/lib/cache";
+import { getRecentAllMatches } from "@/lib/matchesData";
 import { matchClubId, leaguesToCodes } from "@/lib/footballApi";
 import {
   getStartedMatchIds,
@@ -85,6 +86,7 @@ type RawScheduledMatch = {
 };
 
 type RawSingleMatch = {
+  id?: number;
   score?: { fullTime?: { home: number | null; away: number | null } };
   status?: string;
   homeTeam?: RawTeam;
@@ -102,11 +104,9 @@ type RawStandingsResponse = {
   standings?: { type: string; table: RawStandingsRow[] }[];
 };
 
-// How long before kickoff the "starting soon" reminder goes out. The
-// job runs roughly every 5 minutes, so a scheduled match's minutes-
-// until-kickoff will land somewhere inside this window at least once
-// before it starts - the alert isn't sent at exactly 15:00 to go, just
-// the first time it's checked and found to be 15 minutes or less away.
+// How long before kickoff the "starting soon" reminder goes out: the
+// first time the job (run every minute by cron-job.org) finds the match
+// 15 minutes or less away. The alert says how many minutes are left.
 const REMINDER_WINDOW_MINUTES = 15;
 
 // Wraps one phase of runCheckGoals so that if something inside it
@@ -271,7 +271,10 @@ async function runCheckGoals(): Promise<NextResponse> {
   const fixturesByCompetition = new Map<string, RawScheduledMatch[]>();
   let anyMightBeLive = false;
 
-  await withSection("kickoff/reminder loop", async () => {
+  // Competitions where a match could be in play right now (see below).
+  const competitionsMaybeLive = new Set<string>();
+
+  await withSection("fixtures/reminder loop", async () => {
   await Promise.all(watchedCompetitions.map(async (competition) => {
     const now = Date.now();
     let fixtures: RawScheduledMatch[];
@@ -321,13 +324,10 @@ async function runCheckGoals(): Promise<NextResponse> {
       roundStillGoing.add(competition);
     }
 
-    // Only spend a live-score request on this competition when a match in
-    // it could actually be in play: kicking off in the next 20 minutes,
+    // A match here could be in play: kicking off in the next 20 minutes,
     // kicked off in the last 3.5 hours, or already being tracked as
-    // started. Most of the day nothing is on, and this job (which runs
-    // every 5 minutes) used to ask football-data.org for live scores in
-    // every followed league on every single run anyway - using up the
-    // same 10-requests-a-minute limit the app's own pages depend on.
+    // started. Most of the day nothing is on, and then no live-score
+    // request is made at all.
     const mightBeLive = fixtures.some((match) => {
       const kickoff = kickoffOf(match);
       return (
@@ -335,55 +335,9 @@ async function runCheckGoals(): Promise<NextResponse> {
         (kickoff > now - 3.5 * 60 * 60 * 1000 && kickoff < now + 20 * 60 * 1000)
       );
     });
-
-    if (mightBeLive) anyMightBeLive = true;
-
-    let liveMatches: RawLiveMatch[] = [];
     if (mightBeLive) {
-      try {
-        // Shared with /api/matches, which caches the raw football-data.org
-        // response object ({ matches: [...] }) under this same key.
-        const data = await getOrSet(`matches:${competition}:LIVE`, 60 * 1000, async () => {
-          const response = await fetchWithRetry(
-            `https://api.football-data.org/v4/competitions/${competition}/matches?status=LIVE`,
-            { headers: { "X-Auth-Token": apiKey }, cache: "no-store" }
-          );
-          if (!response.ok) {
-            throw new Error(`football-data.org returned ${response.status}`);
-          }
-          return slimMatchesResponse(await response.json());
-        });
-        liveMatches = ((data as { matches?: RawLiveMatch[] })?.matches ?? []) as RawLiveMatch[];
-      } catch {
-        // Live check failed (most likely a rate limit) - try again next
-        // run. Tracked matches stay tracked, so nothing is lost or
-        // falsely announced.
-        liveMatches = [];
-      }
-    }
-
-    for (const match of liveMatches) {
-      const matchId = String(match.id);
-      stillLiveIds.add(matchId);
-      liveMatchesById.set(matchId, match);
-
-      if (previouslyStarted.has(matchId)) continue;
-
-      // First time we've seen this match in the LIVE list - it just
-      // kicked off.
-      await markMatchStarted(matchId);
-      await clearMatchReminded(matchId);
-      kickoffsSent += 1;
-
-      const homeClubId = matchClubId(match.homeTeam.name);
-      const awayClubId = matchClubId(match.awayTeam.name);
-      const clubIds = [homeClubId, awayClubId].filter((id): id is string => id !== null);
-      await notifySubscribers(
-        clubIds,
-        `⚽ Kickoff: ${match.homeTeam.name} vs ${match.awayTeam.name}`,
-        `${match.competition.name} is underway`,
-        `/match/${matchId}`
-      );
+      anyMightBeLive = true;
+      competitionsMaybeLive.add(competition);
     }
 
     for (const match of fixtures) {
@@ -402,38 +356,118 @@ async function runCheckGoals(): Promise<NextResponse> {
       const homeClubId = matchClubId(match.homeTeam.name);
       const awayClubId = matchClubId(match.awayTeam.name);
       const clubIds = [homeClubId, awayClubId].filter((id): id is string => id !== null);
+      const minutesLeft = Math.max(1, Math.round(minutesUntilKickoff));
       await notifySubscribers(
         clubIds,
         `⏰ Starting soon: ${match.homeTeam.name} vs ${match.awayTeam.name}`,
-        `${match.competition.name} kicks off shortly`,
+        `${match.competition.name} · kicks off in ${minutesLeft} min`,
         `/match/${matchId}`
       );
     }
-
   }));
   });
 
-  // Any match that was tracked as started last run, but isn't in any
-  // competition's LIVE list this run, has left play - either finished,
-  // or postponed/abandoned. Either way, look up its current state once
-  // (not repeatedly) to get the real final score and send the full-time
-  // alert, then stop tracking it.
+  // Live scores for EVERY followed league from one request (the same
+  // shared list the Matches page uses), so matches that kick off at the
+  // same time are noticed in the same run, and finished ones are seen
+  // straight away. Asking each league separately used to spread over
+  // several runs when the per-minute request allowance ran short, so the
+  // second of two simultaneous kickoffs arrived minutes after the first.
+  const finishedById = new Map<string, RawSingleMatch>();
+  await withSection("live loop", async () => {
+    if (!anyMightBeLive) return;
+
+    const liveMatches: RawLiveMatch[] = [];
+    let gotLiveList = false;
+    try {
+      const recent = await getRecentAllMatches(apiKey);
+      for (const match of recent.matches) {
+        const code = String(match.competition.code);
+        if (!competitionsMaybeLive.has(code) && !previouslyStarted.has(String(match.id))) continue;
+        if (match.status === "IN_PLAY" || match.status === "PAUSED") {
+          liveMatches.push(match as unknown as RawLiveMatch);
+        } else if (match.status === "FINISHED") {
+          finishedById.set(String(match.id), match as unknown as RawSingleMatch);
+        }
+      }
+      gotLiveList = true;
+    } catch {
+      // The shared list couldn't be loaded - fall back to asking each
+      // league that might be live, like before.
+    }
+
+    if (!gotLiveList) {
+      await Promise.all(Array.from(competitionsMaybeLive).map(async (competition) => {
+        try {
+          const data = await getOrSet(`matches:${competition}:LIVE`, 60 * 1000, async () => {
+            const response = await fetchWithRetry(
+              `https://api.football-data.org/v4/competitions/${competition}/matches?status=LIVE`,
+              { headers: { "X-Auth-Token": apiKey }, cache: "no-store" }
+            );
+            if (!response.ok) {
+              throw new Error(`football-data.org returned ${response.status}`);
+            }
+            return slimMatchesResponse(await response.json());
+          });
+          liveMatches.push(...(((data as { matches?: RawLiveMatch[] })?.matches ?? []) as RawLiveMatch[]));
+        } catch {
+          // Live check failed (most likely a rate limit) - try again next
+          // run. Tracked matches stay tracked, so nothing is lost or
+          // falsely announced.
+          for (const match of fixturesByCompetition.get(competition) ?? []) {
+            if (previouslyStarted.has(String(match.id))) stillLiveIds.add(String(match.id));
+          }
+        }
+      }));
+    }
+
+    // Send every kickoff found in this run together.
+    const newKickoffs = liveMatches.filter((match) => {
+      const matchId = String(match.id);
+      stillLiveIds.add(matchId);
+      liveMatchesById.set(matchId, match);
+      return !previouslyStarted.has(matchId);
+    });
+    await Promise.all(newKickoffs.map(async (match) => {
+      const matchId = String(match.id);
+      await markMatchStarted(matchId);
+      await clearMatchReminded(matchId);
+      kickoffsSent += 1;
+
+      const homeClubId = matchClubId(match.homeTeam.name);
+      const awayClubId = matchClubId(match.awayTeam.name);
+      const clubIds = [homeClubId, awayClubId].filter((id): id is string => id !== null);
+      await notifySubscribers(
+        clubIds,
+        `⚽ Kickoff: ${match.homeTeam.name} vs ${match.awayTeam.name}`,
+        `${match.competition.name} · the match has started`,
+        `/match/${matchId}`
+      );
+    }));
+  });
+
+  // Any match that was tracked as started last run, but isn't live this
+  // run, has left play - either finished, or postponed/abandoned. Its
+  // final state usually comes straight from the shared list above; only
+  // if it isn't there is it looked up on its own, once.
   await withSection("full-time loop", async () => {
   await Promise.all(Array.from(previouslyStarted).map(async (matchId) => {
     if (stillLiveIds.has(matchId)) return;
 
     const liveMatch = liveMatchesById.get(matchId);
     try {
-      const single = await getOrSet(`match-live:${matchId}`, 30 * 1000, async () => {
-        const response = await fetchWithRetry(
-          `https://api.football-data.org/v4/matches/${matchId}`,
-          { headers: { "X-Auth-Token": apiKey }, cache: "no-store" }
-        );
-        if (!response.ok) {
-          throw new Error(`football-data.org returned ${response.status}`);
-        }
-        return slimMatch(await response.json()) as RawSingleMatch;
-      });
+      const single =
+        finishedById.get(matchId) ??
+        (await getOrSet(`match-live:${matchId}`, 30 * 1000, async () => {
+          const response = await fetchWithRetry(
+            `https://api.football-data.org/v4/matches/${matchId}`,
+            { headers: { "X-Auth-Token": apiKey }, cache: "no-store" }
+          );
+          if (!response.ok) {
+            throw new Error(`football-data.org returned ${response.status}`);
+          }
+          return slimMatch(await response.json()) as RawSingleMatch;
+        }));
 
       // Only send a full-time alert for a match that's actually
       // finished - not one that was merely postponed, suspended, or
@@ -441,13 +475,6 @@ async function runCheckGoals(): Promise<NextResponse> {
       if (single.status === "FINISHED") {
         const homeScore = single.score?.fullTime?.home ?? null;
         const awayScore = single.score?.fullTime?.away ?? null;
-        // Read team names/competition straight off this single-match
-        // lookup (the real API always includes them) rather than
-        // liveMatchesById, which only ever holds matches that are STILL
-        // live as of this run - a match that just finished is, by
-        // definition, never in it. Falling back to `liveMatch` here only
-        // covers the (never expected) case where the API response itself
-        // is missing these fields.
         const homeTeam = single.homeTeam ?? liveMatch?.homeTeam;
         const awayTeam = single.awayTeam ?? liveMatch?.awayTeam;
         const competitionName = single.competition?.name ?? liveMatch?.competition.name;
@@ -456,27 +483,31 @@ async function runCheckGoals(): Promise<NextResponse> {
           const homeClubId = matchClubId(homeTeam.name);
           const awayClubId = matchClubId(awayTeam.name);
           const clubIds = [homeClubId, awayClubId].filter((id): id is string => id !== null);
+          // Say plainly who won, so the alert makes sense at a glance.
+          const outcome =
+            homeScore > awayScore
+              ? `${homeTeam.name} win`
+              : awayScore > homeScore
+                ? `${awayTeam.name} win`
+                : "It ends in a draw";
           await notifySubscribers(
             clubIds,
             `🏁 Full time: ${homeTeam.name} ${homeScore}-${awayScore} ${awayTeam.name}`,
-            `${competitionName} · final score`,
+            `${outcome} · ${competitionName}`,
             `/match/${matchId}`
           );
         }
         // Refresh this competition's top-scorers cache right away -
-        // see scorersData.ts. single.competition?.code is football-
-        // data.org's own short code (e.g. "PL"), the same ones used as
-        // cache keys everywhere else in this app, so no lookup/mapping
-        // is needed here.
+        // see scorersData.ts.
         if (single.competition?.code) {
           await refreshScorersAfterMatch(single.competition.code, apiKey);
         }
       }
       // Only stop tracking a match once it has really left play
       // (finished, postponed, cancelled...). If it's still in play - e.g.
-      // its competition's live list just failed to load this run - keep
-      // tracking it, otherwise the next run would see it "kick off" again
-      // and send a second kickoff alert.
+      // the live list just failed to load this run - keep tracking it,
+      // otherwise the next run would see it "kick off" again and send a
+      // second kickoff alert.
       const stillInPlay =
         single.status === "IN_PLAY" ||
         single.status === "PAUSED" ||
