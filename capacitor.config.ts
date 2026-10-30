@@ -17,6 +17,9 @@ const config: CapacitorConfig = {
   server: {
     url: "https://matchday-web-zeta.vercel.app",
     cleartext: false,
+    // Shown instead of an error when the site can't load (no internet):
+    // the clubs and matches saved on the phone, and a Try again button.
+    errorPath: "offline.html",
   },
   ios: {
     contentInset: "automatic",
@@ -26,7 +29,10 @@ const config: CapacitorConfig = {
   // (see AppDelegate.swift) - pushClient.ts only turns on app
   // notifications when it sees this marker. Bump the number if a future
   // build changes how native push works.
-  appendUserAgent: "ClubsideNativePush/1",
+  // "ClubsideApp/3" (build 3 and later) tells the site this build has
+  // Clubside's own native features - widget, calendar, vibrations, share
+  // sheet (see src/lib/nativeApp.ts).
+  appendUserAgent: "ClubsideNativePush/1 ClubsideApp/3",
   plugins: {
     PushNotifications: {
       // Show alerts even while the app is open on screen, not only when

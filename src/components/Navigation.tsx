@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { haptic } from "../lib/nativeApp";
 import { usePathname } from "next/navigation";
 import { useClubs } from "../context/ClubsContext";
 import { getClub } from "../lib/clubHelpers";
@@ -97,6 +98,9 @@ export default function Navigation() {
             <Link
               key={tab.href}
               href={tab.href}
+              onClick={() => {
+                if (!isActive) haptic("selection");
+              }}
               onMouseEnter={
                 tab.href === "/" || tab.href === "/matches"
                   ? () => prefetchMatches(followedLeagueCodes)

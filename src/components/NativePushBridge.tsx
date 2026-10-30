@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { isNativePushApp, refreshNativePushToken } from "../lib/pushClient";
+import { haptic } from "../lib/nativeApp";
 
 // iPhone app only (a no-op in browsers): when someone taps a goal/kickoff
 // notification, open the match it's about - the server puts that page's
@@ -16,6 +17,19 @@ export default function NativePushBridge() {
 
     let removed = false;
     let handle: { remove: () => Promise<void> } | null = null;
+    let receivedHandle: { remove: () => Promise<void> } | null = null;
+
+    import("@capacitor/push-notifications")
+      .then(({ PushNotifications }) =>
+        PushNotifications.addListener("pushNotificationReceived", () => {
+          haptic("success");
+        })
+      )
+      .then((h) => {
+        if (removed) h.remove().catch(() => {});
+        else receivedHandle = h;
+      })
+      .catch(() => {});
 
     import("@capacitor/push-notifications")
       .then(({ PushNotifications }) =>
@@ -38,6 +52,7 @@ export default function NativePushBridge() {
     return () => {
       removed = true;
       handle?.remove().catch(() => {});
+      receivedHandle?.remove().catch(() => {});
     };
   }, [router]);
 

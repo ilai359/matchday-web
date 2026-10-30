@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Clubside · Offline</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: #0B0E16; color: #fff;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; }
+  main { min-height: 100vh; padding: calc(env(safe-area-inset-top) + 28px) 20px calc(env(safe-area-inset-bottom) + 28px); }
+  .brand { font-size: 13px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: rgba(255,255,255,.45); }
+  h1 { margin: 10px 0 6px; font-size: 28px; font-weight: 900; letter-spacing: -.02em; }
+  .sub { margin: 0 0 22px; font-size: 14px; line-height: 1.45; color: rgba(255,255,255,.65); }
+  button { width: 100%; border: 0; border-radius: 16px; padding: 15px; font-size: 15px; font-weight: 800;
+    color: #0B0E16; background: #fff; }
+  button:active { transform: scale(.98); }
+  h2 { margin: 28px 0 10px; font-size: 12px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; color: rgba(255,255,255,.45); }
+  .card { position: relative; overflow: hidden; margin-bottom: 10px; padding: 14px 14px 14px 18px; border-radius: 18px; background: #151a27; }
+  .card::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: var(--c, #3b82f6); }
+  .club { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 900; }
+  .club img { width: 22px; height: 22px; object-fit: contain; }
+  .line { margin-top: 8px; font-size: 14px; font-weight: 700; }
+  .meta { margin-top: 3px; font-size: 12px; color: rgba(255,255,255,.5); }
+  .live { color: #ff4545; }
+  .saved { margin-top: 18px; font-size: 12px; color: rgba(255,255,255,.4); text-align: center; }
+</style>
+</head>
+<body>
+<main>
+  <div class="brand">Clubside</div>
+  <h1>You're offline</h1>
+  <p class="sub">No internet right now. Here's what Clubside saved for your clubs. It opens again by itself when you're back online.</p>
+  <button id="retry" type="button">Try again</button>
+  <div id="clubs"></div>
+  <div class="saved" id="saved"></div>
+</main>
+<script>
+  var SITE = "https://matchday-web-zeta.vercel.app/";
+  function retry() { window.location.href = SITE; }
+  document.getElementById("retry").addEventListener("click", function () {
+    haptic("light");
+    retry();
+  });
+  window.addEventListener("online", retry);
+
+  function plugin() {
+    var cap = window.Capacitor;
+    if (!cap) return null;
+    try {
+      if (cap.registerPlugin) return cap.registerPlugin("ClubsideNative");
+    } catch (e) {}
+    return cap.Plugins ? cap.Plugins.ClubsideNative : null;
+  }
+  var native = plugin();
+  function haptic(style) {
+    try { if (native) native.haptic({ style: style }).catch(function () {}); } catch (e) {}
+  }
+
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function team(t) { return esc((t && (t.shortName || t.name)) || ""); }
+  function when(iso) {
+    var d = new Date(iso);
+    if (isNaN(d)) return "";
+    return d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" }) +
+      " · " + d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  }
+  function score(m) { return (m.homeScore == null ? 0 : m.homeScore) + "–" + (m.awayScore == null ? 0 : m.awayScore); }
+
+  function render(json) {
+    var data;
+    try { data = JSON.parse(json); } catch (e) { return; }
+    var clubs = (data && data.payload && data.payload.clubs) || [];
+    if (!clubs.length) return;
+    var html = "<h2>Your clubs</h2>";
+    clubs.forEach(function (c) {
+      var line = "", meta = "";
+      if (c.last) {
+        line = team(c.last.home) + " " + score(c.last) + " " + team(c.last.away);
+        meta = "Last result · " + esc(c.last.competition);
+      }
+      var next = "";
+      if (c.next) {
+        next = '<div class="line">' + team(c.next.home) + " vs " + team(c.next.away) + "</div>" +
+          '<div class="meta">Next · ' + esc(when(c.next.utcDate)) + " · " + esc(c.next.competition) + "</div>";
+      }
+      html += '<div class="card" style="--c:' + esc(c.color) + '">' +
+        '<div class="club">' + (c.crest ? '<img alt="" src="' + esc(c.crest) + '" onerror="this.remove()">' : "") + esc(c.name) + "</div>" +
+        (line ? '<div class="line">' + line + '</div><div class="meta">' + meta + "</div>" : "") +
+        next + "</div>";
+    });
+    document.getElementById("clubs").innerHTML = html;
+    if (data.payload.generatedAt) {
+      var t = new Date(data.payload.generatedAt);
+      if (!isNaN(t)) document.getElementById("saved").textContent =
+        "Saved " + t.toLocaleString(undefined, { weekday: "short", hour: "2-digit", minute: "2-digit" });
+    }
+  }
+
+  if (native) {
+    try {
+      native.getWidgetData().then(function (r) { if (r && r.json) render(r.json); }).catch(function () {});
+    } catch (e) {}
+  }
+</script>
+</body>
+</html>

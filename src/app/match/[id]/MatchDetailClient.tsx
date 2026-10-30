@@ -2,12 +2,18 @@
 
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { matches } from "../../../data/matches";
 import { useClubs } from "../../../context/ClubsContext";
 import { getClub, getClubName } from "../../../lib/clubHelpers";
 import { getRememberedMatch } from "../../../lib/clientCache";
 import { createMatchShareImage, shareOrDownloadImage } from "../../../lib/shareImage";
+import {
+  addMatchToCalendar,
+  downloadCalendarFile,
+  hasNativeFeatures,
+  haptic,
+} from "../../../lib/nativeApp";
 import {
   formatFullDate,
   formatFullDateWithYear,
@@ -518,6 +524,10 @@ export default function MatchDetailClient({ id }: { id: string }) {
   // Stops polling once the match is confirmed finished.
   const [liveStatus, setLiveStatus] = useState<LiveMatchStatus | null>(null);
   const [sharing, setSharing] = useState(false);
+  const [calendarAdded, setCalendarAdded] = useState(false);
+  // Last score seen while polling, so a goal gives a little vibration in
+  // the iPhone app.
+  const lastPolledScore = useRef<string | null>(null);
   const kickoffForPolling = displayMatch?.kickoff;
 
   useEffect(() => {
@@ -536,6 +546,11 @@ export default function MatchDetailClient({ id }: { id: string }) {
       fetchLiveMatchStatus(id)
         .then((result) => {
           if (cancelled || !result) return;
+          const scoreKey = `${result.homeScore ?? 0}-${result.awayScore ?? 0}`;
+          if (lastPolledScore.current !== null && lastPolledScore.current !== scoreKey) {
+            haptic("success");
+          }
+          lastPolledScore.current = scoreKey;
           setLiveStatus(result);
           if (result.status === "FINISHED" && intervalId) {
             clearInterval(intervalId);
@@ -717,6 +732,29 @@ export default function MatchDetailClient({ id }: { id: string }) {
     : isMatchFinished
     ? "Full-time"
     : displayMatch.statusLabel;
+
+  async function handleAddToCalendar() {
+    if (!displayMatch) return;
+    haptic("light");
+    const event = {
+      id: String(id),
+      title: `${displayMatch.homeName} vs ${displayMatch.awayName}`,
+      start: displayMatch.kickoff,
+      durationMinutes: 120,
+      location: displayMatch.venue || fallbackVenue || undefined,
+      notes: `${displayMatch.competition} · via Clubside`,
+      url: `https://matchday-web-zeta.vercel.app/match/${id}`,
+    };
+    if (hasNativeFeatures()) {
+      try {
+        if (await addMatchToCalendar(event)) setCalendarAdded(true);
+      } catch {
+        // Calendar access not allowed - nothing else to do.
+      }
+    } else {
+      downloadCalendarFile(event);
+    }
+  }
 
   async function handleShareMatch() {
     if (!displayMatch) return;
@@ -1040,6 +1078,33 @@ export default function MatchDetailClient({ id }: { id: string }) {
                 </>
               )}
             </button>
+
+            {!isLive && !isMatchFinished && new Date(displayMatch.kickoff).getTime() > Date.now() && (
+              <button
+                type="button"
+                onClick={handleAddToCalendar}
+                disabled={calendarAdded}
+                className="mt-2.5 flex w-full items-center justify-center gap-2 rounded-2xl border border-zinc-200 bg-white py-3 text-xs font-black uppercase tracking-wide text-[#111318] transition active:scale-[0.98] disabled:opacity-70 dark:border-white/10 dark:bg-white/5 dark:text-white"
+              >
+                <svg
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <rect x="3" y="5" width="18" height="16" rx="3" />
+                  <path d="M3 10h18" />
+                  <path d="M8 3v4" />
+                  <path d="M16 3v4" />
+                  {!calendarAdded && <path d="M12 13v5M9.5 15.5h5" />}
+                </svg>
+                {calendarAdded ? "Added to your calendar" : "Add to calendar"}
+              </button>
+            )}
 
             <div className="mt-5 border-t border-zinc-100 pt-4 dark:border-white/10">
               <div className="mb-2.5 text-xs font-black uppercase tracking-widest text-zinc-400 dark:text-zinc-500">

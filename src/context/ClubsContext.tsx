@@ -6,6 +6,7 @@ import {
   maybeAskForNotificationsOnce,
   updatePushClubs,
 } from "../lib/pushClient";
+import { haptic, saveWidgetData } from "../lib/nativeApp";
 
 type ClubsContextType = {
   selectedIds: string[];
@@ -88,6 +89,7 @@ export function ClubsProvider({ children }: { children: ReactNode }) {
 
   function toggleClub(id: string) {
     const isFirstEverFollow = selectedIds.length === 0 && !selectedIds.includes(id);
+    haptic(selectedIds.includes(id) ? "light" : "success");
 
     setSelectedIds((prev) =>
       prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]
@@ -109,6 +111,41 @@ export function ClubsProvider({ children }: { children: ReactNode }) {
         .catch(() => {});
     }
   }
+
+  // iPhone app: keeps the home-screen widget (and the offline screen) in
+  // step with the clubs followed - right away when they change, and every
+  // few minutes while the app is open.
+  useEffect(() => {
+    if (!loaded) return;
+    let cancelled = false;
+    const sync = () => {
+      const ids = latestIds.current;
+      if (ids.length === 0) {
+        saveWidgetData([], null).catch(() => {});
+        return;
+      }
+      fetch(`/api/widget?clubs=${encodeURIComponent(ids.join(","))}`)
+        .then((response) => (response.ok ? response.json() : null))
+        .then((payload) => {
+          if (!cancelled && payload) return saveWidgetData(ids, payload);
+        })
+        .catch(() => {
+          // Offline: keep what's already saved on the phone.
+        });
+    };
+    const timer = setTimeout(sync, 1500);
+    const interval = setInterval(sync, 5 * 60 * 1000);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") sync();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [selectedIds, loaded]);
 
   function resetClubs() {
     setSelectedIds([]);

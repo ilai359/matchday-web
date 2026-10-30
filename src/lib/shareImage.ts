@@ -1,3 +1,5 @@
+import { haptic, shareImageNatively } from "./nativeApp";
+
 // Generates shareable PNGs for a match result/fixture and for a club's
 // stats - something someone can post to a story, a group chat, or a
 // feed, with "Clubside" on it, which is the whole point: a user sharing
@@ -476,6 +478,10 @@ export async function shareOrDownloadImage(
   filename: string,
   shareText: string
 ): Promise<void> {
+  haptic("light");
+  // Inside the iPhone app: Apple's own share sheet.
+  if (await shareImageNatively(blob, filename, shareText)) return;
+
   try {
     const file = new File([blob], filename, { type: "image/png" });
     const nav = navigator as Navigator & {
