@@ -23,6 +23,22 @@ import { getClub, getClubName } from "@/lib/clubHelpers";
 import { fetchLiveUpdates } from "@/lib/newsApi";
 import { refreshScorersAfterMatch } from "@/lib/scorersData";
 
+// Notification titles only get ONE line on the lock screen (about 30-35
+// characters), so alerts use the app's short club names ("Tottenham", not
+// "Tottenham Hotspur FC"). A club outside the app's list just loses the
+// usual "FC"/"CF"/... bits.
+function shortTeamName(apiName: string): string {
+  const clubId = matchClubId(apiName);
+  const club = clubId ? getClub(clubId) : undefined;
+  if (club) return club.shortName;
+  const cleaned = apiName
+    .replace(/\b(FC|CF|AFC|SC|SV|SL|AC|AS|CD|UD|RC|SSC|FK|SK|BV|VfB|VfL|TSG|1\.)\b\.?/g, "")
+    .replace(/\b(18|19|20)\d{2}\b/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return cleaned || apiName;
+}
+
 // Same URL the GitHub Actions workflow itself calls this app at (see
 // .github/workflows/check-goals.yml) - needed here because fetchLiveUpdates
 // normally calls relative paths like "/api/news", which only resolve on
@@ -359,8 +375,8 @@ async function runCheckGoals(): Promise<NextResponse> {
       const minutesLeft = Math.max(1, Math.round(minutesUntilKickoff));
       await notifySubscribers(
         clubIds,
-        `⏰ Starting soon: ${match.homeTeam.name} vs ${match.awayTeam.name}`,
-        `${match.competition.name} · kicks off in ${minutesLeft} min`,
+        `⏰ ${shortTeamName(match.homeTeam.name)} vs ${shortTeamName(match.awayTeam.name)}`,
+        `Starts in ${minutesLeft} min · ${match.competition.name}`,
         `/match/${matchId}`
       );
     }
@@ -439,8 +455,8 @@ async function runCheckGoals(): Promise<NextResponse> {
       const clubIds = [homeClubId, awayClubId].filter((id): id is string => id !== null);
       await notifySubscribers(
         clubIds,
-        `⚽ Kickoff: ${match.homeTeam.name} vs ${match.awayTeam.name}`,
-        `${match.competition.name} · the match has started`,
+        `⚽ ${shortTeamName(match.homeTeam.name)} vs ${shortTeamName(match.awayTeam.name)}`,
+        `Kickoff! The match has started · ${match.competition.name}`,
         `/match/${matchId}`
       );
     }));
@@ -484,16 +500,18 @@ async function runCheckGoals(): Promise<NextResponse> {
           const awayClubId = matchClubId(awayTeam.name);
           const clubIds = [homeClubId, awayClubId].filter((id): id is string => id !== null);
           // Say plainly who won, so the alert makes sense at a glance.
+          const homeShort = shortTeamName(homeTeam.name);
+          const awayShort = shortTeamName(awayTeam.name);
           const outcome =
             homeScore > awayScore
-              ? `${homeTeam.name} win`
+              ? `${homeShort} win`
               : awayScore > homeScore
-                ? `${awayTeam.name} win`
+                ? `${awayShort} win`
                 : "It ends in a draw";
           await notifySubscribers(
             clubIds,
-            `🏁 Full time: ${homeTeam.name} ${homeScore}-${awayScore} ${awayTeam.name}`,
-            `${outcome} · ${competitionName}`,
+            `🏁 ${homeShort} ${homeScore}-${awayScore} ${awayShort}`,
+            `Full time · ${outcome} · ${competitionName}`,
             `/match/${matchId}`
           );
         }
@@ -613,21 +631,20 @@ async function runCheckGoals(): Promise<NextResponse> {
       const places = Math.abs(previousPosition - row.position);
       const placesText = places === 1 ? "one place" : `${places} places`;
       const leagueName = LEAGUE_IN_SENTENCE[competition] ?? competition;
-      // e.g. "⬆️ Tottenham climbed 3 places to 4th in the Premier League",
-      // "⬆️ Tottenham climbed one place to the top of the Premier League",
-      // "⬇️ Tottenham dropped 2 places to 6th in the Premier League".
-      // The app's short club name, not the API's full one ("Tottenham
-      // Hotspur FC").
-      const clubName = getClubName(clubId);
+      // Short title (one line on the lock screen), details below, e.g.
+      //   "⬆️ Tottenham up to 4th"
+      //   "Climbed 3 places in the Premier League · 21 points"
+      const clubName = getClub(clubId)?.shortName ?? getClubName(clubId);
       const title = movedUp
         ? row.position === 1
-          ? `⬆️ ${clubName} climbed ${placesText} to the top of ${leagueName}`
-          : `⬆️ ${clubName} climbed ${placesText} to ${ordinal(row.position)} in ${leagueName}`
-        : `⬇️ ${clubName} dropped ${placesText} to ${ordinal(row.position)} in ${leagueName}`;
+          ? `⬆️ ${clubName} go top`
+          : `⬆️ ${clubName} up to ${ordinal(row.position)}`
+        : `⬇️ ${clubName} down to ${ordinal(row.position)}`;
+      const pointsText = row.points === 1 ? "1 point" : `${row.points} points`;
       await notifySubscribers(
         [clubId],
         title,
-        `Now on ${row.points} points`,
+        `${movedUp ? "Climbed" : "Dropped"} ${placesText} in ${leagueName} · ${pointsText}`,
         `/clubs/${clubId}`
       );
     }
