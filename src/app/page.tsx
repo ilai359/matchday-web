@@ -15,7 +15,12 @@ import {
   extractTeamId,
   leaguesToCodes,
   LiveMatch,
+  fetchStandings,
+  LEAGUE_TO_CODE,
+  StandingsRow,
 } from "../lib/footballApi";
+import { stakeLine } from "../lib/stake";
+import TipRow from "../components/TipRow";
 import ClubBadge from "../components/ClubBadge";
 import YourClubs from "../components/YourClubs";
 import { readPersisted, writePersisted } from "../lib/persistentCache";
@@ -166,6 +171,29 @@ export default function Home() {
     (match) => new Date(match.kickoff).getTime() >= now
   );
   const nextMatch = futureMatches[0];
+
+  // The table for the next match's league, for its "what's at stake" line.
+  const nextLeagueCode = nextMatch ? LEAGUE_TO_CODE[nextMatch.competition] : undefined;
+  const [nextTable, setNextTable] = useState<{ code: string; rows: StandingsRow[] } | null>(null);
+  useEffect(() => {
+    if (!nextLeagueCode || nextLeagueCode === "CL") return;
+    let cancelled = false;
+    fetchStandings(nextLeagueCode)
+      .then((rows) => {
+        if (!cancelled) setNextTable({ code: nextLeagueCode, rows });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [nextLeagueCode]);
+  const stakeClubId = nextMatch
+    ? [nextMatch.homeClubId, nextMatch.awayClubId].find((id) => selectedIds.includes(id))
+    : undefined;
+  const nextStake =
+    nextMatch && nextTable && nextTable.code === nextLeagueCode && stakeClubId
+      ? stakeLine(nextTable.rows, stakeClubId, getClub(stakeClubId)?.shortName ?? "")
+      : null;
   const upcomingMatches = futureMatches.slice(1, 5);
 
   // Three reasons to still be showing the splash instead of the real
@@ -326,6 +354,17 @@ export default function Home() {
                     Details
                   </Link>
                 </div>
+                {nextStake && (
+                  <div className="mt-3 inline-flex rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-black text-white">
+                    {nextStake}
+                  </div>
+                )}
+                <TipRow
+                  matchId={String(nextMatch.id)}
+                  kickoff={nextMatch.kickoff}
+                  homeName={displayName(nextMatch.homeTeamName, nextMatch.homeClubId)}
+                  awayName={displayName(nextMatch.awayTeamName, nextMatch.awayClubId)}
+                />
               </div>
             </div>
           </section>

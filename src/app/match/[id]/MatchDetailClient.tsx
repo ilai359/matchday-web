@@ -14,6 +14,8 @@ import {
   hasNativeFeatures,
   haptic,
 } from "../../../lib/nativeApp";
+import { stakeLine } from "../../../lib/stake";
+import TipRow from "../../../components/TipRow";
 import {
   formatFullDate,
   formatFullDateWithYear,
@@ -1046,6 +1048,33 @@ export default function MatchDetailClient({ id }: { id: string }) {
                 </div>
               </div>
             </div>
+
+            {(() => {
+              if (isLive || isMatchFinished) return null;
+              const clubId = [displayMatch.homeClubId, displayMatch.awayClubId].find(
+                (cid) => cid && selectedIds.includes(cid)
+              );
+              const line = clubId
+                ? stakeLine(standings, clubId, getClub(clubId)?.shortName ?? "")
+                : null;
+              return line ? (
+                <div className="mt-4 flex justify-center">
+                  <div className="rounded-full bg-zinc-100 px-3 py-1.5 text-xs font-black text-[#111318] dark:bg-white/10 dark:text-white">
+                    {line}
+                  </div>
+                </div>
+              ) : null;
+            })()}
+            <TipRow
+              matchId={String(id)}
+              kickoff={displayMatch.kickoff}
+              homeName={displayMatch.homeName}
+              awayName={displayMatch.awayName}
+              status={effectiveStatus}
+              homeScore={liveStatus?.homeScore ?? displayMatch.homeScore}
+              awayScore={liveStatus?.awayScore ?? displayMatch.awayScore}
+              tone="light"
+            />
 
             <button
               type="button"

@@ -14,6 +14,7 @@ import {
   LiveMatch,
 } from "../../lib/footballApi";
 import ClubBadge from "../../components/ClubBadge";
+import TipsSummary from "../../components/TipsSummary";
 import { readPersisted, writePersisted } from "../../lib/persistentCache";
 
 function liveMatchesCacheKey(leaguesKey: string): string {
@@ -268,6 +269,14 @@ export default function Matches() {
               <p className="mt-3 text-sm text-white/45">
                 Every upcoming game from your clubs.
               </p>
+              <TipsSummary
+                matches={liveMatches.map((m) => ({
+                  id: String(m.id),
+                  status: m.status,
+                  homeScore: m.homeScore,
+                  awayScore: m.awayScore,
+                }))}
+              />
             </div>
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.08] text-xl">
               ⚽
