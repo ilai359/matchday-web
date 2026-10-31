@@ -47,18 +47,21 @@ function recentWindow(): { dateFrom: string; dateTo: string } {
  * at once are noticed together.
  */
 export async function getRecentAllMatches(apiKey: string): Promise<{ matches: SlimMatch[] }> {
-  if (Date.now() < allLeaguesUnsupportedUntil) {
-    throw new Error("All-leagues match list unavailable");
-  }
   const { dateFrom, dateTo } = recentWindow();
   return getOrSet(`matches:all:window:${dateFrom}`, 60 * 1000, async () => {
+    // Checked in here (not before getOrSet) so that even then, the last
+    // saved copy of the list is still served. Throwing before getOrSet
+    // made live matches vanish for everyone until a fresh copy came in.
+    if (Date.now() < allLeaguesUnsupportedUntil) {
+      throw new Error("All-leagues match list unavailable");
+    }
     const response = await fetchWithRetry(
       `https://api.football-data.org/v4/matches?dateFrom=${dateFrom}&dateTo=${dateTo}`,
       { headers: { "X-Auth-Token": apiKey }, cache: "no-store" }
     );
     if (!response.ok) {
       if (response.status === 400 || response.status === 403) {
-        allLeaguesUnsupportedUntil = Date.now() + 6 * 60 * 60 * 1000;
+        allLeaguesUnsupportedUntil = Date.now() + 10 * 60 * 1000;
       }
       throw new Error(`football-data.org returned ${response.status}`);
     }
