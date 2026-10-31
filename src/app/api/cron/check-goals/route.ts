@@ -12,6 +12,8 @@ import {
   getRemindedMatchIds,
   markMatchReminded,
   clearMatchReminded,
+  wasKickoffNotified,
+  markKickoffNotified,
   getIdleUntil,
   setIdleUntil,
 } from "@/lib/goalWatch";
@@ -290,6 +292,11 @@ async function runCheckGoals(): Promise<NextResponse> {
   // Competitions where a match could be in play right now (see below).
   const competitionsMaybeLive = new Set<string>();
 
+  // Matches whose scheduled kickoff time has just been reached - their
+  // kickoff alert goes out now instead of waiting for the live data,
+  // which often only shows a match as live a few minutes late.
+  const reachedKickoffTime: RawScheduledMatch[] = [];
+
   await withSection("fixtures/reminder loop", async () => {
   await Promise.all(watchedCompetitions.map(async (competition) => {
     const now = Date.now();
@@ -358,6 +365,20 @@ async function runCheckGoals(): Promise<NextResponse> {
 
     for (const match of fixtures) {
       if (match.status !== "SCHEDULED" && match.status !== "TIMED") continue;
+      // Kickoff time reached in the last 10 minutes, and the match isn't
+      // postponed/cancelled/suspended (those have a different status).
+      const sinceKickoff = now - kickoffOf(match);
+      if (
+        sinceKickoff >= 0 &&
+        sinceKickoff < 10 * 60 * 1000 &&
+        !previouslyStarted.has(String(match.id))
+      ) {
+        reachedKickoffTime.push(match);
+      }
+    }
+
+    for (const match of fixtures) {
+      if (match.status !== "SCHEDULED" && match.status !== "TIMED") continue;
       const matchId = String(match.id);
       if (previouslyReminded.has(matchId)) continue;
 
@@ -390,6 +411,26 @@ async function runCheckGoals(): Promise<NextResponse> {
   // several runs when the per-minute request allowance ran short, so the
   // second of two simultaneous kickoffs arrived minutes after the first.
   const finishedById = new Map<string, RawSingleMatch>();
+  // Kickoff alerts at the scheduled time, all together.
+  await withSection("scheduled kickoff alerts", async () => {
+    await Promise.all(reachedKickoffTime.map(async (match) => {
+      const matchId = String(match.id);
+      if (await wasKickoffNotified(matchId)) return;
+      await markKickoffNotified(matchId);
+      await clearMatchReminded(matchId);
+      kickoffsSent += 1;
+      const homeClubId = matchClubId(match.homeTeam.name);
+      const awayClubId = matchClubId(match.awayTeam.name);
+      const clubIds = [homeClubId, awayClubId].filter((id): id is string => id !== null);
+      await notifySubscribers(
+        clubIds,
+        `⚽ ${shortTeamName(match.homeTeam.name)} vs ${shortTeamName(match.awayTeam.name)}`,
+        `Kickoff! The match has started · ${match.competition.name}`,
+        `/match/${matchId}`
+      );
+    }));
+  });
+
   await withSection("live loop", async () => {
     if (!anyMightBeLive) return;
 
@@ -448,6 +489,10 @@ async function runCheckGoals(): Promise<NextResponse> {
       const matchId = String(match.id);
       await markMatchStarted(matchId);
       await clearMatchReminded(matchId);
+      // Usually already sent at the scheduled kickoff time (see above) -
+      // only sent here if the match showed up live before that.
+      if (await wasKickoffNotified(matchId)) return;
+      await markKickoffNotified(matchId);
       kickoffsSent += 1;
 
       const homeClubId = matchClubId(match.homeTeam.name);

@@ -126,6 +126,40 @@ export async function clearMatchReminded(matchId: string): Promise<void> {
   memoryReminded.delete(matchId);
 }
 
+// "Kickoff alert sent" - the kickoff alert now goes out at the scheduled
+// kickoff time (the free live data often only marks a match as live a
+// few minutes late), or when the match shows up live, whichever comes
+// first. One key per match that expires by itself after 6 hours, so it
+// never needs cleaning up.
+const KICKOFF_SENT_PREFIX = "goalwatch:kickoff-sent:";
+const KICKOFF_SENT_SECONDS = 6 * 60 * 60;
+const memoryKickoffSent = new Map<string, number>();
+
+/** True if this match's kickoff alert has already gone out. */
+export async function wasKickoffNotified(matchId: string): Promise<boolean> {
+  if (redis) {
+    try {
+      return (await redis.exists(KICKOFF_SENT_PREFIX + matchId)) > 0;
+    } catch (error) {
+      console.error("wasKickoffNotified: Redis read failed", error);
+    }
+  }
+  const until = memoryKickoffSent.get(matchId);
+  return until !== undefined && until > Date.now();
+}
+
+/** Remembers that this match's kickoff alert has gone out. */
+export async function markKickoffNotified(matchId: string): Promise<void> {
+  memoryKickoffSent.set(matchId, Date.now() + KICKOFF_SENT_SECONDS * 1000);
+  if (redis) {
+    try {
+      await redis.set(KICKOFF_SENT_PREFIX + matchId, 1, { ex: KICKOFF_SENT_SECONDS });
+    } catch (error) {
+      console.error("markKickoffNotified: Redis write failed, using in-memory fallback", error);
+    }
+  }
+}
+
 const IDLE_UNTIL_KEY = "goalwatch:idle-until";
 
 /**
