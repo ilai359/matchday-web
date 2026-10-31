@@ -467,6 +467,94 @@ export async function createClubShareImage(club: ShareClubInput): Promise<Blob |
   });
 }
 
+export type ShareRecapRow = {
+  clubName: string;
+  clubColor: string;
+  homeName: string;
+  awayName: string;
+  homeScore: number;
+  awayScore: number;
+  homeCrest?: string;
+  awayCrest?: string;
+  result: "W" | "D" | "L";
+  tableLine?: string;
+};
+
+/** "My matchday" card: one row per followed club's latest result (1080 wide). */
+export async function createRecapShareImage(title: string, rows: ShareRecapRow[]): Promise<Blob | null> {
+  if (typeof document === "undefined" || rows.length === 0) return null;
+  const width = 1080;
+  const rowHeight = 190;
+  const height = Math.max(1080, 300 + rows.length * rowHeight + 160);
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return null;
+
+  const crests = await loadCrests(rows.flatMap((r) => [r.homeCrest, r.awayCrest]));
+
+  const bg = ctx.createLinearGradient(0, 0, width, height);
+  bg.addColorStop(0, "#0B0D12");
+  bg.addColorStop(1, "#080B13");
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, width, height);
+  glow(ctx, width * 0.2, 120, 420, rows[0].clubColor);
+  if (rows[1]) glow(ctx, width * 0.85, height * 0.6, 420, rows[1].clubColor);
+
+  ctx.textAlign = "left";
+  ctx.fillStyle = "rgba(255,255,255,0.55)";
+  ctx.font = `800 26px ${FONT}`;
+  ctx.fillText(title.toUpperCase(), 80, 130);
+  ctx.fillStyle = "#FFFFFF";
+  ctx.font = `900 72px ${FONT}`;
+  ctx.fillText("My matchday", 80, 210);
+
+  const resultColor = { W: "#22C55E", D: "#A1A1AA", L: "#EF4444" } as const;
+  rows.forEach((row, i) => {
+    const top = 280 + i * rowHeight;
+    ctx.fillStyle = "rgba(255,255,255,0.06)";
+    roundRect(ctx, 60, top, width - 120, rowHeight - 30, 36);
+    ctx.fill();
+    ctx.fillStyle = row.clubColor;
+    roundRect(ctx, 60, top, 12, rowHeight - 30, 6);
+    ctx.fill();
+
+    const midY = top + (rowHeight - 30) / 2;
+    drawBadge(ctx, 150, midY - 14, 44, row.clubColor, initials(row.homeName), row.homeCrest ? crests.get(row.homeCrest) : undefined);
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#FFFFFF";
+    ctx.font = `900 56px ${FONT}`;
+    ctx.fillText(`${row.homeScore}–${row.awayScore}`, 270, midY + 6);
+    drawBadge(ctx, 390, midY - 14, 44, row.clubColor, initials(row.awayName), row.awayCrest ? crests.get(row.awayCrest) : undefined);
+
+    ctx.textAlign = "left";
+    ctx.font = `800 34px ${FONT}`;
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fillText(truncate(`${row.homeName} – ${row.awayName}`, 26), 470, midY - 8);
+    ctx.font = `700 26px ${FONT}`;
+    ctx.fillStyle = "rgba(255,255,255,0.55)";
+    if (row.tableLine) ctx.fillText(row.tableLine, 470, midY + 34);
+
+    ctx.fillStyle = resultColor[row.result];
+    roundRect(ctx, width - 150, midY - 32, 64, 64, 18);
+    ctx.fill();
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#FFFFFF";
+    ctx.font = `900 34px ${FONT}`;
+    ctx.fillText(row.result, width - 118, midY + 12);
+  });
+
+  ctx.textAlign = "center";
+  ctx.font = `900 36px ${FONT}`;
+  ctx.fillStyle = "#FFFFFF";
+  ctx.fillText("Clubside", width / 2, height - 64);
+
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => resolve(blob), "image/png");
+  });
+}
+
 /**
  * Opens the device's native share sheet with the given image (so it can
  * go straight to Messages, WhatsApp, Instagram Stories, etc.) when the

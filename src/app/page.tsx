@@ -23,6 +23,7 @@ import { stakeLine } from "../lib/stake";
 import TipRow from "../components/TipRow";
 import ClubBadge from "../components/ClubBadge";
 import YourClubs from "../components/YourClubs";
+import MatchdayRecap from "../components/MatchdayRecap";
 import { readPersisted, writePersisted } from "../lib/persistentCache";
 
 function liveMatchesCacheKey(leaguesKey: string): string {
@@ -267,6 +268,7 @@ export default function Home() {
             </span>
           </div>
         )}
+        <MatchdayRecap />
         {nextMatch && (
           <section className="mb-6">
             <div className="mb-2 px-1">
