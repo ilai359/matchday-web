@@ -34,7 +34,7 @@ export default function Support() {
               a score looks wrong, or you have an idea for the app, email{" "}
               <a
                 href="mailto:tidewavegames@gmail.com"
-                className="font-bold text-[#111318] underline dark:text-white"
+                className="selectable font-bold text-[#111318] underline dark:text-white"
               >
                 tidewavegames@gmail.com
               </a>{" "}

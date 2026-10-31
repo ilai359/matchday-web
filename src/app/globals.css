@@ -24,3 +24,29 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Inside the iPhone app only (the class is set in layout.tsx): no web-page
+   behaviour - no grey flash when tapping, no long-press link previews or
+   "Save image" menus, and no text selection except where typing happens. */
+html.native-app {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+}
+html.native-app body {
+  -webkit-user-select: none;
+  user-select: none;
+}
+html.native-app input,
+html.native-app textarea,
+html.native-app [contenteditable="true"],
+html.native-app .selectable {
+  -webkit-user-select: text;
+  user-select: text;
+}
+html.native-app a,
+html.native-app img {
+  -webkit-touch-callout: none;
+}
+html.native-app img {
+  -webkit-user-drag: none;
+}

@@ -92,6 +92,18 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                   document.documentElement.classList.add("dark");
                 }
               } catch (e) {}
+              // Inside the iPhone app: behave like an app, not a web
+              // page - no link previews on long-press, no text
+              // selection, no pinch-zoom (see .native-app in globals.css).
+              try {
+                if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
+                  document.documentElement.classList.add("native-app");
+                  var vp = document.querySelector('meta[name="viewport"]');
+                  if (vp && vp.content.indexOf("user-scalable") === -1) {
+                    vp.setAttribute("content", vp.content + ", maximum-scale=1, user-scalable=no");
+                  }
+                }
+              } catch (e) {}
             `,
           }}
         />
