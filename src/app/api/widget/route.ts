@@ -141,8 +141,25 @@ export async function GET(request: Request) {
     };
   });
 
+  // Most relevant club first: the small widget and the lock screen only
+  // show the first one, the medium widget the first two. A live match
+  // comes first, then whichever club plays soonest - not simply the club
+  // that was followed first.
+  const kickoffOf = (club: (typeof result)[number]) =>
+    club.next ? new Date(club.next.utcDate).getTime() : Number.MAX_SAFE_INTEGER;
+  const sorted = result
+    .map((club, index) => ({ club, index }))
+    .sort((a, b) => {
+      const liveA = a.club.live ? 0 : 1;
+      const liveB = b.club.live ? 0 : 1;
+      if (liveA !== liveB) return liveA - liveB;
+      const byKickoff = kickoffOf(a.club) - kickoffOf(b.club);
+      return byKickoff !== 0 ? byKickoff : a.index - b.index;
+    })
+    .map(({ club }) => club);
+
   return NextResponse.json(
-    { generatedAt: new Date().toISOString(), clubs: result },
+    { generatedAt: new Date().toISOString(), clubs: sorted },
     { headers: cdnCacheHeaders(60) }
   );
 }
