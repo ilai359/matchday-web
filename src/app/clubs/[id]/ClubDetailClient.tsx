@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useNow } from "../../../lib/useNow";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -165,6 +166,8 @@ export default function ClubDetailClient({ id }: { id: string }) {
   const [loading, setLoading] = useState(() => cachedBundle === null);
   const [tableExpanded, setTableExpanded] = useState(false);
   const [sharing, setSharing] = useState(false);
+  // Ticks every 30 seconds, so a match leaves "Upcoming fixtures" at kickoff.
+  const now = useNow();
 
   useEffect(() => {
     // No `loading` to reset here if there's no club: the component
@@ -296,8 +299,14 @@ export default function ClubDetailClient({ id }: { id: string }) {
     .slice(0, 5);
   const formResults = [...clubResults].reverse();
 
+  // Only matches that haven't started yet - a live one isn't "upcoming".
   const clubUpcoming = upcomingMatches
     .filter((m) => m.homeClubId === club.id || m.awayClubId === club.id)
+    .filter(
+      (m) =>
+        (m.status === "SCHEDULED" || m.status === "TIMED") &&
+        new Date(m.kickoff).getTime() > now
+    )
     .sort((a, b) => new Date(a.kickoff).getTime() - new Date(b.kickoff).getTime())
     .slice(0, 5);
 

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
+import { useNow } from "../lib/useNow";
 import { matches } from "../data/matches";
 import { useClubs } from "../context/ClubsContext";
 import { getClub, displayName } from "../lib/clubHelpers";
@@ -133,7 +134,8 @@ export default function Home() {
         new Date(a.kickoff).getTime() -
         new Date(b.kickoff).getTime()
     );
-  const now = new Date().getTime();
+  // Ticks every 30 seconds, so a match leaves "upcoming" at kickoff.
+  const now = useNow();
   const combinedMatches =
     myLiveMatches.length > 0
       ? myLiveMatches.map((m) => ({
