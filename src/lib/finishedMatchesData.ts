@@ -33,5 +33,10 @@ export async function getFinishedMatches(
       throw new Error(`football-data.org returned ${response.status}`);
     }
     return slimMatchesResponse(await response.json());
-  }, { serveStale: true });
+  // Past seasons: an old saved copy is always fine. This season: a
+  // refresh in the background wasn't reliable, which left last night's
+  // results missing for hours - so it's fetched right away when the
+  // copy is older than 5 minutes (falling back to the saved copy only if
+  // that fails).
+  }, { serveStale: !isCurrentSeason });
 }

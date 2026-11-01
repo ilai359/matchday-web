@@ -6,26 +6,44 @@ import { useClubs } from "../context/ClubsContext";
 import { getClub } from "../lib/clubHelpers";
 import {
   fetchFinishedMatches,
+  fetchLiveMatches,
   fetchStandings,
   leaguesToCodes,
-  FinishedMatch,
   StandingsRow,
 } from "../lib/footballApi";
 import { createRecapShareImage, shareOrDownloadImage } from "../lib/shareImage";
 import ClubBadge from "./ClubBadge";
 import { useNow } from "../lib/useNow";
 
-// "Your matchday": the morning after your clubs have played, one card at
-// the top of Home with each club's latest result and where that left
-// them in the table. Weekend or midweek - it follows the matches, not
-// the day of the week. Shown for 3 days, or until dismissed.
+// "Your weekend" / "Your midweek": once ALL your clubs have played their
+// matches of a round, the next morning one card at the top of Home shows
+// each club's result and where it left them in the table. A round is
+// Friday-Monday (weekend) or Tuesday-Thursday (midweek), so a Wednesday
+// match never gets mixed in with the weekend's. Shown for 3 days, or
+// until dismissed.
 
 const DISMISSED_KEY = "clubside-recap-dismissed";
 const POSITIONS_KEY = "clubside-positions";
-const RECENT_MS = 4 * 24 * 60 * 60 * 1000;
+const LOOK_BACK_MS = 8 * 24 * 60 * 60 * 1000;
 const SHOW_FOR_MS = 3 * 24 * 60 * 60 * 1000;
 
 type PositionLog = Record<string, Array<{ position: number; at: number }>>;
+
+type AnyMatch = {
+  id: string;
+  kickoff: string;
+  status: string;
+  homeClubId: string | null;
+  awayClubId: string | null;
+  homeTeamName: string;
+  awayTeamName: string;
+  homeCrest: string | null;
+  awayCrest: string | null;
+  homeScore: number | null;
+  awayScore: number | null;
+};
+
+type Round = { kind: "weekend" | "midweek"; start: number; end: number };
 
 function readJson<T>(key: string, fallback: T): T {
   try {
@@ -63,19 +81,36 @@ function nextMorning(time: number): number {
   return d.getTime();
 }
 
+/** Friday-Monday = weekend round, Tuesday-Thursday = midweek round (local time). */
+function roundOf(iso: string): Round {
+  const d = new Date(iso);
+  const day = d.getDay(); // 0 Sun ... 6 Sat
+  const weekend = day === 5 || day === 6 || day === 0 || day === 1;
+  const offset = weekend
+    ? ({ 5: 0, 6: 1, 0: 2, 1: 3 } as Record<number, number>)[day]
+    : ({ 2: 0, 3: 1, 4: 2 } as Record<number, number>)[day];
+  const start = new Date(d);
+  start.setHours(0, 0, 0, 0);
+  start.setDate(start.getDate() - offset);
+  const end = new Date(start);
+  end.setDate(end.getDate() + (weekend ? 4 : 3));
+  return { kind: weekend ? "weekend" : "midweek", start: start.getTime(), end: end.getTime() };
+}
+
 type Row = {
   clubId: string;
-  match: FinishedMatch;
+  match: AnyMatch;
   result: "W" | "D" | "L";
   tableLine?: string;
 };
 
 export default function MatchdayRecap() {
   const { selectedIds, loaded } = useClubs();
-  const [matches, setMatches] = useState<FinishedMatch[]>([]);
+  const [matches, setMatches] = useState<AnyMatch[]>([]);
   const [tables, setTables] = useState<Record<string, StandingsRow[]>>({});
   const [dismissedKey, setDismissedKey] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
+  const now = useNow(60_000);
 
   const leagues = selectedIds
     .map((id) => getClub(id)?.league)
@@ -92,9 +127,37 @@ export default function MatchdayRecap() {
     if (!loaded || codes.length === 0) return;
     let cancelled = false;
     const season = currentSeason();
-    Promise.all(codes.map((code) => fetchFinishedMatches(code, season).catch(() => [])))
-      .then((lists) => {
-        if (!cancelled) setMatches(lists.flat());
+    // Two sources: the season's results (older matches) and the list the
+    // Matches page uses (updated every minute - yesterday's results and
+    // what's still to come this round). The fresher copy wins.
+    Promise.all([
+      Promise.all(codes.map((code) => fetchFinishedMatches(code, season).catch(() => []))),
+      fetchLiveMatches(codes, { includeRecentlyFinished: true }).catch(() => []),
+    ])
+      .then(([finishedLists, live]) => {
+        if (cancelled) return;
+        const byId = new Map<string, AnyMatch>();
+        for (const m of finishedLists.flat()) {
+          byId.set(m.id, { ...m, status: "FINISHED" });
+        }
+        for (const m of live) {
+          const existing = byId.get(m.id);
+          if (existing && existing.status === "FINISHED" && m.status !== "FINISHED") continue;
+          byId.set(m.id, {
+            id: m.id,
+            kickoff: m.kickoff,
+            status: m.status,
+            homeClubId: m.homeClubId,
+            awayClubId: m.awayClubId,
+            homeTeamName: m.homeTeamName,
+            awayTeamName: m.awayTeamName,
+            homeCrest: m.homeCrest,
+            awayCrest: m.awayCrest,
+            homeScore: m.homeScore,
+            awayScore: m.awayScore,
+          });
+        }
+        setMatches(Array.from(byId.values()));
       })
       .catch(() => {});
     Promise.all(
@@ -118,44 +181,63 @@ export default function MatchdayRecap() {
     const allRows = Object.values(tables).flat();
     if (allRows.length === 0) return;
     const log = readJson<PositionLog>(POSITIONS_KEY, {});
-    const now = Date.now();
+    const at = Date.now();
     for (const clubId of selectedIds) {
       const row = allRows.find((r) => r.clubId === clubId);
       if (!row) continue;
       const history = log[clubId] ?? [];
       const last = history[history.length - 1];
-      if (!last || last.position !== row.position || now - last.at > 6 * 60 * 60 * 1000) {
-        history.push({ position: row.position, at: now });
+      if (!last || last.position !== row.position || at - last.at > 6 * 60 * 60 * 1000) {
+        history.push({ position: row.position, at });
       }
       log[clubId] = history.slice(-12);
     }
     writeJson(POSITIONS_KEY, log);
   }, [tables, selectedIds]);
 
-  const now = useNow(60_000);
-  const rows: Row[] = [];
+  const involves = (m: AnyMatch, clubId: string) => m.homeClubId === clubId || m.awayClubId === clubId;
+  const followedMatches = matches.filter((m) => selectedIds.some((id) => involves(m, id)));
+  const finished = followedMatches
+    .filter(
+      (m) =>
+        m.status === "FINISHED" &&
+        m.homeScore !== null &&
+        m.awayScore !== null &&
+        now - new Date(m.kickoff).getTime() < LOOK_BACK_MS
+    )
+    .sort((a, b) => new Date(b.kickoff).getTime() - new Date(a.kickoff).getTime());
+  if (finished.length === 0) return null;
+
+  // The round of the most recent result - only matches from that round.
+  const round = roundOf(finished[0].kickoff);
+  const inRound = (m: AnyMatch) => {
+    const t = new Date(m.kickoff).getTime();
+    return t >= round.start && t < round.end;
+  };
+
+  // Wait until every followed club has played its match of this round.
+  const stillToPlay = followedMatches.some(
+    (m) =>
+      inRound(m) &&
+      (m.status === "SCHEDULED" || m.status === "TIMED" || m.status === "IN_PLAY" || m.status === "PAUSED")
+  );
+  if (stillToPlay) return null;
+
   const allTableRows = Object.values(tables).flat();
-  const positionLog = typeof window === "undefined" ? {} : readJson<PositionLog>(POSITIONS_KEY, {});
+  const positionLog = readJson<PositionLog>(POSITIONS_KEY, {});
+  const rows: Row[] = [];
   for (const clubId of selectedIds) {
-    const latest = matches
-      .filter(
-        (m) =>
-          (m.homeClubId === clubId || m.awayClubId === clubId) &&
-          m.homeScore !== null &&
-          m.awayScore !== null &&
-          now - new Date(m.kickoff).getTime() < RECENT_MS
-      )
-      .sort((a, b) => new Date(b.kickoff).getTime() - new Date(a.kickoff).getTime())[0];
-    if (!latest) continue;
-    const isHome = latest.homeClubId === clubId;
-    const own = (isHome ? latest.homeScore : latest.awayScore) as number;
-    const other = (isHome ? latest.awayScore : latest.homeScore) as number;
+    const match = finished.find((m) => involves(m, clubId) && inRound(m));
+    if (!match) continue;
+    const isHome = match.homeClubId === clubId;
+    const own = (isHome ? match.homeScore : match.awayScore) as number;
+    const other = (isHome ? match.awayScore : match.homeScore) as number;
     const result = own > other ? "W" : own < other ? "L" : "D";
 
     let tableLine: string | undefined;
     const tableRow = allTableRows.find((r) => r.clubId === clubId);
     if (tableRow) {
-      const kickoff = new Date(latest.kickoff).getTime();
+      const kickoff = new Date(match.kickoff).getTime();
       const before = (positionLog[clubId] ?? []).filter((p) => p.at < kickoff).pop();
       const moved = before ? before.position - tableRow.position : 0;
       tableLine =
@@ -165,50 +247,62 @@ export default function MatchdayRecap() {
             ? `Now ${ordinal(tableRow.position)} · down ${-moved}`
             : `Now ${ordinal(tableRow.position)}`;
     }
-    rows.push({ clubId, match: latest, result, tableLine });
+    rows.push({ clubId, match, result, tableLine });
   }
-
   if (rows.length === 0) return null;
-  const lastKickoff = Math.max(...rows.map((r) => new Date(r.match.kickoff).getTime()));
+
+  const kickoffs = rows.map((r) => new Date(r.match.kickoff).getTime());
+  const lastKickoff = Math.max(...kickoffs);
   const showFrom = nextMorning(lastKickoff + 2 * 60 * 60 * 1000);
   if (now < showFrom || now > showFrom + SHOW_FOR_MS) return null;
   const recapKey = rows.map((r) => r.match.id).sort().join(",");
   if (dismissedKey === recapKey) return null;
 
-  const firstDay = new Date(Math.min(...rows.map((r) => new Date(r.match.kickoff).getTime())));
-  const dayLabel = (d: Date) => d.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+  const heading = round.kind === "weekend" ? "Your weekend" : "Your midweek";
+  const dayLabel = (t: number) =>
+    new Date(t).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+  const firstKickoff = Math.min(...kickoffs);
   const title =
-    dayLabel(firstDay) === dayLabel(new Date(lastKickoff))
-      ? dayLabel(firstDay)
-      : `${dayLabel(firstDay)} – ${dayLabel(new Date(lastKickoff))}`;
+    dayLabel(firstKickoff) === dayLabel(lastKickoff)
+      ? dayLabel(firstKickoff)
+      : `${dayLabel(firstKickoff)} – ${dayLabel(lastKickoff)}`;
 
   function dismiss() {
     writeJson(DISMISSED_KEY, recapKey);
     setDismissedKey(recapKey);
   }
 
+  const nameFor = (clubId: string | null, fallback: string) =>
+    (clubId && getClub(clubId)?.shortName) || fallback;
+  const crestFor = (clubId: string | null, fallback: string | null) =>
+    (clubId && getClub(clubId)?.crest) || fallback || undefined;
+
   async function share() {
     setSharing(true);
     try {
       const blob = await createRecapShareImage(
         title,
-        rows.map((r) => {
-          const club = getClub(r.clubId);
-          return {
-            clubName: club?.shortName ?? "",
-            clubColor: club?.primaryColor ?? "#3B82F6",
-            homeName: r.match.homeClubId ? getClub(r.match.homeClubId)?.shortName ?? r.match.homeTeamName : r.match.homeTeamName,
-            awayName: r.match.awayClubId ? getClub(r.match.awayClubId)?.shortName ?? r.match.awayTeamName : r.match.awayTeamName,
-            homeScore: r.match.homeScore as number,
-            awayScore: r.match.awayScore as number,
-            homeCrest: (r.match.homeClubId && getClub(r.match.homeClubId)?.crest) || r.match.homeCrest || undefined,
-            awayCrest: (r.match.awayClubId && getClub(r.match.awayClubId)?.crest) || r.match.awayCrest || undefined,
-            result: r.result,
-            tableLine: r.tableLine,
-          };
-        })
+        rows.map((r) => ({
+          clubName: getClub(r.clubId)?.shortName ?? "",
+          clubColor: getClub(r.clubId)?.primaryColor ?? "#3B82F6",
+          homeName: nameFor(r.match.homeClubId, r.match.homeTeamName),
+          awayName: nameFor(r.match.awayClubId, r.match.awayTeamName),
+          homeScore: r.match.homeScore as number,
+          awayScore: r.match.awayScore as number,
+          homeCrest: crestFor(r.match.homeClubId, r.match.homeCrest),
+          awayCrest: crestFor(r.match.awayClubId, r.match.awayCrest),
+          result: r.result,
+          tableLine: r.tableLine,
+        })),
+        round.kind === "weekend" ? "My weekend" : "My midweek"
       );
-      if (blob) await shareOrDownloadImage(blob, "clubside-my-matchday.png", "My matchday - via Clubside");
+      if (blob) {
+        await shareOrDownloadImage(
+          blob,
+          `clubside-my-${round.kind}.png`,
+          `${round.kind === "weekend" ? "My weekend" : "My midweek"} - via Clubside`
+        );
+      }
     } finally {
       setSharing(false);
     }
@@ -224,7 +318,7 @@ export default function MatchdayRecap() {
           <div className="mb-3 flex items-start justify-between gap-3">
             <div>
               <div className="text-[10px] font-black uppercase tracking-[0.22em] text-white/45">{title}</div>
-              <h2 className="mt-1 text-xl font-black tracking-tight">Your matchday</h2>
+              <h2 className="mt-1 text-xl font-black tracking-tight">{heading}</h2>
             </div>
             <button
               type="button"
@@ -247,7 +341,7 @@ export default function MatchdayRecap() {
                 >
                   <ClubBadge
                     name={r.match.homeTeamName}
-                    crest={homeClub?.crest ?? r.match.homeCrest ?? undefined}
+                    crest={crestFor(r.match.homeClubId, r.match.homeCrest)}
                     color={homeClub?.primaryColor ?? "#334155"}
                     size={28}
                   />
@@ -256,13 +350,14 @@ export default function MatchdayRecap() {
                   </span>
                   <ClubBadge
                     name={r.match.awayTeamName}
-                    crest={awayClub?.crest ?? r.match.awayCrest ?? undefined}
+                    crest={crestFor(r.match.awayClubId, r.match.awayCrest)}
                     color={awayClub?.primaryColor ?? "#334155"}
                     size={28}
                   />
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-black">
-                      {homeClub?.shortName ?? r.match.homeTeamName} – {awayClub?.shortName ?? r.match.awayTeamName}
+                      {nameFor(r.match.homeClubId, r.match.homeTeamName)} –{" "}
+                      {nameFor(r.match.awayClubId, r.match.awayTeamName)}
                     </div>
                     {r.tableLine && <div className="text-xs font-semibold text-white/55">{r.tableLine}</div>}
                   </div>
@@ -279,7 +374,7 @@ export default function MatchdayRecap() {
             disabled={sharing}
             className="mt-3 w-full rounded-2xl bg-white py-3 text-xs font-black uppercase tracking-wide text-[#0B0E16] active:scale-[0.98] disabled:opacity-60"
           >
-            {sharing ? "Preparing image…" : "Share my matchday"}
+            {sharing ? "Preparing image…" : `Share my ${round.kind}`}
           </button>
         </div>
       </div>

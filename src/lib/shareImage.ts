@@ -481,7 +481,11 @@ export type ShareRecapRow = {
 };
 
 /** "My matchday" card: one row per followed club's latest result (1080 wide). */
-export async function createRecapShareImage(title: string, rows: ShareRecapRow[]): Promise<Blob | null> {
+export async function createRecapShareImage(
+  title: string,
+  rows: ShareRecapRow[],
+  heading = "My matchday"
+): Promise<Blob | null> {
   if (typeof document === "undefined" || rows.length === 0) return null;
   const width = 1080;
   const rowHeight = 190;
@@ -508,7 +512,7 @@ export async function createRecapShareImage(title: string, rows: ShareRecapRow[]
   ctx.fillText(title.toUpperCase(), 80, 130);
   ctx.fillStyle = "#FFFFFF";
   ctx.font = `900 72px ${FONT}`;
-  ctx.fillText("My matchday", 80, 210);
+  ctx.fillText(heading, 80, 210);
 
   const resultColor = { W: "#22C55E", D: "#A1A1AA", L: "#EF4444" } as const;
   rows.forEach((row, i) => {
