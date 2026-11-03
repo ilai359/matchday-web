@@ -68,10 +68,12 @@ export default function TipsSummary({ matches }: { matches: FinishedInfo[] }) {
   return (
     <div className="mt-3 inline-flex flex-wrap items-center gap-2 rounded-full border border-white/10 bg-white/[0.08] px-3 py-1.5 text-xs font-black text-white">
       <span>🎯 {summary.points} pts</span>
-      {summary.streak > 1 && <span>🔥 {summary.streak} in a row</span>}
       <span className="font-semibold text-white/55">
-        {summary.settled}/{summary.total} tips scored
+        from {summary.settled} {summary.settled === 1 ? "game" : "games"}
+        {summary.total - summary.settled > 0 &&
+          ` · ${summary.total - summary.settled} still to play`}
       </span>
+      {summary.streak > 1 && <span>🔥 {summary.streak} in a row</span>}
     </div>
   );
 }
