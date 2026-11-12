@@ -31,6 +31,7 @@ type ClubsideNativePlugin = {
     url?: string;
   }): Promise<{ saved: boolean }>;
   haptic(options: { style: HapticStyle }): Promise<void>;
+  screensLoaded(): Promise<void>;
   shareImage(options: {
     base64?: string;
     filename?: string;
@@ -70,6 +71,19 @@ export function haptic(style: HapticStyle = "light"): void {
   if (!hasNativeFeatures()) return;
   loadPlugin()
     .then(() => plugin?.haptic({ style }))
+    .catch(() => {});
+}
+
+/**
+ * Tells the app its built-in screens started fine (app 1.2 and later). The
+ * app then looks for newer screens on the website, and if newer screens it
+ * downloaded ever fail to start, it goes back to the ones it came with.
+ */
+export function confirmScreensLoaded(): void {
+  if (typeof window === "undefined" || window.location.protocol !== "capacitor:") return;
+  if (!hasNativeFeatures()) return;
+  loadPlugin()
+    .then(() => plugin?.screensLoaded())
     .catch(() => {});
 }
 

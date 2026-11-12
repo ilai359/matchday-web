@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<title>Clubside</title>
+</head>
+<body>
+<script>
+  // Used once by the Clubside iPhone app (version 1.2) to move the clubs,
+  // tips and settings the older app saved for this website over to its
+  // built-in screens. Does nothing in a normal browser.
+  (function () {
+    var send = function (text) {
+      try { window.webkit.messageHandlers.clubsideOldData.postMessage(text); } catch (e) {}
+    };
+    try {
+      var saved = {};
+      for (var i = 0; i < localStorage.length; i++) {
+        var key = localStorage.key(i);
+        saved[key] = localStorage.getItem(key);
+      }
+      send(JSON.stringify(saved));
+    } catch (e) {
+      send("{}");
+    }
+  })();
+</script>
+</body>
+</html>

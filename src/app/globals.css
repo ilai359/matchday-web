@@ -50,3 +50,9 @@ html.native-app img {
 html.native-app img {
   -webkit-user-drag: none;
 }
+
+/* iPhone app 1.2: hidden for the moment the older app's saved data is
+   moved over on first start (see the script in layout.tsx). */
+html.moving-data body {
+  visibility: hidden;
+}

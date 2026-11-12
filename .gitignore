@@ -46,3 +46,7 @@ ios/App/Pods/
 ios/App/build/
 ios/App/DerivedData/
 ios/.xcode.env.local
+
+# The iPhone app's screens, built during every deploy (scripts/build-app-bundle.mjs)
+/public/app-bundle/
+/out-app/

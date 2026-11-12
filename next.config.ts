@@ -35,6 +35,27 @@ const nextConfig: NextConfig = {
   // back-and-forth (the original complaint), while keeping that window
   // short enough that it's never the reason a score or match status
   // looks wrong.
+  // The iPhone app (version 1.2 and later) has Clubside's screens built in
+  // and runs them from "capacitor://localhost" - this lets those screens
+  // read the API's answers. The app downloads its newest screens from
+  // /app-bundle/ (see scripts/build-app-bundle.mjs).
+  async headers() {
+    return [
+      {
+        source: "/api/:path*",
+        headers: [
+          { key: "Access-Control-Allow-Origin", value: "capacitor://localhost" },
+          { key: "Access-Control-Allow-Methods", value: "GET, POST, OPTIONS" },
+          { key: "Access-Control-Allow-Headers", value: "Content-Type" },
+          { key: "Access-Control-Max-Age", value: "86400" },
+        ],
+      },
+      {
+        source: "/app-bundle/manifest.json",
+        headers: [{ key: "Cache-Control", value: "no-cache" }],
+      },
+    ];
+  },
   experimental: {
     staleTimes: {
       dynamic: 20,

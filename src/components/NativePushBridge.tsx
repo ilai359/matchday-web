@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { isNativePushApp, refreshNativePushToken } from "../lib/pushClient";
 import { haptic } from "../lib/nativeApp";
+import { toAppPath } from "../lib/appLinks";
 
 // iPhone app only (a no-op in browsers): when someone taps a goal/kickoff
 // notification, open the match it's about - the server puts that page's
@@ -37,7 +38,7 @@ export default function NativePushBridge() {
           const url = action.notification?.data?.url;
           // Only ever navigate within the app itself.
           if (typeof url === "string" && url.startsWith("/")) {
-            router.push(url);
+            router.push(toAppPath(url));
           }
         })
       )

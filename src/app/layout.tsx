@@ -1,21 +1,19 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { GeistSans } from "geist/font/sans";
+import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 import { ClubsProvider } from "../context/ClubsContext";
 import { ThemeProvider } from "../context/ThemeContext";
 import Navigation from "../components/Navigation";
 import ServiceWorkerRegister from "../components/ServiceWorkerRegister";
 import NativePushBridge from "../components/NativePushBridge";
+import AppScreensReady from "../components/AppScreensReady";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+// The Geist font files come with the app's own code (the "geist" package)
+// rather than from Google Fonts, so the iPhone app's built-in screens have
+// them without the internet.
+const geistSans = GeistSans;
+const geistMono = GeistMono;
 
 const SITE_URL = "https://matchday-web-zeta.vercel.app";
 const CLUBSIDE_DESCRIPTION =
@@ -104,6 +102,65 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
                   }
                 }
               } catch (e) {}
+              // iPhone app 1.2 and later: the screens are stored on the
+              // phone (capacitor://localhost), but the API stays on the
+              // website - send every /api/ request there.
+              try {
+                if (location.protocol === "capacitor:") {
+                  var SITE = "https://matchday-web-zeta.vercel.app";
+                  var nativeFetch = window.fetch.bind(window);
+                  window.fetch = function (input, init) {
+                    try {
+                      if (typeof input === "string" && input.indexOf("/api/") === 0) {
+                        input = SITE + input;
+                        // Sent as plain text, iOS skips an extra permission
+                        // check before each POST - the API reads the JSON
+                        // body the same either way.
+                        if (init && init.body && init.headers) {
+                          var h = new Headers(init.headers);
+                          if ((h.get("content-type") || "").indexOf("application/json") === 0) {
+                            h.set("content-type", "text/plain;charset=UTF-8");
+                            init = Object.assign({}, init, { headers: h });
+                          }
+                        }
+                      }
+                    } catch (e) {}
+                    return nativeFetch(input, init);
+                  };
+                }
+              } catch (e) {}
+              // First start of app 1.2: clubs, tips and settings saved by
+              // the older app (which loaded the website) are moved over
+              // once. The screen stays hidden for that second.
+              try {
+                if (location.protocol === "capacitor:" && !localStorage.getItem("clubside-data-moved")) {
+                  var cap = window.Capacitor;
+                  if (cap && cap.nativePromise) {
+                    var root = document.documentElement;
+                    var show = function () { root.classList.remove("moving-data"); };
+                    root.classList.add("moving-data");
+                    var safety = setTimeout(show, 8000);
+                    cap.nativePromise("ClubsideNative", "getOldAppData", {}).then(function (r) {
+                      clearTimeout(safety);
+                      if (!r || !r.checked) { show(); return; }
+                      var old = {};
+                      try { old = JSON.parse(r.json || "{}") || {}; } catch (e) {}
+                      // The older app's data wins: anything here is only
+                      // from the last few seconds of this very first start.
+                      var moved = 0;
+                      for (var k in old) {
+                        if (Object.prototype.hasOwnProperty.call(old, k)) {
+                          localStorage.setItem(k, String(old[k]));
+                          moved++;
+                        }
+                      }
+                      localStorage.setItem("clubside-data-moved", "1");
+                      if (moved > 0) location.replace("/");
+                      else show();
+                    }, function () { clearTimeout(safety); show(); });
+                  }
+                }
+              } catch (e) {}
             `,
           }}
         />
@@ -113,6 +170,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         />
         <ServiceWorkerRegister />
         <NativePushBridge />
+        <AppScreensReady />
         <ThemeProvider>
           <ClubsProvider>
             <div

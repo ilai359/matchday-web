@@ -1,5 +1,6 @@
 "use client";
 
+import { clubHref } from "../../lib/appLinks";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useTheme } from "../../context/ThemeContext";
@@ -382,7 +383,7 @@ export default function Settings() {
 
                   {bestPlaced && (
                     <Link
-                      href={`/clubs/${bestPlaced.club.id}`}
+                      href={clubHref(bestPlaced.club.id)}
                       onMouseEnter={() => prefetchClubPage(bestPlaced.club.id)}
                       onTouchStart={() => prefetchClubPage(bestPlaced.club.id)}
                       className="flex items-center gap-3 border-t border-zinc-100 px-5 py-4 dark:border-white/[0.06]"

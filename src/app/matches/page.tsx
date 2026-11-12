@@ -1,4 +1,5 @@
 "use client";
+import { matchHref } from "../../lib/appLinks";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { clubs } from "../../data/clubs";
@@ -491,7 +492,7 @@ export default function Matches() {
                           )}
                         </div>
                         <Link
-                          href={`/match/${match.id}`}
+                          href={matchHref(match.id)}
                           onClick={saveScrollPosition}
                           className="shrink-0 rounded-xl bg-[#F2F4F7] px-3 py-2 text-[11px] font-black text-zinc-600 transition hover:bg-[#E8EBF0] dark:bg-white/10 dark:text-zinc-300 dark:hover:bg-white/15"
                         >

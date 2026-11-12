@@ -1,5 +1,6 @@
 import Foundation
 import UIKit
+import WebKit
 import Capacitor
 import EventKit
 import EventKitUI
@@ -13,6 +14,9 @@ import WidgetKit
 ///   - addToCalendar: opens Apple's own "add event" sheet for a match
 ///   - haptic: a small vibration (tap, success, warning)
 ///   - shareImage: the iPhone share sheet with a match/club image
+///   - screensLoaded: the built-in screens started fine (see ScreensUpdater)
+///   - getOldAppData: the clubs, tips and settings saved by app versions up
+///     to 1.1, which loaded the website instead of built-in screens
 @objc(ClubsideNativePlugin)
 public class ClubsideNativePlugin: CAPPlugin, CAPBridgedPlugin, EKEventEditViewDelegate {
     public let identifier = "ClubsideNativePlugin"
@@ -22,7 +26,9 @@ public class ClubsideNativePlugin: CAPPlugin, CAPBridgedPlugin, EKEventEditViewD
         CAPPluginMethod(name: "getWidgetData", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "addToCalendar", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "haptic", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "shareImage", returnType: CAPPluginReturnPromise)
+        CAPPluginMethod(name: "shareImage", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "screensLoaded", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getOldAppData", returnType: CAPPluginReturnPromise)
     ]
 
     static let appGroup = "group.com.ilai.clubside"
@@ -188,6 +194,31 @@ public class ClubsideNativePlugin: CAPPlugin, CAPBridgedPlugin, EKEventEditViewD
         }
     }
 
+    // MARK: - Built-in screens
+
+    @objc func screensLoaded(_ call: CAPPluginCall) {
+        ScreensUpdater.shared.screensLoaded()
+        call.resolve()
+    }
+
+    /// App versions up to 1.1 showed the website, so everything they saved
+    /// (followed clubs, tips, settings) belongs to the website's address, not
+    /// to the built-in screens. A hidden page on the website reads it once
+    /// and hands it over. `checked` is false when that wasn't possible (no
+    /// internet) - the screens then ask again next time.
+    @objc func getOldAppData(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            let reader = OldAppDataReader { json in
+                if let json = json {
+                    call.resolve(["checked": true, "json": json])
+                } else {
+                    call.resolve(["checked": false])
+                }
+            }
+            reader.start(in: self.bridge?.viewController?.view)
+        }
+    }
+
     // MARK: - Helpers
 
     static func parseDate(_ value: String) -> Date? {
@@ -197,5 +228,66 @@ public class ClubsideNativePlugin: CAPPlugin, CAPBridgedPlugin, EKEventEditViewD
         let plain = ISO8601DateFormatter()
         plain.formatOptions = [.withInternetDateTime]
         return plain.date(from: value)
+    }
+}
+
+/// Reads what the older app saved for the website (see getOldAppData).
+final class OldAppDataReader: NSObject, WKScriptMessageHandler, WKNavigationDelegate {
+    private var webView: WKWebView?
+    private var done: ((String?) -> Void)?
+    private var keepAlive: OldAppDataReader?
+
+    init(done: @escaping (String?) -> Void) {
+        self.done = done
+        super.init()
+    }
+
+    func start(in parent: UIView?) {
+        keepAlive = self
+        let config = WKWebViewConfiguration()
+        // The same storage the older app used.
+        config.websiteDataStore = .default()
+        config.userContentController.add(self, name: "clubsideOldData")
+        let view = WKWebView(frame: CGRect(x: 0, y: 0, width: 1, height: 1), configuration: config)
+        view.alpha = 0
+        view.isUserInteractionEnabled = false
+        view.navigationDelegate = self
+        parent?.addSubview(view)
+        webView = view
+
+        guard let url = URL(string: ClubsideViewController.siteURL + "/app-migrate.html") else {
+            finish(nil)
+            return
+        }
+        var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.timeoutInterval = 6
+        view.load(request)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 7) { [weak self] in
+            self?.finish(nil)
+        }
+    }
+
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        finish((message.body as? String) ?? "{}")
+    }
+
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        finish(nil)
+    }
+
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        finish(nil)
+    }
+
+    private func finish(_ json: String?) {
+        guard let done = done else { return }
+        self.done = nil
+        webView?.configuration.userContentController.removeScriptMessageHandler(forName: "clubsideOldData")
+        webView?.stopLoading()
+        webView?.removeFromSuperview()
+        webView = nil
+        done(json)
+        keepAlive = nil
     }
 }

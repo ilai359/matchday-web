@@ -1,5 +1,6 @@
 "use client";
 
+import { matchHref } from "../lib/appLinks";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useClubs } from "../context/ClubsContext";
@@ -336,7 +337,7 @@ export default function MatchdayRecap() {
               return (
                 <Link
                   key={r.match.id}
-                  href={`/match/${r.match.id}`}
+                  href={matchHref(r.match.id)}
                   className="flex items-center gap-3 rounded-2xl bg-white/[0.06] px-3 py-2.5"
                 >
                   <ClubBadge

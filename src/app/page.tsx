@@ -1,5 +1,6 @@
 "use client";
 
+import { matchHref } from "../lib/appLinks";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
@@ -350,7 +351,7 @@ export default function Home() {
                     </span>
                   </div>
                   <Link
-                    href={`/match/${nextMatch.id}`}
+                    href={matchHref(nextMatch.id)}
                     className="shrink-0 rounded-xl bg-white/10 px-3 py-2 text-xs font-bold text-white/80 transition hover:bg-white/15"
                   >
                     Details
@@ -394,7 +395,7 @@ export default function Home() {
                 return (
                   <Link
                     key={match.id}
-                    href={`/match/${match.id}`}
+                    href={matchHref(match.id)}
                     className="relative block overflow-hidden rounded-[22px] border border-black/[0.045] bg-white p-3.5 shadow-[0_5px_20px_rgba(0,0,0,0.035)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_30px_rgba(0,0,0,0.07)] dark:border-white/[0.06] dark:bg-[#14171F] dark:shadow-none"
                   >
                     <div

@@ -1,5 +1,6 @@
 "use client";
 
+import { matchHref } from "../../../lib/appLinks";
 import { useEffect, useState } from "react";
 import { useNow } from "../../../lib/useNow";
 import Link from "next/link";
@@ -632,7 +633,7 @@ export default function ClubDetailClient({ id }: { id: string }) {
                 return (
                   <Link
                     key={m.id}
-                    href={`/match/${m.id}`}
+                    href={matchHref(m.id)}
                     className="flex items-center gap-3 rounded-2xl border border-black/[0.045] bg-white px-3.5 py-3 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md dark:border-white/[0.06] dark:bg-[#14171F] dark:shadow-none"
                   >
                     <ClubBadge name={opp.name} crest={opp.crest} color={opp.color} size={36} />

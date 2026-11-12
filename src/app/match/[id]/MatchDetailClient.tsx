@@ -1,5 +1,6 @@
 "use client";
 
+import { clubHref } from "../../../lib/appLinks";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
@@ -904,7 +905,7 @@ export default function MatchDetailClient({ id }: { id: string }) {
               <div className="min-w-0 text-center">
                 {isHomeFollowed && displayMatch.homeClubId ? (
                   <Link
-                    href={`/clubs/${displayMatch.homeClubId}`}
+                    href={clubHref(displayMatch.homeClubId)}
                     onMouseEnter={() => prefetchClubPage(displayMatch.homeClubId!)}
                     onTouchStart={() => prefetchClubPage(displayMatch.homeClubId!)}
                     className="block"
@@ -995,7 +996,7 @@ export default function MatchDetailClient({ id }: { id: string }) {
               <div className="min-w-0 text-center">
                 {isAwayFollowed && displayMatch.awayClubId ? (
                   <Link
-                    href={`/clubs/${displayMatch.awayClubId}`}
+                    href={clubHref(displayMatch.awayClubId)}
                     onMouseEnter={() => prefetchClubPage(displayMatch.awayClubId!)}
                     onTouchStart={() => prefetchClubPage(displayMatch.awayClubId!)}
                     className="block"

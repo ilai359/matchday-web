@@ -1,5 +1,6 @@
 "use client";
 
+import { clubHref } from "../lib/appLinks";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
@@ -352,7 +353,7 @@ function ClubStatsCard({
   return (
     <div className="overflow-hidden rounded-[28px] bg-white shadow-[0_10px_30px_rgba(0,0,0,0.06)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_45px_rgba(0,0,0,0.1)] dark:bg-[#14171F] dark:shadow-none">
       <Link
-        href={`/clubs/${club.id}`}
+        href={clubHref(club.id)}
         onMouseEnter={() => prefetchClubPage(club.id)}
         onTouchStart={() => prefetchClubPage(club.id)}
         className="relative block overflow-hidden p-3.5 text-white transition hover:brightness-[1.08] active:brightness-95"

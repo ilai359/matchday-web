@@ -1,4 +1,5 @@
 import { haptic, shareImageNatively } from "./nativeApp";
+import { IS_APP_BUNDLE, apiUrl } from "./appLinks";
 
 // Generates shareable PNGs for a match result/fixture and for a club's
 // stats - something someone can post to a story, a group chat, or a
@@ -85,12 +86,17 @@ function truncate(text: string, maxChars: number): string {
 const CREST_OPTIMIZE_WIDTH = 384;
 
 function optimizedCrestUrl(src: string): string {
+  // The iPhone app's built-in screens have no image optimizer of their own:
+  // crests come through the website's crest route instead, which allows
+  // the app to draw them (see src/app/api/crest/route.ts).
+  if (IS_APP_BUNDLE) return apiUrl(`/api/crest?url=${encodeURIComponent(src)}`);
   return `/_next/image?url=${encodeURIComponent(src)}&w=${CREST_OPTIMIZE_WIDTH}&q=75`;
 }
 
 function loadImage(src: string): Promise<HTMLImageElement | null> {
   return new Promise((resolve) => {
     const img = new Image();
+    if (IS_APP_BUNDLE) img.crossOrigin = "anonymous";
     img.onload = () => resolve(img);
     img.onerror = () => resolve(null);
     img.src = optimizedCrestUrl(src);
